@@ -23,6 +23,9 @@
   "dependencies": {
     "@medusajs/admin-sdk": "2.12.1",
     "@medusajs/admin-shared": "2.12.1",
+    "@medusajs/icons": "2.12.1",
+    "@medusajs/js-sdk": "2.12.1",
+    "@medusajs/ui": "4.0.29",
     "@medusajs/cli": "2.12.1",
     "@medusajs/dashboard": "2.12.1",
     "@medusajs/draft-order": "2.12.1",
@@ -40,6 +43,7 @@
   },
   "devDependencies": {
     "@medusajs/test-utils": "2.12.1",
+    "@tanstack/react-query": "5.64.2",
     "@react-email/preview-server": "^5.1.0",
     "@swc/core": "1.5.7",
     "@swc/jest": "^0.2.39",
@@ -51,6 +55,7 @@
     "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "6.20.1",
     "react-email": "^5.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",

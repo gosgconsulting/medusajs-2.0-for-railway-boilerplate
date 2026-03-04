@@ -1,0 +1,733 @@
+import React, { useCallback, useEffect, useRef, useState } from "react"
+import {
+  Link,
+  useLoaderData,
+  useParams,
+  type LoaderFunctionArgs,
+} from "react-router-dom"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  Badge,
+  Button,
+  Container,
+  Heading,
+  IconButton,
+  Input,
+  Label,
+  Switch,
+  Text,
+  toast,
+  Tooltip,
+} from "@medusajs/ui"
+import { ThumbnailBadge, Trash } from "@medusajs/icons"
+import { sdk } from "../../../../lib/sdk"
+
+const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
+
+type LoaderData = Awaited<ReturnType<typeof loader>>
+
+async function loader({ params }: LoaderFunctionArgs) {
+  const { id } = params
+  if (!id) {
+    throw new Response("Not found", { status: 404 })
+  }
+  try {
+    const { product } = await sdk.admin.product.retrieve(id)
+    return { product }
+  } catch {
+    throw new Response("Product not found", { status: 404 })
+  }
+}
+
+function getProductFromData(data: LoaderData | undefined) {
+  return data?.product
+}
+
+const ProductEditPage = () => {
+  const loaderData = useLoaderData() as LoaderData | undefined
+  const { id } = useParams<{ id: string }>()
+  const productFromLoader = getProductFromData(loaderData)
+
+  const queryClient = useQueryClient()
+  const { data: fetchedProduct, isLoading: isLoadingProduct } = useQuery({
+    queryKey: ["admin-product", id],
+    queryFn: () => sdk.admin.product.retrieve(id!).then((r) => r.product),
+    enabled: Boolean(id) && !productFromLoader,
+  })
+
+  const initialProduct = productFromLoader ?? fetchedProduct
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [updatingMedia, setUpdatingMedia] = useState(false)
+
+  const [title, setTitle] = useState(initialProduct?.title ?? "")
+  const [subtitle, setSubtitle] = useState(initialProduct?.subtitle ?? "")
+  const [description, setDescription] = useState(
+    initialProduct?.description ?? ""
+  )
+  const [status, setStatus] = useState(initialProduct?.status ?? "draft")
+  const [handle, setHandle] = useState(initialProduct?.handle ?? "")
+  const [tagsInput, setTagsInput] = useState(
+    (initialProduct?.tags ?? [])
+      .map((t: { value?: string }) => (typeof t === "object" && t?.value) || t)
+      .filter(Boolean)
+      .join(", ")
+  )
+  const [material, setMaterial] = useState(initialProduct?.material ?? "")
+  const [discountable, setDiscountable] = useState(
+    initialProduct?.discountable ?? true
+  )
+  const [thumbnail, setThumbnail] = useState(initialProduct?.thumbnail ?? "")
+  const [weight, setWeight] = useState(
+    initialProduct?.weight != null ? String(initialProduct.weight) : ""
+  )
+  const [width, setWidth] = useState(
+    initialProduct?.width != null ? String(initialProduct.width) : ""
+  )
+  const [height, setHeight] = useState(
+    initialProduct?.height != null ? String(initialProduct.height) : ""
+  )
+  const [length, setLength] = useState(
+    initialProduct?.length != null ? String(initialProduct.length) : ""
+  )
+  const [originCountry, setOriginCountry] = useState(
+    initialProduct?.origin_country ?? ""
+  )
+  const [midCode, setMidCode] = useState(initialProduct?.mid_code ?? "")
+  const [hsCode, setHsCode] = useState(initialProduct?.hs_code ?? "")
+  const [externalId, setExternalId] = useState(initialProduct?.external_id ?? "")
+  const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<"success" | "error" | null>(
+    null
+  )
+
+  useEffect(() => {
+    if (!initialProduct) return
+    setTitle(initialProduct.title ?? "")
+    setSubtitle(initialProduct.subtitle ?? "")
+    setDescription(initialProduct.description ?? "")
+    setStatus(initialProduct.status ?? "draft")
+    setHandle(initialProduct.handle ?? "")
+    setTagsInput(
+      (initialProduct.tags ?? [])
+        .map((t: { value?: string }) => (typeof t === "object" && t?.value) || t)
+        .filter(Boolean)
+        .join(", ")
+    )
+    setMaterial(initialProduct.material ?? "")
+    setDiscountable(initialProduct.discountable ?? true)
+    setThumbnail(initialProduct.thumbnail ?? "")
+    setWeight(
+      initialProduct.weight != null ? String(initialProduct.weight) : ""
+    )
+    setWidth(initialProduct.width != null ? String(initialProduct.width) : "")
+    setHeight(initialProduct.height != null ? String(initialProduct.height) : "")
+    setLength(initialProduct.length != null ? String(initialProduct.length) : "")
+    setOriginCountry(initialProduct.origin_country ?? "")
+    setMidCode(initialProduct.mid_code ?? "")
+    setHsCode(initialProduct.hs_code ?? "")
+    setExternalId(initialProduct.external_id ?? "")
+  }, [initialProduct])
+
+  const handleSave = useCallback(async () => {
+    if (!id) return
+    setSaving(true)
+    setSaveMessage(null)
+    try {
+      const tags = tagsInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const num = (v: string) => (v === "" ? undefined : Number(v))
+      await sdk.admin.product.update(id, {
+        title: title || undefined,
+        subtitle: subtitle || undefined,
+        description: description || undefined,
+        status: status as "draft" | "published",
+        handle: handle || undefined,
+        material: material || undefined,
+        discountable,
+        thumbnail: thumbnail || undefined,
+        weight: num(weight),
+        width: num(width),
+        height: num(height),
+        length: num(length),
+        origin_country: originCountry || undefined,
+        mid_code: midCode || undefined,
+        hs_code: hsCode || undefined,
+        external_id: externalId || undefined,
+        ...(tags.length > 0 && { tags: tags.map((value) => ({ value })) }),
+      } as Parameters<typeof sdk.admin.product.update>[1])
+      setSaveMessage("success")
+      toast.success("Product saved")
+    } catch {
+      setSaveMessage("error")
+      toast.error("Failed to save product")
+    } finally {
+      setSaving(false)
+    }
+  }, [
+    id,
+    title,
+    subtitle,
+    description,
+    status,
+    handle,
+    tagsInput,
+    material,
+    discountable,
+    thumbnail,
+    weight,
+    width,
+    height,
+    length,
+    originCountry,
+    midCode,
+    hsCode,
+    externalId,
+  ])
+
+  const refetchProduct = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["admin-product", id] })
+  }, [queryClient, id])
+
+  const handleUploadImages = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!id || !files?.length) return
+      setUploading(true)
+      try {
+        const { files: uploaded } = await sdk.admin.upload.create({
+          files: Array.from(files),
+        })
+        if (!uploaded?.length) {
+          toast.error("Upload failed")
+          return
+        }
+        const currentImages = (initialProduct?.images ?? []).map(
+          (i: { id?: string; url?: string }) => ({ id: i.id, url: i.url })
+        )
+        const newImages = [
+          ...currentImages,
+          ...uploaded.map((f: { url?: string }) => ({ url: f.url })),
+        ]
+        await sdk.admin.product.update(id, {
+          images: newImages,
+        } as Parameters<typeof sdk.admin.product.update>[1])
+        toast.success("Images added")
+        refetchProduct()
+      } catch (err) {
+        toast.error("Failed to upload images")
+      } finally {
+        setUploading(false)
+        e.target.value = ""
+      }
+    },
+    [id, initialProduct?.images, refetchProduct]
+  )
+
+  const handleDeleteImage = useCallback(
+    async (imageId: string, imageUrl: string) => {
+      if (!id) return
+      setUpdatingMedia(true)
+      try {
+        const currentImages = (initialProduct?.images ?? []).map(
+          (i: { id?: string; url?: string }) => ({ id: i.id, url: i.url })
+        )
+        const mediaToKeep = currentImages.filter((i: { id?: string }) => i.id !== imageId)
+        const wasThumbnail = initialProduct?.thumbnail === imageUrl
+        await sdk.admin.product.update(id, {
+          images: mediaToKeep,
+          ...(wasThumbnail && { thumbnail: "" }),
+        } as Parameters<typeof sdk.admin.product.update>[1])
+        toast.success("Image removed")
+        refetchProduct()
+      } catch {
+        toast.error("Failed to remove image")
+      } finally {
+        setUpdatingMedia(false)
+      }
+    },
+    [id, initialProduct?.images, initialProduct?.thumbnail, refetchProduct]
+  )
+
+  const handleSetAsThumbnail = useCallback(
+    async (imageUrl: string) => {
+      if (!id) return
+      setUpdatingMedia(true)
+      try {
+        await sdk.admin.product.update(id, {
+          thumbnail: imageUrl,
+        } as Parameters<typeof sdk.admin.product.update>[1])
+        setThumbnail(imageUrl)
+        toast.success("Thumbnail updated")
+        refetchProduct()
+      } catch {
+        toast.error("Failed to set thumbnail")
+      } finally {
+        setUpdatingMedia(false)
+      }
+    },
+    [id, refetchProduct]
+  )
+
+  const isLoading = Boolean(id) && !initialProduct && isLoadingProduct
+  const isNotFound = !id || (Boolean(id) && !initialProduct && !isLoadingProduct)
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Text className="text-ui-fg-muted">Loading product…</Text>
+      </div>
+    )
+  }
+
+  if (isNotFound) {
+    return (
+      <div className="flex flex-col gap-4 p-8">
+        <Text className="text-ui-fg-muted">Product not found.</Text>
+        <Link to="/products">
+          <Button variant="secondary">Back to products</Button>
+        </Link>
+      </div>
+    )
+  }
+
+  const product = initialProduct!
+  const images = product.images ?? []
+  const variants = product.variants ?? []
+  const options = product.options ?? []
+
+  return (
+    <div className="flex flex-col gap-6 pb-8">
+      {/* Header: breadcrumb + Save + status */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-ui-fg-subtle txt-small">
+          <Link to="/products" className="hover:text-ui-fg-base">
+            Products
+          </Link>
+          <span>/</span>
+          <span className="text-ui-fg-base truncate max-w-[200px]">
+            {title || "Edit product"}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {saveMessage === "success" && (
+            <Text size="small" className="text-ui-fg-success">
+              Saved
+            </Text>
+          )}
+          {saveMessage === "error" && (
+            <Text size="small" className="text-ui-fg-error">
+              Save failed
+            </Text>
+          )}
+          <Badge color={status === "published" ? "green" : "grey"}>
+            {status === "published" ? "Published" : "Draft"}
+          </Badge>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
+        {/* Main column */}
+        <div className="flex flex-col gap-6">
+          {/* Media */}
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div>
+                <Heading level="h2">Media</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Upload, delete, or set thumbnail. Drag order in default product view.
+                </Text>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPT_IMAGES}
+                multiple
+                className="hidden"
+                onChange={handleUploadImages}
+              />
+              <Button
+                size="small"
+                variant="secondary"
+                disabled={uploading || updatingMedia}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading ? "Uploading…" : "Upload images"}
+              </Button>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-4">
+              {images.length > 0 ? (
+                <div className="flex flex-wrap gap-4">
+                  {images.map((img: { id?: string; url?: string }) => {
+                    const isCurrentThumbnail = (product?.thumbnail ?? thumbnail) === img.url
+                    return (
+                      <div
+                        key={img.id ?? img.url}
+                        className="relative w-28 rounded-lg border border-ui-border-base overflow-hidden bg-ui-bg-subtle group"
+                      >
+                        <img
+                          src={img.url}
+                          alt=""
+                          className="w-full aspect-square object-cover"
+                        />
+                        {isCurrentThumbnail && (
+                          <span className="absolute left-1 top-1 rounded bg-ui-bg-base px-1.5 py-0.5 txt-small font-medium">
+                            Thumbnail
+                          </span>
+                        )}
+                        <div className="flex items-center justify-end gap-1 p-1.5 bg-ui-bg-base border-t border-ui-border-base">
+                          {!isCurrentThumbnail && (
+                            <Tooltip content="Set as thumbnail">
+                              <IconButton
+                                size="small"
+                                variant="transparent"
+                                disabled={updatingMedia}
+                                onClick={() => handleSetAsThumbnail(img.url ?? "")}
+                                type="button"
+                              >
+                                <ThumbnailBadge />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip content="Remove image">
+                            <IconButton
+                              size="small"
+                              variant="transparent"
+                              className="text-ui-fg-error"
+                              disabled={updatingMedia}
+                              onClick={() => handleDeleteImage(img.id!, img.url ?? "")}
+                              type="button"
+                            >
+                              <Trash />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Text size="small" className="text-ui-fg-muted">
+                    No images yet. Click «Upload images» to add some.
+                  </Text>
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {uploading ? "Uploading…" : "Upload images"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Container>
+
+          {/* Title & description */}
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4">
+              <Heading level="h2">Title and description</Heading>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-title">Title</Label>
+                <Input
+                  id="product-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Product name"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-subtitle">Subtitle</Label>
+                <Input
+                  id="product-subtitle"
+                  value={subtitle}
+                  onChange={(e) => setSubtitle(e.target.value)}
+                  placeholder="Short tagline or subtitle"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-description">Description</Label>
+                <textarea
+                  id="product-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe your product"
+                  rows={5}
+                  className="flex w-full rounded-md border border-ui-border-base bg-ui-bg-field shadow-buttons-neutral placeholder:text-ui-fg-muted focus:border-ui-border-interactive focus:outline-none px-3 py-2 txt-small"
+                />
+              </div>
+            </div>
+          </Container>
+
+          {/* Variants */}
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div>
+                <Heading level="h2">Variants</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Options and variant details. Click Edit to change title, SKU, prices, and inventory.
+                </Text>
+              </div>
+              <Link to={`/products/${id}/variants/new`}>
+                <Button size="small" variant="secondary">
+                  Add variant
+                </Button>
+              </Link>
+            </div>
+            <div className="px-6 py-4">
+              {options.length > 0 && (
+                <div className="mb-3">
+                  <Text size="small" className="text-ui-fg-muted">
+                    Options:{" "}
+                    {options
+                      .map((o: { title?: string; values?: Array<{ value?: string } | string> }) =>
+                        `${o.title} (${(o.values ?? []).map((val) => (typeof val === "object" && val?.value) || val).join(", ")})`
+                      )
+                      .join(" · ")}
+                  </Text>
+                </div>
+              )}
+              {variants.length > 0 ? (
+                <ul className="divide-y divide-ui-border-base">
+                  {variants.map((v) => (
+                      <li
+                        key={v.id}
+                        className="flex items-center justify-between gap-4 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <Text size="small" weight="plus" className="block truncate">
+                            {v.title ?? v.id}
+                          </Text>
+                          {v.sku && (
+                            <Text size="small" className="text-ui-fg-muted">
+                              SKU: {v.sku}
+                            </Text>
+                          )}
+                        </div>
+                        <Link to={`/products/${id}/variants/${v.id}`}>
+                          <Button size="small" variant="secondary">
+                            Edit
+                          </Button>
+                        </Link>
+                      </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <Text size="small" className="text-ui-fg-muted">
+                    No variants yet.
+                  </Text>
+                  <Link to={`/products/${id}/variants/new`}>
+                    <Button size="small" variant="secondary">
+                      Add variant
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </Container>
+        </div>
+
+        {/* Sidebar */}
+        <div className="flex flex-col gap-6">
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4">
+              <Heading level="h2">Status</Heading>
+            </div>
+            <div className="px-6 py-4">
+              <div className="flex flex-col gap-2">
+                <Label>Status</Label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as "draft" | "published")}
+                  className="flex h-8 w-full rounded-md border border-ui-border-base bg-ui-bg-field px-3 py-1.5 txt-small focus:border-ui-border-interactive focus:outline-none"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+            </div>
+          </Container>
+
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4">
+              <Heading level="h2">Organization</Heading>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-handle">Handle (URL)</Label>
+                <Input
+                  id="product-handle"
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  placeholder="product-handle"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-tags">Tags</Label>
+                <Input
+                  id="product-tags"
+                  value={tagsInput}
+                  onChange={(e) => setTagsInput(e.target.value)}
+                  placeholder="tag1, tag2"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-material">Material</Label>
+                <Input
+                  id="product-material"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  placeholder="e.g. Cotton, Polyester"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="product-discountable">Discountable</Label>
+                <Switch
+                  id="product-discountable"
+                  checked={discountable}
+                  onCheckedChange={setDiscountable}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-external-id">External ID</Label>
+                <Input
+                  id="product-external-id"
+                  value={externalId}
+                  onChange={(e) => setExternalId(e.target.value)}
+                  placeholder="e.g. ERP or external system ID"
+                />
+              </div>
+              <div className="border-t border-ui-border-base pt-4 flex flex-col gap-2">
+                <Text size="small" weight="plus" className="text-ui-fg-subtle">
+                  More in default view
+                </Text>
+                <Text size="small" className="text-ui-fg-muted">
+                  Categories, collection, shipping profile and inventory are managed in the default product view.
+                </Text>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <Link to={`/products/${id}/organization`}>
+                    <Button size="small" variant="secondary">
+                      Categories & collection
+                    </Button>
+                  </Link>
+                  <Link to={`/products/${id}/shipping-profile`}>
+                    <Button size="small" variant="secondary">
+                      Shipping profile
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </Container>
+
+          {/* Attributes: dimensions & customs */}
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4">
+              <Heading level="h2">Attributes</Heading>
+              <Text size="small" className="text-ui-fg-subtle mt-1">
+                Weight, dimensions, and customs codes
+              </Text>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="product-weight">Weight (g)</Label>
+                  <Input
+                    id="product-weight"
+                    type="number"
+                    min={0}
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="product-origin">Origin country</Label>
+                  <Input
+                    id="product-origin"
+                    value={originCountry}
+                    onChange={(e) => setOriginCountry(e.target.value)}
+                    placeholder="e.g. US"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="product-width">Width (mm)</Label>
+                  <Input
+                    id="product-width"
+                    type="number"
+                    min={0}
+                    value={width}
+                    onChange={(e) => setWidth(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="product-height">Height (mm)</Label>
+                  <Input
+                    id="product-height"
+                    type="number"
+                    min={0}
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="product-length">Length (mm)</Label>
+                  <Input
+                    id="product-length"
+                    type="number"
+                    min={0}
+                    value={length}
+                    onChange={(e) => setLength(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="product-mid">MID code</Label>
+                  <Input
+                    id="product-mid"
+                    value={midCode}
+                    onChange={(e) => setMidCode(e.target.value)}
+                    placeholder=""
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="product-hs">HS code</Label>
+                  <Input
+                    id="product-hs"
+                    value={hsCode}
+                    onChange={(e) => setHsCode(e.target.value)}
+                    placeholder=""
+                  />
+                </div>
+              </div>
+            </div>
+          </Container>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export { loader }
+export default ProductEditPage
+
+export const handle = {
+  breadcrumb: ({ data }: { data?: LoaderData }) =>
+    data?.product?.title ?? "Edit product",
+}
