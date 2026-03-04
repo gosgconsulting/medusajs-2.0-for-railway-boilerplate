@@ -477,7 +477,7 @@ const ProductEditPage = () => {
                   Options and variant details. Click Edit to change title, SKU, prices, and inventory.
                 </Text>
               </div>
-              <Link to={`/products/${id}/variants/new`}>
+              <Link to={`/products/${id}/variants/create`}>
                 <Button size="small" variant="secondary">
                   Add variant
                 </Button>
@@ -526,7 +526,7 @@ const ProductEditPage = () => {
                   <Text size="small" className="text-ui-fg-muted">
                     No variants yet.
                   </Text>
-                  <Link to={`/products/${id}/variants/new`}>
+                  <Link to={`/products/${id}/variants/create`}>
                     <Button size="small" variant="secondary">
                       Add variant
                     </Button>
