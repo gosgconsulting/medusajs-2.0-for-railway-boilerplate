@@ -19,7 +19,7 @@ import {
   toast,
   Tooltip,
 } from "@medusajs/ui"
-import { ThumbnailBadge, Trash } from "@medusajs/icons"
+import { ChevronLeft, ThumbnailBadge, Trash } from "@medusajs/icons"
 import { sdk } from "../../../../lib/sdk"
 
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
@@ -96,6 +96,21 @@ const ProductEditPage = () => {
   const [midCode, setMidCode] = useState(initialProduct?.mid_code ?? "")
   const [hsCode, setHsCode] = useState(initialProduct?.hs_code ?? "")
   const [externalId, setExternalId] = useState(initialProduct?.external_id ?? "")
+  const [optionsState, setOptionsState] = useState<
+    { id: string; title: string; valuesStr: string }[]
+  >(
+    (initialProduct?.options ?? []).map(
+      (o: { id?: string; title?: string; values?: Array<{ value?: string } | string> }) => ({
+        id: o.id ?? "",
+        title: o.title ?? "",
+        valuesStr: (o.values ?? [])
+          .map((v) => (typeof v === "object" && v?.value) || v)
+          .filter(Boolean)
+          .join(", "),
+      })
+    )
+  )
+  const [savingOptions, setSavingOptions] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<"success" | "error" | null>(
     null
@@ -127,6 +142,18 @@ const ProductEditPage = () => {
     setMidCode(initialProduct.mid_code ?? "")
     setHsCode(initialProduct.hs_code ?? "")
     setExternalId(initialProduct.external_id ?? "")
+    setOptionsState(
+      (initialProduct.options ?? []).map(
+        (o: { id?: string; title?: string; values?: Array<{ value?: string } | string> }) => ({
+          id: o.id ?? "",
+          title: o.title ?? "",
+          valuesStr: (o.values ?? [])
+            .map((v) => (typeof v === "object" && v?.value) || v)
+            .filter(Boolean)
+            .join(", "),
+        })
+      )
+    )
   }, [initialProduct])
 
   const handleSave = useCallback(async () => {
@@ -271,6 +298,41 @@ const ProductEditPage = () => {
     [id, refetchProduct]
   )
 
+  const handleSaveOptions = useCallback(async () => {
+    if (!id) return
+    setSavingOptions(true)
+    try {
+      for (const opt of optionsState) {
+        if (!opt.id) continue
+        const values = opt.valuesStr
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+        await sdk.admin.product.updateOption(id, opt.id, {
+          title: opt.title || undefined,
+          values,
+        } as Parameters<typeof sdk.admin.product.updateOption>[2])
+      }
+      toast.success("Options saved")
+      refetchProduct()
+    } catch {
+      toast.error("Failed to save options")
+    } finally {
+      setSavingOptions(false)
+    }
+  }, [id, optionsState, refetchProduct])
+
+  const setOptionField = useCallback(
+    (index: number, field: "title" | "valuesStr", value: string) => {
+      setOptionsState((prev) => {
+        const next = [...prev]
+        next[index] = { ...next[index], [field]: value }
+        return next
+      })
+    },
+    []
+  )
+
   const isLoading = Boolean(id) && !initialProduct && isLoadingProduct
   const isNotFound = !id || (Boolean(id) && !initialProduct && !isLoadingProduct)
 
@@ -300,14 +362,17 @@ const ProductEditPage = () => {
 
   return (
     <div className="flex flex-col gap-6 pb-8">
-      {/* Header: breadcrumb + Save + status */}
+      {/* Header: back + breadcrumb + Save + status */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-ui-fg-subtle txt-small">
-          <Link to="/products" className="hover:text-ui-fg-base">
-            Products
+        <div className="flex items-center gap-3">
+          <Link to={`/products/${id}`}>
+            <Button variant="transparent" size="small" className="!p-0 gap-1.5">
+              <ChevronLeft />
+              Back to products
+            </Button>
           </Link>
-          <span>/</span>
-          <span className="text-ui-fg-base truncate max-w-[200px]">
+          <span className="text-ui-fg-muted">/</span>
+          <span className="text-ui-fg-subtle txt-small truncate max-w-[200px]">
             {title || "Edit product"}
           </span>
         </div>
@@ -484,16 +549,73 @@ const ProductEditPage = () => {
               </Link>
             </div>
             <div className="px-6 py-4">
-              {options.length > 0 && (
-                <div className="mb-3">
+              {(optionsState.length > 0 || options.length > 0) && (
+                <div className="mb-6 flex flex-col gap-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <Text size="small" weight="plus" className="text-ui-fg-subtle">
+                      Product options (e.g. Size, Color). Edit below and save.
+                    </Text>
+                    <Link to={`/products/${id}/options/create`}>
+                      <Button size="small" variant="secondary">
+                        Add option
+                      </Button>
+                    </Link>
+                  </div>
+                  {optionsState.map((opt, index) => (
+                    <div
+                      key={opt.id}
+                      className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4"
+                    >
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor={`option-title-${opt.id}`}>
+                          Option name
+                        </Label>
+                        <Input
+                          id={`option-title-${opt.id}`}
+                          value={opt.title}
+                          onChange={(e) =>
+                            setOptionField(index, "title", e.target.value)
+                          }
+                          placeholder="e.g. Size, Color"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor={`option-values-${opt.id}`}>
+                          Values (comma-separated)
+                        </Label>
+                        <Input
+                          id={`option-values-${opt.id}`}
+                          value={opt.valuesStr}
+                          onChange={(e) =>
+                            setOptionField(index, "valuesStr", e.target.value)
+                          }
+                          placeholder="e.g. S, M, L or Red, Blue, Green"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {optionsState.length > 0 && (
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      disabled={savingOptions}
+                      onClick={handleSaveOptions}
+                    >
+                      {savingOptions ? "Saving options…" : "Save options"}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {optionsState.length === 0 && options.length === 0 && (
+                <div className="mb-6 flex flex-col gap-2">
                   <Text size="small" className="text-ui-fg-muted">
-                    Options:{" "}
-                    {options
-                      .map((o: { title?: string; values?: Array<{ value?: string } | string> }) =>
-                        `${o.title} (${(o.values ?? []).map((val) => (typeof val === "object" && val?.value) || val).join(", ")})`
-                      )
-                      .join(" · ")}
+                    No options yet. Add options like Size or Color to create variants.
                   </Text>
+                  <Link to={`/products/${id}/options/create`}>
+                    <Button size="small" variant="secondary">
+                      Add option
+                    </Button>
+                  </Link>
                 </div>
               )}
               {variants.length > 0 ? (
