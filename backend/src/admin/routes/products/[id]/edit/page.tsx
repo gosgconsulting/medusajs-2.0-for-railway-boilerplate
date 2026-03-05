@@ -20,6 +20,7 @@ import {
   Tooltip,
 } from "@medusajs/ui"
 import { ChevronLeft, ThumbnailBadge, Trash } from "@medusajs/icons"
+import { SimpleMarkdownEditor } from "../../../../components/SimpleMarkdownEditor"
 import { sdk } from "../../../../lib/sdk"
 
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
@@ -520,14 +521,13 @@ const ProductEditPage = () => {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="product-description">Description</Label>
-                <textarea
+                <Label htmlFor="product-description">Description (Markdown)</Label>
+                <SimpleMarkdownEditor
                   id="product-description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe your product"
-                  rows={5}
-                  className="flex w-full rounded-md border border-ui-border-base bg-ui-bg-field shadow-buttons-neutral placeholder:text-ui-fg-muted focus:border-ui-border-interactive focus:outline-none px-3 py-2 txt-small"
+                  onChange={setDescription}
+                  placeholder="Describe your product. Use the toolbar for bold, italic, underline, and lists."
+                  minHeight={280}
                 />
               </div>
             </div>
