@@ -344,6 +344,25 @@ const ProductEditPage = () => {
     }
   }, [id, optionsState, refetchProduct])
 
+  const handleDeleteOption = useCallback(
+    async (optionId: string) => {
+      if (!id || !optionId) return
+      setSavingOptions(true)
+      try {
+        await sdk.admin.product.deleteOption(id, optionId)
+        toast.success("Option deleted")
+        // Remove from local state immediately for better UX
+        setOptionsState((prev) => prev.filter((o) => o.id !== optionId))
+        refetchProduct()
+      } catch {
+        toast.error("Failed to delete option")
+      } finally {
+        setSavingOptions(false)
+      }
+    },
+    [id, refetchProduct]
+  )
+
   const setOptionField = useCallback(
     (index: number, field: "title" | "valuesStr", value: string) => {
       setOptionsState((prev) => {
@@ -599,8 +618,20 @@ const ProductEditPage = () => {
                   {optionsState.map((opt, index) => (
                     <div
                       key={opt.id}
-                      className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4"
+                      className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4 relative group"
                     >
+                      <div className="absolute top-2 right-2">
+                        <IconButton
+                          size="small"
+                          variant="transparent"
+                          className="text-ui-fg-error"
+                          disabled={savingOptions}
+                          onClick={() => opt.id && handleDeleteOption(opt.id)}
+                          type="button"
+                        >
+                          <Trash />
+                        </IconButton>
+                      </div>
                       <div className="flex flex-col gap-2">
                         <Label htmlFor={`option-title-${opt.id}`}>
                           Option name
