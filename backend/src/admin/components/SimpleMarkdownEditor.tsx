@@ -72,7 +72,7 @@ function toggleListSimple(
   prefix: string
 ): [string, number, number] {
   const lineStart = getLineStart(value, start)
-  const lineEnd = getLineEnd(value, end)
+  const lineEnd = getLineEnd(value, start)
   const line = value.slice(lineStart, lineEnd)
   const trimmed = line.trimStart()
   const indent = line.slice(0, line.length - trimmed.length)
