@@ -578,34 +578,24 @@ const ProductEditPage = () => {
             </div>
           </Container>
 
-          {/* Variants */}
+          {/* Options */}
           <Container className="divide-y p-0">
             <div className="px-6 py-4 flex items-center justify-between">
               <div>
-                <Heading level="h2">Variants</Heading>
+                <Heading level="h2">Options</Heading>
                 <Text size="small" className="text-ui-fg-subtle mt-1">
-                  Options and variant details. Click Edit to change title, SKU, prices, and inventory.
+                  Product options (e.g. Size, Color). Edit below and save.
                 </Text>
               </div>
-              <Link to={`/products/${id}/variants/create`}>
+              <Link to={`/products/${id}/options/create`}>
                 <Button size="small" variant="secondary">
-                  Add variant
+                  Add option
                 </Button>
               </Link>
             </div>
             <div className="px-6 py-4">
-              {(optionsState.length > 0 || options.length > 0) && (
-                <div className="mb-6 flex flex-col gap-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <Text size="small" weight="plus" className="text-ui-fg-subtle">
-                      Product options (e.g. Size, Color). Edit below and save.
-                    </Text>
-                    <Link to={`/products/${id}/options/create`}>
-                      <Button size="small" variant="secondary">
-                        Add option
-                      </Button>
-                    </Link>
-                  </div>
+              {(optionsState.length > 0 || options.length > 0) ? (
+                <div className="flex flex-col gap-4">
                   {optionsState.map((opt, index) => (
                     <div
                       key={opt.id}
@@ -650,9 +640,8 @@ const ProductEditPage = () => {
                     </Button>
                   )}
                 </div>
-              )}
-              {optionsState.length === 0 && options.length === 0 && (
-                <div className="mb-6 flex flex-col gap-2">
+              ) : (
+                <div className="flex flex-col gap-3 items-start">
                   <Text size="small" className="text-ui-fg-muted">
                     No options yet. Add options like Size or Color to create variants.
                   </Text>
@@ -663,8 +652,27 @@ const ProductEditPage = () => {
                   </Link>
                 </div>
               )}
+            </div>
+          </Container>
+
+          {/* Variants */}
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div>
+                <Heading level="h2">Variants</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Variant details. Click Edit to change title, SKU, prices, and inventory.
+                </Text>
+              </div>
+              <Link to={`/products/${id}/variants/create`}>
+                <Button size="small" variant="secondary">
+                  Add variant
+                </Button>
+              </Link>
+            </div>
+            <div className="px-6 py-4">
               {variants.length > 0 ? (
-                <ul className="divide-y divide-ui-border-base">
+                <ul className="divide-y divide-ui-border-base -mt-3">
                   {variants.map((v) => (
                     <li
                       key={v.id}
@@ -689,7 +697,7 @@ const ProductEditPage = () => {
                   ))}
                 </ul>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 items-start">
                   <Text size="small" className="text-ui-fg-muted">
                     No variants yet.
                   </Text>
