@@ -16,6 +16,7 @@ import {
   Label,
   Switch,
   Text,
+  Textarea,
   toast,
   Tooltip,
 } from "@medusajs/ui"
@@ -27,7 +28,7 @@ const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 
 type LoaderData = Awaited<ReturnType<typeof loader>>
 
-async function loader({ params }: LoaderFunctionArgs) {
+async function loader({ params }: LoaderFunctionArgs): Promise<{ product: any }> {
   const { id } = params
   if (!id) {
     throw new Response("Not found", { status: 404 })
@@ -116,6 +117,12 @@ const ProductEditPage = () => {
   const [saveMessage, setSaveMessage] = useState<"success" | "error" | null>(
     null
   )
+  const [metadataEntries, setMetadataEntries] = useState<{ key: string; value: string }[]>(() => {
+    if (!initialProduct?.metadata) return [{ key: "", value: "" }]
+    const entries = Object.entries(initialProduct.metadata).map(([k, v]) => ({ key: k, value: String(v) }))
+    return entries.length > 0 ? entries : [{ key: "", value: "" }]
+  })
+
 
   useEffect(() => {
     if (!initialProduct) return
@@ -155,12 +162,24 @@ const ProductEditPage = () => {
         })
       )
     )
+    const entries = initialProduct.metadata
+      ? Object.entries(initialProduct.metadata).map(([k, v]) => ({ key: k, value: String(v) }))
+      : []
+    setMetadataEntries(entries.length > 0 ? entries : [{ key: "", value: "" }])
   }, [initialProduct])
 
   const handleSave = useCallback(async () => {
     if (!id) return
     setSaving(true)
     setSaveMessage(null)
+
+    const parsedMetadata = metadataEntries.reduce((acc, { key, value }) => {
+      if (key.trim()) {
+        acc[key.trim()] = value
+      }
+      return acc
+    }, {} as Record<string, string>)
+
     try {
       const tags = tagsInput
         .split(",")
@@ -171,6 +190,7 @@ const ProductEditPage = () => {
         title: title || undefined,
         subtitle: subtitle || undefined,
         description: description || undefined,
+        metadata: parsedMetadata,
         status: status as "draft" | "published",
         handle: handle || undefined,
         material: material || undefined,
@@ -185,7 +205,7 @@ const ProductEditPage = () => {
         hs_code: hsCode || undefined,
         external_id: externalId || undefined,
         ...(tags.length > 0 && { tags: tags.map((value) => ({ value })) }),
-      } as Parameters<typeof sdk.admin.product.update>[1])
+      } as unknown as Parameters<typeof sdk.admin.product.update>[1])
       setSaveMessage("success")
       toast.success("Product saved")
     } catch {
@@ -213,6 +233,7 @@ const ProductEditPage = () => {
     midCode,
     hsCode,
     externalId,
+    metadataEntries,
   ])
 
   const refetchProduct = useCallback(() => {
@@ -333,6 +354,30 @@ const ProductEditPage = () => {
     },
     []
   )
+
+  const updateMetadataKey = useCallback((index: number, key: string) => {
+    setMetadataEntries((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], key }
+      return next
+    })
+  }, [])
+
+  const updateMetadataValue = useCallback((index: number, value: string) => {
+    setMetadataEntries((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], value }
+      return next
+    })
+  }, [])
+
+  const addMetadataEntry = useCallback(() => {
+    setMetadataEntries((prev) => [...prev, { key: "", value: "" }])
+  }, [])
+
+  const removeMetadataEntry = useCallback((index: number) => {
+    setMetadataEntries((prev) => prev.filter((_, i) => i !== index))
+  }, [])
 
   const isLoading = Boolean(id) && !initialProduct && isLoadingProduct
   const isNotFound = !id || (Boolean(id) && !initialProduct && !isLoadingProduct)
@@ -621,26 +666,26 @@ const ProductEditPage = () => {
               {variants.length > 0 ? (
                 <ul className="divide-y divide-ui-border-base">
                   {variants.map((v) => (
-                      <li
-                        key={v.id}
-                        className="flex items-center justify-between gap-4 py-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <Text size="small" weight="plus" className="block truncate">
-                            {v.title ?? v.id}
+                    <li
+                      key={v.id}
+                      className="flex items-center justify-between gap-4 py-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <Text size="small" weight="plus" className="block truncate">
+                          {v.title ?? v.id}
+                        </Text>
+                        {v.sku && (
+                          <Text size="small" className="text-ui-fg-muted">
+                            SKU: {v.sku}
                           </Text>
-                          {v.sku && (
-                            <Text size="small" className="text-ui-fg-muted">
-                              SKU: {v.sku}
-                            </Text>
-                          )}
-                        </div>
-                        <Link to={`/products/${id}/variants/${v.id}`}>
-                          <Button size="small" variant="secondary">
-                            Edit
-                          </Button>
-                        </Link>
-                      </li>
+                        )}
+                      </div>
+                      <Link to={`/products/${id}/variants/${v.id}`}>
+                        <Button size="small" variant="secondary">
+                          Edit
+                        </Button>
+                      </Link>
+                    </li>
                   ))}
                 </ul>
               ) : (
@@ -655,6 +700,57 @@ const ProductEditPage = () => {
                   </Link>
                 </div>
               )}
+            </div>
+          </Container>
+
+          {/* Metadata */}
+          <Container className="divide-y p-0">
+            <div className="px-6 py-4">
+              <Heading level="h2">Metadata</Heading>
+              <Text size="small" className="text-ui-fg-subtle mt-1">
+                Custom key-value pairs for this product.
+              </Text>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-4">
+              {metadataEntries.map((entry, i) => (
+                <div key={i} className="flex flex-col gap-2 p-4 border border-ui-border-base rounded-lg bg-ui-bg-subtle">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1">
+                      <Label className="mb-2 block">Key</Label>
+                      <Input
+                        placeholder="Key"
+                        value={entry.key}
+                        onChange={(e) => updateMetadataKey(i, e.target.value)}
+                      />
+                    </div>
+                    <div className="pt-6">
+                      <IconButton
+                        variant="transparent"
+                        className="text-ui-fg-error"
+                        onClick={() => removeMetadataEntry(i)}
+                        type="button"
+                      >
+                        <Trash />
+                      </IconButton>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="mb-2 block">Value</Label>
+                    <SimpleMarkdownEditor
+                      id={`metadata-value-${i}`}
+                      value={entry.value}
+                      onChange={(val) => updateMetadataValue(i, val)}
+                      placeholder="Metadata value"
+                      minHeight={150}
+                    />
+                  </div>
+                </div>
+              ))}
+              <div>
+                <Button size="small" variant="secondary" onClick={addMetadataEntry} type="button">
+                  Add metadata
+                </Button>
+              </div>
             </div>
           </Container>
         </div>
