@@ -43,6 +43,7 @@ type ProductRow = {
   id: string
   title: string
   subtitle: string
+  description: string
   handle: string
   status: ProductStatus
   category_ids: string[]
@@ -71,6 +72,7 @@ type ApiProduct = {
   id: string
   title?: string | null
   subtitle?: string | null
+  description?: string | null
   handle?: string | null
   status?: string | null
   categories?: { id?: string; name?: string }[] | null
@@ -118,6 +120,7 @@ function toRow(p: ApiProduct): ProductRow {
     id: p.id,
     title: p.title ?? "",
     subtitle: p.subtitle ?? "",
+    description: p.description ?? "",
     handle: p.handle ?? "",
     status: (p.status as ProductStatus) ?? "draft",
     category_ids: (p.categories ?? [])
@@ -190,7 +193,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+tags,*categories,+material,+weight,+discountable,+variants,+variants.prices",
+          "+tags,*categories,+description,+material,+weight,+discountable,+variants,+variants.prices",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     refetchOnWindowFocus: false,
   })
@@ -262,6 +265,7 @@ const BulkEditPage = () => {
       if (
         row.title !== orig.title ||
         row.subtitle !== orig.subtitle ||
+        row.description !== orig.description ||
         row.handle !== orig.handle ||
         row.status !== orig.status ||
         JSON.stringify(row.category_ids) !== JSON.stringify(orig.category_ids) ||
@@ -505,6 +509,8 @@ const BulkEditPage = () => {
 
         if (row.title !== orig.title) patch.title = row.title
         if (row.subtitle !== orig.subtitle) patch.subtitle = row.subtitle
+          if (row.description !== orig.description)
+            patch.description = row.description || null
         if (row.handle !== orig.handle) patch.handle = row.handle
         if (row.status !== orig.status) patch.status = row.status
         if (
@@ -1136,6 +1142,12 @@ const BulkEditPage = () => {
                   </th>
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 260 }}
+                  >
+                    Description
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 150 }}
                   >
                     Handle
@@ -1267,6 +1279,19 @@ const BulkEditPage = () => {
                               updateRow(row.id, "subtitle", e.target.value)
                             }
                             placeholder="Short subtitle"
+                          />
+                        </td>
+
+                        {/* Description */}
+                        <td className="px-3 py-2">
+                          <textarea
+                            value={row.description}
+                            onChange={(e) =>
+                              updateRow(row.id, "description", e.target.value)
+                            }
+                            placeholder="Product description"
+                            rows={2}
+                            className={`${cellInput} h-auto py-2 resize-y`}
                           />
                         </td>
 
