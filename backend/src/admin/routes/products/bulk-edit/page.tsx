@@ -190,7 +190,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+tags,+categories,+material,+weight,+discountable,+variants,+variants.prices",
+          "+tags,*categories,+material,+weight,+discountable,+variants,+variants.prices",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     refetchOnWindowFocus: false,
   })
