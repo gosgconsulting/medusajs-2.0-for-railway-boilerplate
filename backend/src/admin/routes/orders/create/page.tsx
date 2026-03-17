@@ -98,7 +98,7 @@ const selectInput =
 
 function formatPrice(amount: number | undefined, currencyCode?: string): string {
   if (amount == null) return "—"
-  const display = (amount / 100).toFixed(2)
+  const display = amount.toFixed(2)
   return currencyCode
     ? `${currencyCode.toUpperCase()} ${display}`
     : display
