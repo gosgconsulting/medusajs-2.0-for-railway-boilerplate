@@ -6,17 +6,23 @@ import {
   Button,
   Checkbox,
   Container,
+  DropdownMenu,
   Heading,
   Input,
   Text,
   toast,
 } from "@medusajs/ui"
-import { ChevronDown, ChevronLeft, ChevronRight } from "@medusajs/icons"
+import { ChevronDown, ChevronLeft, ChevronRight, XMarkMini } from "@medusajs/icons"
 import { sdk } from "../../../lib/sdk"
 
 const PAGE_SIZE = 20
 
-type ProductStatus = "draft" | "published"
+type ProductStatus = "draft" | "proposed" | "published" | "rejected"
+
+type DateOperator = {
+  $gte?: string
+  $lte?: string
+}
 
 // ─── Data types ──────────────────────────────────────────────────────────────
 
@@ -131,20 +137,76 @@ const cellInput =
 const BulkEditPage = () => {
   const queryClient = useQueryClient()
   const [offset, setOffset] = useState(0)
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<ProductStatus[]>([])
+  const [tagIds, setTagIds] = useState<string[]>([])
+  const [typeIds, setTypeIds] = useState<string[]>([])
+  const [salesChannelIds, setSalesChannelIds] = useState<string[]>([])
+  const [createdAt, setCreatedAt] = useState<DateOperator>({})
+  const [updatedAt, setUpdatedAt] = useState<DateOperator>({})
+  const [filterSearch, setFilterSearch] = useState("")
   const [source, setSource] = useState<ProductRow[]>([])
   const [working, setWorking] = useState<ProductRow[]>([])
   const [errors, setErrors] = useState<RowErrors>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setOffset(0)
+    }, 250)
+
+    return () => window.clearTimeout(t)
+  }, [search])
+
   // ── Fetch ───────────────────────────────────────────────────────────────
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["admin-products-bulk", offset],
+    queryKey: [
+      "admin-products-bulk",
+      offset,
+      debouncedSearch,
+      statusFilter,
+      tagIds,
+      typeIds,
+      salesChannelIds,
+      createdAt,
+      updatedAt,
+    ],
     queryFn: () =>
       sdk.admin.product.list({
         limit: PAGE_SIZE,
         offset,
+        ...(debouncedSearch ? { q: debouncedSearch } : {}),
+        ...(statusFilter.length ? { status: statusFilter } : {}),
+        ...(tagIds.length ? { tag_id: tagIds } : {}),
+        ...(typeIds.length ? { type_id: typeIds } : {}),
+        ...(salesChannelIds.length ? { sales_channel_id: salesChannelIds } : {}),
+        ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
+        ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields: "+tags,+material,+weight,+discountable,+variants,+variants.prices",
       } as Parameters<typeof sdk.admin.product.list>[0]),
+    refetchOnWindowFocus: false,
+  })
+
+  const { data: tagsData } = useQuery({
+    queryKey: ["admin-product-tags-bulk"],
+    queryFn: () => sdk.admin.productTag.list({ limit: 200 }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const { data: typesData } = useQuery({
+    queryKey: ["admin-product-types-bulk"],
+    queryFn: () => sdk.admin.productType.list({ limit: 200 }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const { data: channelsData } = useQuery({
+    queryKey: ["admin-sales-channels-bulk"],
+    queryFn: () => sdk.admin.salesChannel.list({ limit: 200 }),
+    staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
 
@@ -306,6 +368,87 @@ const BulkEditPage = () => {
     setErrors({})
   }, [source])
 
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      if (hasDirty) {
+        if (
+          !window.confirm(
+            "You have unsaved changes. Discard them and change search?"
+          )
+        ) {
+          return
+        }
+        discard()
+      }
+      setSearch(value)
+    },
+    [discard, hasDirty]
+  )
+
+  const handleFiltersChange = useCallback(
+    (next: {
+      status?: ProductStatus[]
+      tagIds?: string[]
+      typeIds?: string[]
+      salesChannelIds?: string[]
+      createdAt?: DateOperator
+      updatedAt?: DateOperator
+    }) => {
+      if (hasDirty) {
+        if (
+          !window.confirm(
+            "You have unsaved changes. Discard them and change filters?"
+          )
+        ) {
+          return
+        }
+        discard()
+      }
+
+      if (next.status !== undefined) setStatusFilter(next.status)
+      if (next.tagIds !== undefined) setTagIds(next.tagIds)
+      if (next.typeIds !== undefined) setTypeIds(next.typeIds)
+      if (next.salesChannelIds !== undefined)
+        setSalesChannelIds(next.salesChannelIds)
+      if (next.createdAt !== undefined) setCreatedAt(next.createdAt)
+      if (next.updatedAt !== undefined) setUpdatedAt(next.updatedAt)
+      setOffset(0)
+    },
+    [discard, hasDirty]
+  )
+
+  const clearFilters = useCallback(() => {
+    handleFiltersChange({
+      status: [],
+      tagIds: [],
+      typeIds: [],
+      salesChannelIds: [],
+      createdAt: {},
+      updatedAt: {},
+    })
+  }, [handleFiltersChange])
+
+  const ensureSafeToChangeFilters = useCallback(() => {
+    if (!hasDirty) return true
+    if (
+      !window.confirm("You have unsaved changes. Discard them and continue?")
+    ) {
+      return false
+    }
+    discard()
+    return true
+  }, [discard, hasDirty])
+
+  const hasAnyFilters =
+    statusFilter.length > 0 ||
+    tagIds.length > 0 ||
+    typeIds.length > 0 ||
+    salesChannelIds.length > 0 ||
+    createdAt.$gte != null ||
+    createdAt.$lte != null ||
+    updatedAt.$gte != null ||
+    updatedAt.$lte != null
+
   // ── Batch save ──────────────────────────────────────────────────────────
   const { mutate: saveBatch, isPending: isSaving } = useMutation({
     mutationFn: async () => {
@@ -465,6 +608,378 @@ const BulkEditPage = () => {
 
       {/* Table */}
       <Container className="p-0 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-ui-border-base bg-ui-bg-base">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {tagIds.length > 0 && (
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() =>
+                  ensureSafeToChangeFilters() &&
+                  handleFiltersChange({ tagIds: [] })
+                }
+                disabled={isSaving}
+              >
+                Tag <XMarkMini className="ml-1" />
+              </Button>
+            )}
+            {typeIds.length > 0 && (
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() =>
+                  ensureSafeToChangeFilters() &&
+                  handleFiltersChange({ typeIds: [] })
+                }
+                disabled={isSaving}
+              >
+                Type <XMarkMini className="ml-1" />
+              </Button>
+            )}
+            {salesChannelIds.length > 0 && (
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() =>
+                  ensureSafeToChangeFilters() &&
+                  handleFiltersChange({ salesChannelIds: [] })
+                }
+                disabled={isSaving}
+              >
+                Sales Channel <XMarkMini className="ml-1" />
+              </Button>
+            )}
+            {statusFilter.length > 0 && (
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() =>
+                  ensureSafeToChangeFilters() &&
+                  handleFiltersChange({ status: [] })
+                }
+                disabled={isSaving}
+              >
+                Status <XMarkMini className="ml-1" />
+              </Button>
+            )}
+            {(createdAt.$gte || createdAt.$lte) && (
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() =>
+                  ensureSafeToChangeFilters() &&
+                  handleFiltersChange({ createdAt: {} })
+                }
+                disabled={isSaving}
+              >
+                Created <XMarkMini className="ml-1" />
+              </Button>
+            )}
+            {(updatedAt.$gte || updatedAt.$lte) && (
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() =>
+                  ensureSafeToChangeFilters() &&
+                  handleFiltersChange({ updatedAt: {} })
+                }
+                disabled={isSaving}
+              >
+                Updated <XMarkMini className="ml-1" />
+              </Button>
+            )}
+
+            <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
+              <DropdownMenu.Trigger asChild>
+                <Button variant="secondary" size="small" disabled={isSaving}>
+                  Add filter <ChevronDown className="ml-1" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content className="w-[260px]">
+                <DropdownMenu.SubMenu>
+                  <DropdownMenu.SubMenuTrigger>Type</DropdownMenu.SubMenuTrigger>
+                  <DropdownMenu.SubMenuContent className="w-[320px]">
+                    <div className="p-3 flex flex-col gap-2">
+                      <Input
+                        value={filterSearch}
+                        onChange={(e) => setFilterSearch(e.target.value)}
+                        placeholder="Search"
+                      />
+                      <div className="max-h-[260px] overflow-auto">
+                        {(typesData?.product_types ?? [])
+                          .filter((t: any) =>
+                            (t.value ?? t.name ?? "")
+                              .toLowerCase()
+                              .includes(filterSearch.toLowerCase())
+                          )
+                          .map((t: any) => (
+                            <DropdownMenu.CheckboxItem
+                              key={t.id}
+                              checked={typeIds.includes(t.id)}
+                              onCheckedChange={(checked) => {
+                                if (!ensureSafeToChangeFilters()) return
+                                const next = checked
+                                  ? Array.from(new Set([...typeIds, t.id]))
+                                  : typeIds.filter((id) => id !== t.id)
+                                handleFiltersChange({ typeIds: next })
+                              }}
+                            >
+                              {t.value ?? t.name ?? t.id}
+                            </DropdownMenu.CheckboxItem>
+                          ))}
+                      </div>
+                    </div>
+                  </DropdownMenu.SubMenuContent>
+                </DropdownMenu.SubMenu>
+
+                <DropdownMenu.SubMenu>
+                  <DropdownMenu.SubMenuTrigger>Tag</DropdownMenu.SubMenuTrigger>
+                  <DropdownMenu.SubMenuContent className="w-[320px]">
+                    <div className="p-3 flex flex-col gap-2">
+                      <Input
+                        value={filterSearch}
+                        onChange={(e) => setFilterSearch(e.target.value)}
+                        placeholder="Search"
+                      />
+                      <div className="max-h-[260px] overflow-auto">
+                        {(tagsData?.product_tags ?? [])
+                          .filter((t: any) =>
+                            (t.value ?? "")
+                              .toLowerCase()
+                              .includes(filterSearch.toLowerCase())
+                          )
+                          .map((t: any) => (
+                            <DropdownMenu.CheckboxItem
+                              key={t.id}
+                              checked={tagIds.includes(t.id)}
+                              onCheckedChange={(checked) => {
+                                if (!ensureSafeToChangeFilters()) return
+                                const next = checked
+                                  ? Array.from(new Set([...tagIds, t.id]))
+                                  : tagIds.filter((id) => id !== t.id)
+                                handleFiltersChange({ tagIds: next })
+                              }}
+                            >
+                              {t.value}
+                            </DropdownMenu.CheckboxItem>
+                          ))}
+                      </div>
+                    </div>
+                  </DropdownMenu.SubMenuContent>
+                </DropdownMenu.SubMenu>
+
+                <DropdownMenu.SubMenu>
+                  <DropdownMenu.SubMenuTrigger>
+                    Sales Channel
+                  </DropdownMenu.SubMenuTrigger>
+                  <DropdownMenu.SubMenuContent className="w-[320px]">
+                    <div className="p-3 flex flex-col gap-2">
+                      <Input
+                        value={filterSearch}
+                        onChange={(e) => setFilterSearch(e.target.value)}
+                        placeholder="Search"
+                      />
+                      <div className="max-h-[260px] overflow-auto">
+                        {(channelsData?.sales_channels ?? [])
+                          .filter((c: any) =>
+                            (c.name ?? "")
+                              .toLowerCase()
+                              .includes(filterSearch.toLowerCase())
+                          )
+                          .map((c: any) => (
+                            <DropdownMenu.CheckboxItem
+                              key={c.id}
+                              checked={salesChannelIds.includes(c.id)}
+                              onCheckedChange={(checked) => {
+                                if (!ensureSafeToChangeFilters()) return
+                                const next = checked
+                                  ? Array.from(
+                                      new Set([...salesChannelIds, c.id])
+                                    )
+                                  : salesChannelIds.filter((id) => id !== c.id)
+                                handleFiltersChange({ salesChannelIds: next })
+                              }}
+                            >
+                              {c.name}
+                            </DropdownMenu.CheckboxItem>
+                          ))}
+                      </div>
+                    </div>
+                  </DropdownMenu.SubMenuContent>
+                </DropdownMenu.SubMenu>
+
+                <DropdownMenu.SubMenu>
+                  <DropdownMenu.SubMenuTrigger>Status</DropdownMenu.SubMenuTrigger>
+                  <DropdownMenu.SubMenuContent className="w-[280px]">
+                    <div className="p-3 flex flex-col gap-2">
+                      {(["draft", "proposed", "published", "rejected"] as const).map(
+                        (s) => (
+                          <DropdownMenu.CheckboxItem
+                            key={s}
+                            checked={statusFilter.includes(s)}
+                            onCheckedChange={(checked) => {
+                              if (!ensureSafeToChangeFilters()) return
+                              const next = checked
+                                ? Array.from(new Set([...statusFilter, s]))
+                                : statusFilter.filter((x) => x !== s)
+                              handleFiltersChange({ status: next })
+                            }}
+                          >
+                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                          </DropdownMenu.CheckboxItem>
+                        )
+                      )}
+                    </div>
+                  </DropdownMenu.SubMenuContent>
+                </DropdownMenu.SubMenu>
+
+                <DropdownMenu.SubMenu>
+                  <DropdownMenu.SubMenuTrigger>Created</DropdownMenu.SubMenuTrigger>
+                  <DropdownMenu.SubMenuContent className="w-[320px]">
+                    <div className="p-3 flex flex-col gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Text size="small" className="text-ui-fg-subtle">
+                            From
+                          </Text>
+                          <input
+                            type="date"
+                            value={createdAt.$gte ?? ""}
+                            onChange={(e) => {
+                              if (!ensureSafeToChangeFilters()) return
+                              handleFiltersChange({
+                                createdAt: {
+                                  ...createdAt,
+                                  $gte: e.target.value || undefined,
+                                },
+                              })
+                            }}
+                            className={cellInput}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Text size="small" className="text-ui-fg-subtle">
+                            To
+                          </Text>
+                          <input
+                            type="date"
+                            value={createdAt.$lte ?? ""}
+                            onChange={(e) => {
+                              if (!ensureSafeToChangeFilters()) return
+                              handleFiltersChange({
+                                createdAt: {
+                                  ...createdAt,
+                                  $lte: e.target.value || undefined,
+                                },
+                              })
+                            }}
+                            className={cellInput}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenu.SubMenuContent>
+                </DropdownMenu.SubMenu>
+
+                <DropdownMenu.SubMenu>
+                  <DropdownMenu.SubMenuTrigger>Updated</DropdownMenu.SubMenuTrigger>
+                  <DropdownMenu.SubMenuContent className="w-[320px]">
+                    <div className="p-3 flex flex-col gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Text size="small" className="text-ui-fg-subtle">
+                            From
+                          </Text>
+                          <input
+                            type="date"
+                            value={updatedAt.$gte ?? ""}
+                            onChange={(e) => {
+                              if (!ensureSafeToChangeFilters()) return
+                              handleFiltersChange({
+                                updatedAt: {
+                                  ...updatedAt,
+                                  $gte: e.target.value || undefined,
+                                },
+                              })
+                            }}
+                            className={cellInput}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Text size="small" className="text-ui-fg-subtle">
+                            To
+                          </Text>
+                          <input
+                            type="date"
+                            value={updatedAt.$lte ?? ""}
+                            onChange={(e) => {
+                              if (!ensureSafeToChangeFilters()) return
+                              handleFiltersChange({
+                                updatedAt: {
+                                  ...updatedAt,
+                                  $lte: e.target.value || undefined,
+                                },
+                              })
+                            }}
+                            className={cellInput}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenu.SubMenuContent>
+                </DropdownMenu.SubMenu>
+
+                {hasAnyFilters && (
+                  <>
+                    <DropdownMenu.Separator />
+                    <DropdownMenu.Item
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        clearFilters()
+                      }}
+                    >
+                      Clear all
+                    </DropdownMenu.Item>
+                  </>
+                )}
+              </DropdownMenu.Content>
+            </DropdownMenu>
+
+            {hasAnyFilters && (
+              <Button
+                variant="transparent"
+                size="small"
+                onClick={clearFilters}
+                disabled={isSaving}
+              >
+                Clear all
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="w-full sm:w-[360px]">
+              <Input
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search products by title, handle, or SKU…"
+              />
+            </div>
+            {search.trim() !== "" && (
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() => handleSearchChange("")}
+                disabled={isSaving}
+              >
+                Clear
+              </Button>
+            )}
+
+            <Text size="small" className="text-ui-fg-subtle whitespace-nowrap">
+              {total} result{total !== 1 ? "s" : ""}
+            </Text>
+          </div>
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center p-12">
             <Text className="text-ui-fg-muted">Loading products…</Text>
@@ -482,12 +997,26 @@ const BulkEditPage = () => {
           </div>
         ) : working.length === 0 ? (
           <div className="flex flex-col items-center gap-4 p-12">
-            <Text className="text-ui-fg-muted">No products found.</Text>
-            <Link to="/products/create">
-              <Button size="small" variant="secondary">
-                Create product
+            <Text className="text-ui-fg-muted">
+              {debouncedSearch
+                ? `No products found for "${debouncedSearch}".`
+                : "No products found."}
+            </Text>
+            {debouncedSearch ? (
+              <Button
+                size="small"
+                variant="secondary"
+                onClick={() => handleSearchChange("")}
+              >
+                Clear search
               </Button>
-            </Link>
+            ) : (
+              <Link to="/products/create">
+                <Button size="small" variant="secondary">
+                  Create product
+                </Button>
+              </Link>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -673,7 +1202,9 @@ const BulkEditPage = () => {
                             className={cellInput}
                           >
                             <option value="draft">Draft</option>
+                            <option value="proposed">Proposed</option>
                             <option value="published">Published</option>
+                            <option value="rejected">Rejected</option>
                           </select>
                         </td>
 
