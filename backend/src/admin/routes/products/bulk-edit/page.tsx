@@ -37,6 +37,9 @@ type VariantRow = {
   title: string
   sku: string
   prices: PriceRow[]
+  sale_price_id?: string
+  sale_price_amount: string // display amount for configured price list
+  metadata: Record<string, unknown>
 }
 
 type ProductRow = {
@@ -66,6 +69,7 @@ type ApiVariant = {
   title?: string | null
   sku?: string | null
   prices?: ApiPrice[] | null
+  metadata?: Record<string, unknown> | null
 }
 
 type ApiProduct = {
@@ -91,15 +95,20 @@ function tagsToString(tags?: { value?: string }[] | null): string {
   return tags.map((t) => t.value ?? "").filter(Boolean).join(", ")
 }
 
-/** Medusa stores prices in lowest denomination (cents). Convert to display. */
+/**
+ * Convert API amount to display.
+ *
+ * Note: In this project, amounts are represented in main currency units
+ * (e.g. 59 => "59.00"), not minor units.
+ */
 function amountToDisplay(amount?: number): string {
   if (amount == null) return ""
-  return (amount / 100).toFixed(2)
+  return Number(amount).toFixed(2)
 }
 
-/** Convert human-readable amount back to cents for the API. */
+/** Convert human-readable amount back to API amount (main units). */
 function displayToAmount(value: string): number {
-  return Math.round(Number(value) * 100)
+  return Number(value)
 }
 
 function toVariantRow(v: ApiVariant): VariantRow {
@@ -112,6 +121,12 @@ function toVariantRow(v: ApiVariant): VariantRow {
       currency_code: p.currency_code ?? "usd",
       amount: amountToDisplay(p.amount),
     })),
+    sale_price_id: undefined,
+    sale_price_amount:
+      typeof (v.metadata as any)?.b2b_price === "number"
+        ? amountToDisplay((v.metadata as any).b2b_price)
+        : "",
+    metadata: (v.metadata ?? {}) as Record<string, unknown>,
   }
 }
 
@@ -144,6 +159,20 @@ const cellInput =
 
 const BulkEditPage = () => {
   const queryClient = useQueryClient()
+  const SALE_PRICE_LIST_ID =
+    typeof import.meta !== "undefined"
+      ? ((import.meta as any).env?.VITE_SALE_PRICE_LIST_ID as
+          | string
+          | undefined)
+      : undefined
+  const SALE_PRICE_CURRENCY =
+    typeof import.meta !== "undefined"
+      ? (((import.meta as any).env?.VITE_SALE_PRICE_CURRENCY as
+          | string
+          | undefined) ??
+          "usd")
+      : "usd"
+
   const [offset, setOffset] = useState(0)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -193,7 +222,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+tags,*categories,+description,+material,+weight,+discountable,+variants,+variants.prices",
+          "+tags,*categories,+description,+material,+weight,+discountable,+variants,+variants.prices,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     refetchOnWindowFocus: false,
   })
@@ -226,6 +255,23 @@ const BulkEditPage = () => {
     refetchOnWindowFocus: false,
   })
 
+  const variantIdsOnPage = useMemo(() => {
+    return (data?.products ?? [])
+      .flatMap((p: any) => (p.variants ?? []).map((v: any) => v.id))
+      .filter(Boolean)
+  }, [data])
+
+  const { data: priceListData } = useQuery({
+    queryKey: ["admin-sale-price-list", SALE_PRICE_LIST_ID, variantIdsOnPage],
+    queryFn: () =>
+      sdk.admin.priceList.retrieve(SALE_PRICE_LIST_ID!, {
+        fields: "id,prices.id,prices.variant_id,prices.currency_code,prices.amount",
+      } as any),
+    enabled: !!SALE_PRICE_LIST_ID && variantIdsOnPage.length > 0,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
+
   useEffect(() => {
     if (!data?.products) return
     const rows = (data.products as ApiProduct[]).map(toRow)
@@ -234,6 +280,39 @@ const BulkEditPage = () => {
     setErrors({})
     setExpandedIds(new Set())
   }, [data])
+
+  useEffect(() => {
+    if (!SALE_PRICE_LIST_ID) return
+    const prices = (priceListData as any)?.price_list?.prices ?? []
+    if (!Array.isArray(prices)) return
+
+    const map = new Map<string, { id?: string; amount?: number }>()
+    for (const p of prices) {
+      if (!p?.variant_id) continue
+      if ((p.currency_code ?? "").toLowerCase() !== SALE_PRICE_CURRENCY.toLowerCase())
+        continue
+      map.set(p.variant_id, { id: p.id, amount: p.amount })
+    }
+
+    const apply = (rows: ProductRow[]) =>
+      rows.map((r) => ({
+        ...r,
+        variants: r.variants.map((v) => {
+          const sale = map.get(v.id)
+          return {
+            ...v,
+            sale_price_id: sale?.id ?? v.sale_price_id,
+            // Prefer price list amount when available; otherwise keep existing
+            // (which may come from metadata fallback or user edits).
+            sale_price_amount:
+              sale?.amount != null ? amountToDisplay(sale.amount) : v.sale_price_amount,
+          }
+        }),
+      }))
+
+    setSource((prev) => apply(prev))
+    setWorking((prev) => apply(prev))
+  }, [SALE_PRICE_LIST_ID, SALE_PRICE_CURRENCY, priceListData])
 
   // ── Expand/collapse ─────────────────────────────────────────────────────
   const toggleExpand = useCallback((id: string) => {
@@ -291,7 +370,8 @@ const BulkEditPage = () => {
         if (!origV) continue
         if (
           variant.sku !== origV.sku ||
-          JSON.stringify(variant.prices) !== JSON.stringify(origV.prices)
+          JSON.stringify(variant.prices) !== JSON.stringify(origV.prices) ||
+          variant.sale_price_amount !== origV.sale_price_amount
         ) {
           if (!map.has(row.id)) map.set(row.id, new Set())
           map.get(row.id)!.add(variant.id)
@@ -374,6 +454,33 @@ const BulkEditPage = () => {
                 ),
               }
             }),
+          }
+        })
+      )
+    },
+    []
+  )
+
+  const updateVariantSalePrice = useCallback(
+    (productId: string, variantId: string, amount: string) => {
+      setWorking((prev) =>
+        prev.map((row) => {
+          if (row.id !== productId) return row
+          return {
+            ...row,
+            variants: row.variants.map((v) =>
+              v.id === variantId
+                ? {
+                    ...v,
+                    sale_price_amount: amount,
+                    metadata: {
+                      ...(v.metadata ?? {}),
+                      b2b_price:
+                        amount.trim() === "" ? null : displayToAmount(amount),
+                    },
+                  }
+                : v
+            ),
           }
         })
       )
@@ -471,6 +578,11 @@ const BulkEditPage = () => {
   const { mutate: saveBatch, isPending: isSaving } = useMutation({
     mutationFn: async () => {
       const categoryOps = new Map<string, { add: string[]; remove: string[] }>()
+      const priceListOps = {
+        create: [] as any[],
+        update: [] as any[],
+        delete: [] as string[],
+      }
       const tagValueToId = new Map<string, string>(
         (tagsData?.product_tags ?? []).flatMap((t: any) => {
           const v = (t?.value ?? "").trim()
@@ -569,6 +681,44 @@ const BulkEditPage = () => {
                   amount: displayToAmount(p.amount),
                 }))
             }
+
+            // Sale price via price list
+            if (
+              SALE_PRICE_LIST_ID &&
+              v.sale_price_amount !== origV.sale_price_amount
+            ) {
+              const next = v.sale_price_amount.trim()
+              const prev = origV.sale_price_amount.trim()
+
+              if (prev === "" && next !== "") {
+                priceListOps.create.push({
+                  variant_id: variantId,
+                  currency_code: SALE_PRICE_CURRENCY,
+                  amount: displayToAmount(next),
+                })
+              } else if (prev !== "" && next === "" && origV.sale_price_id) {
+                priceListOps.delete.push(origV.sale_price_id)
+              } else if (prev !== "" && next !== "" && origV.sale_price_id) {
+                priceListOps.update.push({
+                  id: origV.sale_price_id,
+                  variant_id: variantId,
+                  amount: displayToAmount(next),
+                })
+              } else if (prev !== "" && next !== "" && !origV.sale_price_id) {
+                // fallback: create if we somehow don't have an id
+                priceListOps.create.push({
+                  variant_id: variantId,
+                  currency_code: SALE_PRICE_CURRENCY,
+                  amount: displayToAmount(next),
+                })
+              }
+
+              // Mirror sale price into variant metadata
+              vPatch.metadata = {
+                ...(origV.metadata ?? {}),
+                b2b_price: next === "" ? null : displayToAmount(next),
+              }
+            }
             return vPatch
           })
         }
@@ -591,6 +741,18 @@ const BulkEditPage = () => {
             if (ops.remove.length) body.remove = ops.remove
             return sdk.admin.productCategory.updateProducts(categoryId, body as any)
           })
+        )
+      }
+
+      if (
+        SALE_PRICE_LIST_ID &&
+        (priceListOps.create.length ||
+          priceListOps.update.length ||
+          priceListOps.delete.length)
+      ) {
+        await sdk.admin.priceList.batchPrices(
+          SALE_PRICE_LIST_ID,
+          priceListOps as any
         )
       }
 
@@ -1486,6 +1648,14 @@ const BulkEditPage = () => {
                                         Price ({cc.toUpperCase()})
                                       </th>
                                     ))}
+                                    {SALE_PRICE_LIST_ID && (
+                                      <th
+                                        className="px-4 py-2 text-left txt-compact-xsmall-plus text-ui-fg-muted"
+                                        style={{ minWidth: 150 }}
+                                      >
+                                        Sale ({SALE_PRICE_CURRENCY.toUpperCase()})
+                                      </th>
+                                    )}
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-ui-border-base">
@@ -1572,6 +1742,26 @@ const BulkEditPage = () => {
                                             </td>
                                           )
                                         })}
+
+                                        {SALE_PRICE_LIST_ID && (
+                                          <td className="px-4 py-2">
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              step="0.01"
+                                              value={variant.sale_price_amount}
+                                              onChange={(e) =>
+                                                updateVariantSalePrice(
+                                                  row.id,
+                                                  variant.id,
+                                                  e.target.value
+                                                )
+                                              }
+                                              placeholder="0.00"
+                                              className={cellInput}
+                                            />
+                                          </td>
+                                        )}
                                       </tr>
                                     )
                                   })}
