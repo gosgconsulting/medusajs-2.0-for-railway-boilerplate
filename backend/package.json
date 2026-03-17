@@ -67,5 +67,10 @@
   "engines": {
     "node": "22.x",
     "npm": "10.x"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@medusajs/core-flows@2.12.1": "patches/@medusajs__core-flows@2.12.1.patch"
+    }
   }
 }

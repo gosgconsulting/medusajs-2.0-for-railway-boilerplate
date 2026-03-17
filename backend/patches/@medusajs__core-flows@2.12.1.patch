@@ -1,0 +1,47 @@
+diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/cart/workflows/get-variants-and-items-with-prices.js
+index 1c38413311d10ebb3ea2b68c31d3fe4ccc71f593..06359ca5d17559bc35b3a7448e5e4b72aa293da5 100644
+--- a/dist/cart/workflows/get-variants-and-items-with-prices.js
++++ b/dist/cart/workflows/get-variants-and-items-with-prices.js
+@@ -77,7 +77,8 @@ exports.getVariantsAndItemsWithPrices = (0, workflows_sdk_1.createWorkflow)(expo
+             if (!calculatedPriceSet) {
+                 calculatedPriceSet = calculatedPriceSets[item_.variant_id];
+             }
+-            if (!calculatedPriceSet && item_.variant_id) {
++            const isCustomPrice = item_.is_custom_price ?? (0, utils_1.isDefined)(item?.unit_price);
++            if (!calculatedPriceSet && item_.variant_id && !isCustomPrice) {
+                 priceNotFound.push(item_.variant_id);
+             }
+             const variant = variantsData.find((v) => v.id === item.variant_id);
+@@ -89,7 +90,6 @@ exports.getVariantsAndItemsWithPrices = (0, workflows_sdk_1.createWorkflow)(expo
+             if (variant) {
+                 variant.calculated_price = calculatedPriceSet;
+             }
+-            const isCustomPrice = item_.is_custom_price ?? (0, utils_1.isDefined)(item?.unit_price);
+             const input = {
+                 item: item_,
+                 variant: variant,
+diff --git a/dist/draft-order/workflows/convert-draft-order.js b/dist/draft-order/workflows/convert-draft-order.js
+index 768bfd7aa1e3db2747a6598f6e7afd0aea8d1388..d842493e7f7f6fc401dfd500d4d8113ba9393220 100644
+--- a/dist/draft-order/workflows/convert-draft-order.js
++++ b/dist/draft-order/workflows/convert-draft-order.js
+@@ -84,12 +84,14 @@ exports.convertDraftOrderWorkflow = (0, workflows_sdk_1.createWorkflow)(exports.
+         const items = [];
+         const variants = [];
+         for (const orderItem of orderItems.items ?? []) {
+-            items.push({
+-                variant_id: orderItem.variant.id,
+-                quantity: orderItem.quantity,
+-                id: orderItem.id,
+-            });
+-            variants.push(orderItem.variant);
++            if (orderItem.variant) {
++                items.push({
++                    variant_id: orderItem.variant.id,
++                    quantity: orderItem.quantity,
++                    id: orderItem.id,
++                });
++                variants.push(orderItem.variant);
++            }
+         }
+         return {
+             variants,
