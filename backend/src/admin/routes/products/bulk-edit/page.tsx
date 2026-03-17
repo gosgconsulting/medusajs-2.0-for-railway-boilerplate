@@ -45,6 +45,7 @@ type ProductRow = {
   subtitle: string
   handle: string
   status: ProductStatus
+  category_ids: string[]
   material: string
   tags: string      // comma-separated
   weight: string    // as string for input control
@@ -72,6 +73,7 @@ type ApiProduct = {
   subtitle?: string | null
   handle?: string | null
   status?: string | null
+  categories?: { id?: string; name?: string }[] | null
   material?: string | null
   weight?: number | null
   discountable?: boolean | null
@@ -118,6 +120,9 @@ function toRow(p: ApiProduct): ProductRow {
     subtitle: p.subtitle ?? "",
     handle: p.handle ?? "",
     status: (p.status as ProductStatus) ?? "draft",
+    category_ids: (p.categories ?? [])
+      .map((c) => c.id ?? "")
+      .filter(Boolean),
     material: p.material ?? "",
     tags: tagsToString(p.tags),
     weight: p.weight != null ? String(p.weight) : "",
@@ -184,7 +189,8 @@ const BulkEditPage = () => {
         ...(salesChannelIds.length ? { sales_channel_id: salesChannelIds } : {}),
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
-        fields: "+tags,+material,+weight,+discountable,+variants,+variants.prices",
+        fields:
+          "+tags,+categories,+material,+weight,+discountable,+variants,+variants.prices",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     refetchOnWindowFocus: false,
   })
@@ -206,6 +212,13 @@ const BulkEditPage = () => {
   const { data: channelsData } = useQuery({
     queryKey: ["admin-sales-channels-bulk"],
     queryFn: () => sdk.admin.salesChannel.list({ limit: 200 }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["admin-product-categories-bulk"],
+    queryFn: () => sdk.admin.productCategory.list({ limit: 200 }),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
@@ -251,6 +264,7 @@ const BulkEditPage = () => {
         row.subtitle !== orig.subtitle ||
         row.handle !== orig.handle ||
         row.status !== orig.status ||
+        JSON.stringify(row.category_ids) !== JSON.stringify(orig.category_ids) ||
         row.material !== orig.material ||
         row.tags !== orig.tags ||
         row.weight !== orig.weight ||
@@ -298,7 +312,7 @@ const BulkEditPage = () => {
     (
       id: string,
       field: keyof Omit<ProductRow, "id" | "thumbnail" | "variants">,
-      value: string | boolean
+      value: string | boolean | string[]
     ) => {
       setWorking((prev) =>
         prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
@@ -452,7 +466,39 @@ const BulkEditPage = () => {
   // ── Batch save ──────────────────────────────────────────────────────────
   const { mutate: saveBatch, isPending: isSaving } = useMutation({
     mutationFn: async () => {
-      const update = Array.from(dirtyIds).map((id) => {
+      const categoryOps = new Map<string, { add: string[]; remove: string[] }>()
+      const tagValueToId = new Map<string, string>(
+        (tagsData?.product_tags ?? []).flatMap((t: any) => {
+          const v = (t?.value ?? "").trim()
+          if (!v) return []
+          return [[v.toLowerCase(), t.id as string]]
+        })
+      )
+
+      const ensureTagIds = async (values: string[]) => {
+        const ids: string[] = []
+        for (const raw of values) {
+          const key = raw.trim().toLowerCase()
+          if (!key) continue
+
+          const existing = tagValueToId.get(key)
+          if (existing) {
+            ids.push(existing)
+            continue
+          }
+
+          const created = await sdk.admin.productTag.create({ value: raw.trim() })
+          const createdId = (created as any)?.product_tag?.id
+          if (createdId) {
+            tagValueToId.set(key, createdId)
+            ids.push(createdId)
+          }
+        }
+        return ids
+      }
+
+      const update = await Promise.all(
+        Array.from(dirtyIds).map(async (id) => {
         const row = working.find((r) => r.id === id)!
         const orig = source.find((s) => s.id === id)!
         const patch: Record<string, unknown> & { id: string } = { id }
@@ -461,6 +507,26 @@ const BulkEditPage = () => {
         if (row.subtitle !== orig.subtitle) patch.subtitle = row.subtitle
         if (row.handle !== orig.handle) patch.handle = row.handle
         if (row.status !== orig.status) patch.status = row.status
+        if (
+          JSON.stringify(row.category_ids) !== JSON.stringify(orig.category_ids)
+        ) {
+          const toAdd = row.category_ids.filter((c) => !orig.category_ids.includes(c))
+          const toRemove = orig.category_ids.filter((c) => !row.category_ids.includes(c))
+
+          for (const categoryId of toAdd) {
+            if (!categoryOps.has(categoryId)) {
+              categoryOps.set(categoryId, { add: [], remove: [] })
+            }
+            categoryOps.get(categoryId)!.add.push(id)
+          }
+
+          for (const categoryId of toRemove) {
+            if (!categoryOps.has(categoryId)) {
+              categoryOps.set(categoryId, { add: [], remove: [] })
+            }
+            categoryOps.get(categoryId)!.remove.push(id)
+          }
+        }
         if (row.material !== orig.material) patch.material = row.material || null
         if (row.discountable !== orig.discountable)
           patch.discountable = row.discountable
@@ -469,7 +535,8 @@ const BulkEditPage = () => {
             .split(",")
             .map((t) => t.trim())
             .filter(Boolean)
-          patch.tags = arr.map((v) => ({ value: v }))
+          const tagIds = await ensureTagIds(arr)
+          patch.tags = tagIds.map((tagId) => ({ id: tagId }))
         }
         if (row.weight !== orig.weight) {
           patch.weight = row.weight === "" ? null : Number(row.weight)
@@ -502,10 +569,26 @@ const BulkEditPage = () => {
 
         return patch
       })
+      )
 
-      return sdk.admin.product.batch(
+      const batchRes = await sdk.admin.product.batch(
         { update } as Parameters<typeof sdk.admin.product.batch>[0]
       )
+
+      // Product categories are managed through category endpoints, not product batch update.
+      // Apply diffs per category.
+      if (categoryOps.size > 0) {
+        await Promise.all(
+          Array.from(categoryOps.entries()).map(([categoryId, ops]) => {
+            const body: { add?: string[]; remove?: string[] } = {}
+            if (ops.add.length) body.add = ops.add
+            if (ops.remove.length) body.remove = ops.remove
+            return sdk.admin.productCategory.updateProducts(categoryId, body as any)
+          })
+        )
+      }
+
+      return batchRes
     },
     onSuccess: () => {
       const count = dirtyIds.size
@@ -1065,6 +1148,12 @@ const BulkEditPage = () => {
                   </th>
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 200 }}
+                  >
+                    Category
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 170 }}
                   >
                     Tags
@@ -1206,6 +1295,66 @@ const BulkEditPage = () => {
                             <option value="published">Published</option>
                             <option value="rejected">Rejected</option>
                           </select>
+                        </td>
+
+                        {/* Category */}
+                        <td className="px-3 py-2">
+                          <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
+                            <DropdownMenu.Trigger asChild>
+                              <button
+                                type="button"
+                                className={`${cellInput} text-left flex items-center justify-between gap-2`}
+                              >
+                                <span className="truncate">
+                                  {row.category_ids.length > 0
+                                    ? row.category_ids
+                                        .map((id) => {
+                                          const c = (categoriesData as any)
+                                            ?.product_categories?.find(
+                                              (x: any) => x.id === id
+                                            )
+                                          return c?.name ?? id
+                                        })
+                                        .join(", ")
+                                    : "—"}
+                                </span>
+                                <ChevronDown className="shrink-0" />
+                              </button>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Content className="w-[320px]">
+                              <div className="p-3 flex flex-col gap-2">
+                                <Input
+                                  value={filterSearch}
+                                  onChange={(e) => setFilterSearch(e.target.value)}
+                                  placeholder="Search categories"
+                                />
+                                <div className="max-h-[260px] overflow-auto">
+                                  {((categoriesData as any)?.product_categories ?? [])
+                                    .filter((c: any) =>
+                                      (c.name ?? "")
+                                        .toLowerCase()
+                                        .includes(filterSearch.toLowerCase())
+                                    )
+                                    .map((c: any) => (
+                                      <DropdownMenu.CheckboxItem
+                                        key={c.id}
+                                        checked={row.category_ids.includes(c.id)}
+                                        onCheckedChange={(checked) => {
+                                          const next = checked
+                                            ? Array.from(
+                                                new Set([...row.category_ids, c.id])
+                                              )
+                                            : row.category_ids.filter((id) => id !== c.id)
+                                          updateRow(row.id, "category_ids", next)
+                                        }}
+                                      >
+                                        {c.name}
+                                      </DropdownMenu.CheckboxItem>
+                                    ))}
+                                </div>
+                              </div>
+                            </DropdownMenu.Content>
+                          </DropdownMenu>
                         </td>
 
                         {/* Tags */}
