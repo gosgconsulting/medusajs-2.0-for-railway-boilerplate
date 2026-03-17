@@ -15,6 +15,16 @@ fs.copyFileSync(
   path.join(MEDUSA_SERVER_PATH, 'pnpm-lock.yaml')
 );
 
+// Sync pnpm field for patchedDependencies
+const rootPackageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+const serverPackageJsonPath = path.join(MEDUSA_SERVER_PATH, 'package.json');
+const serverPackageJson = JSON.parse(fs.readFileSync(serverPackageJsonPath, 'utf8'));
+
+if (rootPackageJson.pnpm) {
+  serverPackageJson.pnpm = rootPackageJson.pnpm;
+  fs.writeFileSync(serverPackageJsonPath, JSON.stringify(serverPackageJson, null, 2));
+}
+
 // Copy .env if it exists
 const envPath = path.join(process.cwd(), '.env');
 if (fs.existsSync(envPath)) {
@@ -22,6 +32,12 @@ if (fs.existsSync(envPath)) {
     envPath,
     path.join(MEDUSA_SERVER_PATH, '.env')
   );
+}
+
+// Copy patches if they exist
+const patchesPath = path.join(process.cwd(), 'patches');
+if (fs.existsSync(patchesPath)) {
+  fs.cpSync(patchesPath, path.join(MEDUSA_SERVER_PATH, 'patches'), { recursive: true });
 }
 
 // Install dependencies
