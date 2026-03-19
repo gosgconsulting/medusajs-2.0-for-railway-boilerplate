@@ -1058,7 +1058,7 @@ const BulkEditPage = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-6 pb-8">
+    <div className="flex flex-col pb-4">
       <input
         ref={productThumbnailInputRef}
         type="file"
@@ -1074,7 +1074,7 @@ const BulkEditPage = () => {
         onChange={handleVariantThumbnailUpload}
       />
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4" >
         <div className="flex items-center gap-3">
           <Link to="/products">
             <Button variant="transparent" size="small" className="!p-0 gap-1.5">
@@ -1111,7 +1111,7 @@ const BulkEditPage = () => {
       </div>
 
       {/* Page title */}
-      <div>
+      {/* <div>
         <Heading>Bulk Edit Products</Heading>
         <Text size="small" className="text-ui-fg-subtle mt-1">
           Edit product fields and variant prices in bulk. Press Ctrl+S (or ⌘S)
@@ -1119,11 +1119,11 @@ const BulkEditPage = () => {
           Tags are comma-separated. Prices are in main currency units (e.g.
           dollars, not cents).
         </Text>
-      </div>
+      </div> */}
 
       {/* Table */}
       <Container className="p-0 overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-ui-border-base bg-ui-bg-base">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-ui-border-base bg-ui-bg-base">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {tagIds.length > 0 && (
               <Button
@@ -1534,7 +1534,7 @@ const BulkEditPage = () => {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto" style={{ maxHeight: "calc(100vh - 53px)" }}>
+          <div className="overflow-x-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
             <table className="w-full" style={{ minWidth: 1400 }}>
               <thead>
                 <tr className="border-b border-ui-border-base bg-ui-bg-subtle">
