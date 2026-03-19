@@ -12,10 +12,45 @@ import {
   Text,
   toast,
 } from "@medusajs/ui"
-import { ChevronDown, ChevronLeft, ChevronRight, XMarkMini } from "@medusajs/icons"
+import { ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
 import { sdk } from "../../../lib/sdk"
 
 const PAGE_SIZE = 20
+const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
+
+/** Variant metadata keys editable in bulk */
+const VARIANT_METADATA_KEYS = [
+  "b2b_price",
+  "color_hex",
+  "wcwp_client-a",
+  "wcwp_client-b",
+  "wcwp_client-c",
+] as const
+
+function getMeta(metadata: Record<string, unknown> | undefined, key: string): string {
+  const val = metadata?.[key]
+  if (val == null) return ""
+  return String(val)
+}
+
+/** Get price range string (e.g. "29 - 50") from variants' metadata key, or "" if none. */
+function getVariantPriceRange(
+  variants: VariantRow[],
+  metaKey: string
+): string {
+  const nums = variants
+    .map((v) => {
+      const val = v.metadata?.[metaKey]
+      if (val == null) return NaN
+      const n = Number(val)
+      return Number.isFinite(n) ? n : NaN
+    })
+    .filter((n) => !Number.isNaN(n))
+  if (nums.length === 0) return ""
+  const min = Math.min(...nums)
+  const max = Math.max(...nums)
+  return min === max ? String(min) : `${min} - ${max}`
+}
 
 type ProductStatus = "draft" | "proposed" | "published" | "rejected"
 
@@ -39,6 +74,9 @@ type VariantRow = {
   prices: PriceRow[]
   sale_price_id?: string
   sale_price_amount: string // display amount for configured price list
+  thumbnail: string | null
+  manage_inventory: boolean
+  inventory_quantity: number | null
   metadata: Record<string, unknown>
 }
 
@@ -69,6 +107,10 @@ type ApiVariant = {
   title?: string | null
   sku?: string | null
   prices?: ApiPrice[] | null
+  thumbnail?: string | null
+  images?: { id?: string; url?: string }[] | null
+  manage_inventory?: boolean | null
+  inventory_quantity?: number | null
   metadata?: Record<string, unknown> | null
 }
 
@@ -112,6 +154,12 @@ function displayToAmount(value: string): number {
 }
 
 function toVariantRow(v: ApiVariant): VariantRow {
+  const meta = (v.metadata ?? {}) as Record<string, unknown>
+  // Variant thumbnail: top-level field first, then first image URL, then metadata fallback
+  const thumbnail =
+    (typeof v.thumbnail === "string" && v.thumbnail.trim() ? v.thumbnail : null) ??
+    (v.images?.[0]?.url ?? null) ??
+    (typeof meta?.thumbnail === "string" ? meta.thumbnail : null)
   return {
     id: v.id,
     title: v.title ?? "Default",
@@ -123,10 +171,13 @@ function toVariantRow(v: ApiVariant): VariantRow {
     })),
     sale_price_id: undefined,
     sale_price_amount:
-      typeof (v.metadata as any)?.b2b_price === "number"
-        ? amountToDisplay((v.metadata as any).b2b_price)
+      typeof meta?.b2b_price === "number"
+        ? amountToDisplay(meta.b2b_price as number)
         : "",
-    metadata: (v.metadata ?? {}) as Record<string, unknown>,
+    thumbnail,
+    manage_inventory: v.manage_inventory ?? false,
+    inventory_quantity: v.inventory_quantity ?? null,
+    metadata: meta,
   }
 }
 
@@ -159,6 +210,13 @@ const cellInput =
 
 const BulkEditPage = () => {
   const queryClient = useQueryClient()
+  const productThumbnailInputRef = React.useRef<HTMLInputElement>(null)
+  const variantThumbnailInputRef = React.useRef<HTMLInputElement>(null)
+  const [uploadingThumbnailFor, setUploadingThumbnailFor] = useState<string | null>(null)
+  const [uploadingVariantThumbnailFor, setUploadingVariantThumbnailFor] = useState<{
+    productId: string
+    variantId: string
+  } | null>(null)
   const SALE_PRICE_LIST_ID =
     typeof import.meta !== "undefined"
       ? ((import.meta as any).env?.VITE_SALE_PRICE_LIST_ID as
@@ -222,7 +280,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+tags,*categories,+description,+material,+weight,+discountable,+variants,+variants.prices,+variants.metadata",
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+discountable,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     refetchOnWindowFocus: false,
   })
@@ -351,7 +409,8 @@ const BulkEditPage = () => {
         row.material !== orig.material ||
         row.tags !== orig.tags ||
         row.weight !== orig.weight ||
-        row.discountable !== orig.discountable
+        row.discountable !== orig.discountable ||
+        row.thumbnail !== orig.thumbnail
       ) {
         set.add(row.id)
       }
@@ -368,10 +427,17 @@ const BulkEditPage = () => {
       for (const variant of row.variants) {
         const origV = orig.variants.find((v) => v.id === variant.id)
         if (!origV) continue
+        const metadataDirty = VARIANT_METADATA_KEYS.some(
+          (k) => getMeta(variant.metadata, k) !== getMeta(origV.metadata, k)
+        )
         if (
           variant.sku !== origV.sku ||
           JSON.stringify(variant.prices) !== JSON.stringify(origV.prices) ||
-          variant.sale_price_amount !== origV.sale_price_amount
+          variant.sale_price_amount !== origV.sale_price_amount ||
+          variant.thumbnail !== origV.thumbnail ||
+          variant.manage_inventory !== origV.manage_inventory ||
+          variant.inventory_quantity !== origV.inventory_quantity ||
+          metadataDirty
         ) {
           if (!map.has(row.id)) map.set(row.id, new Set())
           map.get(row.id)!.add(variant.id)
@@ -395,8 +461,8 @@ const BulkEditPage = () => {
   const updateRow = useCallback(
     (
       id: string,
-      field: keyof Omit<ProductRow, "id" | "thumbnail" | "variants">,
-      value: string | boolean | string[]
+      field: keyof Omit<ProductRow, "id" | "variants">,
+      value: string | boolean | string[] | null
     ) => {
       setWorking((prev) =>
         prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
@@ -486,6 +552,151 @@ const BulkEditPage = () => {
       )
     },
     []
+  )
+
+  const updateVariantThumbnail = useCallback(
+    (productId: string, variantId: string, thumbnail: string | null) => {
+      setWorking((prev) =>
+        prev.map((row) => {
+          if (row.id !== productId) return row
+          return {
+            ...row,
+            variants: row.variants.map((v) =>
+              v.id === variantId ? { ...v, thumbnail } : v
+            ),
+          }
+        })
+      )
+    },
+    []
+  )
+
+  const updateVariantMetadata = useCallback(
+    (
+      productId: string,
+      variantId: string,
+      key: string,
+      value: string | number | null
+    ) => {
+      setWorking((prev) =>
+        prev.map((row) => {
+          if (row.id !== productId) return row
+          return {
+            ...row,
+            variants: row.variants.map((v) => {
+              if (v.id !== variantId) return v
+              const nextMeta = { ...(v.metadata ?? {}) }
+              if (value !== null && value !== "") {
+                nextMeta[key] =
+                  typeof value === "number" ? value : String(value).trim()
+              } else {
+                delete nextMeta[key]
+              }
+              return { ...v, metadata: nextMeta }
+            }),
+          }
+        })
+      )
+    },
+    []
+  )
+
+  const updateVariantManageInventory = useCallback(
+    (productId: string, variantId: string, manage_inventory: boolean) => {
+      setWorking((prev) =>
+        prev.map((row) => {
+          if (row.id !== productId) return row
+          return {
+            ...row,
+            variants: row.variants.map((v) =>
+              v.id === variantId
+                ? {
+                    ...v,
+                    manage_inventory,
+                    inventory_quantity: manage_inventory
+                      ? v.inventory_quantity ?? 0
+                      : null,
+                  }
+                : v
+            ),
+          }
+        })
+      )
+    },
+    []
+  )
+
+  const updateVariantInventoryQuantity = useCallback(
+    (
+      productId: string,
+      variantId: string,
+      inventory_quantity: number | null
+    ) => {
+      setWorking((prev) =>
+        prev.map((row) => {
+          if (row.id !== productId) return row
+          return {
+            ...row,
+            variants: row.variants.map((v) =>
+              v.id === variantId ? { ...v, inventory_quantity } : v
+            ),
+          }
+        })
+      )
+    },
+    []
+  )
+
+  const handleProductThumbnailUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const productId = uploadingThumbnailFor
+      const files = e.target.files
+      if (!productId || !files?.length) return
+      setUploadingThumbnailFor(null)
+      try {
+        const { files: uploaded } = await sdk.admin.upload.create({
+          files: Array.from(files),
+        })
+        if (uploaded?.length && (uploaded[0] as { url?: string }).url) {
+          updateRow(productId, "thumbnail", (uploaded[0] as { url: string }).url)
+          toast.success("Thumbnail updated")
+        } else {
+          toast.error("Upload failed")
+        }
+      } catch {
+        toast.error("Upload failed")
+      }
+      e.target.value = ""
+    },
+    [uploadingThumbnailFor, updateRow]
+  )
+
+  const handleVariantThumbnailUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const target = uploadingVariantThumbnailFor
+      const files = e.target.files
+      if (!target || !files?.length) return
+      setUploadingVariantThumbnailFor(null)
+      try {
+        const { files: uploaded } = await sdk.admin.upload.create({
+          files: Array.from(files),
+        })
+        if (uploaded?.length && (uploaded[0] as { url?: string }).url) {
+          updateVariantThumbnail(
+            target.productId,
+            target.variantId,
+            (uploaded[0] as { url: string }).url
+          )
+          toast.success("Variant thumbnail updated")
+        } else {
+          toast.error("Upload failed")
+        }
+      } catch {
+        toast.error("Upload failed")
+      }
+      e.target.value = ""
+    },
+    [uploadingVariantThumbnailFor, updateVariantThumbnail]
   )
 
   const discard = useCallback(() => {
@@ -659,6 +870,9 @@ const BulkEditPage = () => {
         if (row.weight !== orig.weight) {
           patch.weight = row.weight === "" ? null : Number(row.weight)
         }
+        if (row.thumbnail !== orig.thumbnail) {
+          patch.thumbnail = row.thumbnail || null
+        }
 
         // Include dirty variant updates
         const dirtyVariants = dirtyVariantMap.get(id)
@@ -681,8 +895,28 @@ const BulkEditPage = () => {
                   amount: displayToAmount(p.amount),
                 }))
             }
+            // Variant thumbnail is a top-level field in Medusa API
+            if (v.thumbnail !== origV.thumbnail) {
+              vPatch.thumbnail = v.thumbnail?.trim() || null
+            }
+            if (v.manage_inventory !== origV.manage_inventory) {
+              vPatch.manage_inventory = v.manage_inventory
+            }
+            if (
+              v.manage_inventory &&
+              v.inventory_quantity !== origV.inventory_quantity
+            ) {
+              vPatch.inventory_quantity =
+                v.inventory_quantity != null ? v.inventory_quantity : null
+            }
 
-            // Sale price via price list
+            // Build merged metadata for b2b_price, color_hex, wcwp_client-*, etc.
+            const metaUpdates: Record<string, unknown> = {
+              ...(origV.metadata ?? {}),
+            }
+            let metaChanged = false
+
+            // Sale price (b2b_price) via price list when configured
             if (
               SALE_PRICE_LIST_ID &&
               v.sale_price_amount !== origV.sale_price_amount
@@ -705,19 +939,35 @@ const BulkEditPage = () => {
                   amount: displayToAmount(next),
                 })
               } else if (prev !== "" && next !== "" && !origV.sale_price_id) {
-                // fallback: create if we somehow don't have an id
                 priceListOps.create.push({
                   variant_id: variantId,
                   currency_code: SALE_PRICE_CURRENCY,
                   amount: displayToAmount(next),
                 })
               }
+              metaUpdates.b2b_price =
+                next === "" ? null : displayToAmount(next)
+              metaChanged = true
+            }
 
-              // Mirror sale price into variant metadata
-              vPatch.metadata = {
-                ...(origV.metadata ?? {}),
-                b2b_price: next === "" ? null : displayToAmount(next),
+            // Other metadata fields (b2b_price when no price list, color_hex, wcwp_client-*)
+            for (const key of VARIANT_METADATA_KEYS) {
+              if (key === "b2b_price" && SALE_PRICE_LIST_ID) continue // already handled above
+              const prev = getMeta(origV.metadata, key)
+              const next = getMeta(v.metadata, key)
+              if (prev !== next) {
+                if (next && next.trim()) {
+                  metaUpdates[key] =
+                    key === "b2b_price" ? displayToAmount(next) : next.trim()
+                } else {
+                  delete metaUpdates[key]
+                }
+                metaChanged = true
               }
+            }
+
+            if (metaChanged) {
+              vPatch.metadata = metaUpdates
             }
             return vPatch
           })
@@ -809,6 +1059,20 @@ const BulkEditPage = () => {
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6 pb-8">
+      <input
+        ref={productThumbnailInputRef}
+        type="file"
+        accept={ACCEPT_IMAGES}
+        className="hidden"
+        onChange={handleProductThumbnailUpload}
+      />
+      <input
+        ref={variantThumbnailInputRef}
+        type="file"
+        accept={ACCEPT_IMAGES}
+        className="hidden"
+        onChange={handleVariantThumbnailUpload}
+      />
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -1270,12 +1534,12 @@ const BulkEditPage = () => {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ maxHeight: "calc(100vh - 53px)" }}>
             <table className="w-full" style={{ minWidth: 1400 }}>
               <thead>
                 <tr className="border-b border-ui-border-base bg-ui-bg-subtle">
                   {/* Expand-all toggle */}
-                  <th className="px-3 py-3" style={{ width: 40 }}>
+                  <th className="px-3 py-3" style={{ minWidth: 40 }}>
                     <button
                       onClick={toggleExpandAll}
                       className="text-ui-fg-muted hover:text-ui-fg-base transition-colors"
@@ -1286,7 +1550,7 @@ const BulkEditPage = () => {
                   </th>
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ width: 56 }}
+                    style={{ minWidth: 56 }}
                   >
                     Image
                   </th>
@@ -1295,6 +1559,66 @@ const BulkEditPage = () => {
                     style={{ minWidth: 180 }}
                   >
                     Title
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 130 }}
+                  >
+                    Status
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 200 }}
+                  >
+                    Category
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 100 }}
+                  >
+                    Base price
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 100 }}
+                  >
+                    Sale price
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 90 }}
+                  >
+                    Client A
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 90 }}
+                  >
+                    Client B
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 90 }}
+                  >
+                    Client C
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 120 }}
+                  >
+                    SKU
+                  </th>
+                  <th
+                    className="px-3 py-3 text-center txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 100 }}
+                  >
+                    Manage Stock
+                  </th>
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 90 }}
+                  >
+                    Stock qty
                   </th>
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
@@ -1316,18 +1640,6 @@ const BulkEditPage = () => {
                   </th>
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ width: 130 }}
-                  >
-                    Status
-                  </th>
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 200 }}
-                  >
-                    Category
-                  </th>
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 170 }}
                   >
                     Tags
@@ -1340,19 +1652,25 @@ const BulkEditPage = () => {
                   </th>
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ width: 100 }}
+                    style={{ minWidth: 100 }}
                   >
                     Weight (g)
                   </th>
                   <th
                     className="px-3 py-3 text-center txt-compact-small-plus text-ui-fg-muted"
-                    style={{ width: 110 }}
+                    style={{ minWidth: 110 }}
                   >
                     Discountable
                   </th>
                   <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 90 }}
+                  >
+                    Color
+                  </th>
+                  <th
                     className="px-3 py-3"
-                    style={{ width: 90 }}
+                    style={{ minWidth: 90 }}
                     aria-label="Changed"
                   />
                 </tr>
@@ -1365,15 +1683,6 @@ const BulkEditPage = () => {
                     hasVariantDirty && !dirtyProductIds.has(row.id)
                   const rowError = errors[row.id]
                   const isExpanded = expandedIds.has(row.id)
-
-                  // Collect all unique currency codes across this product's variants
-                  const currencies = Array.from(
-                    new Set(
-                      row.variants.flatMap((v) =>
-                        v.prices.map((p) => p.currency_code)
-                      )
-                    )
-                  )
 
                   return (
                     <React.Fragment key={row.id}>
@@ -1406,15 +1715,72 @@ const BulkEditPage = () => {
 
                         {/* Thumbnail */}
                         <td className="px-3 py-2">
-                          {row.thumbnail ? (
-                            <img
-                              src={row.thumbnail}
-                              alt=""
-                              className="w-9 h-9 rounded object-cover border border-ui-border-base"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded bg-ui-bg-subtle border border-ui-border-base" />
-                          )}
+                          <DropdownMenu>
+                            <DropdownMenu.Trigger asChild>
+                              <button
+                                type="button"
+                                className="flex items-center gap-1.5 rounded border border-ui-border-base hover:border-ui-border-interactive transition-colors overflow-hidden focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
+                              >
+                                {row.thumbnail ? (
+                                  <img
+                                    src={row.thumbnail}
+                                    alt=""
+                                    className="w-9 h-9 object-contain"
+                                  />
+                                ) : (
+                                  <div className="w-9 h-9 bg-ui-bg-subtle" />
+                                )}
+                                <PencilSquare className="w-4 h-4 text-ui-fg-muted shrink-0 mr-1" />
+                              </button>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Content align="start" className="w-64">
+                              <div className="p-2 flex flex-col gap-2">
+                                <Button
+                                  size="small"
+                                  variant="secondary"
+                                  className="w-full"
+                                  disabled={uploadingThumbnailFor === row.id}
+                                  onClick={() => {
+                                    setUploadingThumbnailFor(row.id)
+                                    productThumbnailInputRef.current?.click()
+                                  }}
+                                >
+                                  {uploadingThumbnailFor === row.id
+                                    ? "Uploading…"
+                                    : "Upload image"}
+                                </Button>
+                                <div className="flex flex-col gap-1">
+                                  <Text size="xsmall" className="text-ui-fg-muted">
+                                    Or paste URL
+                                  </Text>
+                                  <Input
+                                    size="small"
+                                    placeholder="https://..."
+                                    value={row.thumbnail ?? ""}
+                                    onChange={(e) =>
+                                      updateRow(
+                                        row.id,
+                                        "thumbnail",
+                                        e.target.value || null
+                                      )
+                                    }
+                                  />
+                                </div>
+                                {row.thumbnail && (
+                                  <Button
+                                    size="small"
+                                    variant="transparent"
+                                    className="w-full text-ui-fg-error"
+                                    onClick={() =>
+                                      updateRow(row.id, "thumbnail", null)
+                                    }
+                                  >
+                                    Clear
+                                  </Button>
+                                )}
+                              </div>
+                            </DropdownMenu.Content>
+                          </DropdownMenu>
                         </td>
 
                         {/* Title */}
@@ -1431,41 +1797,6 @@ const BulkEditPage = () => {
                               {rowError}
                             </p>
                           )}
-                        </td>
-
-                        {/* Subtitle */}
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.subtitle}
-                            onChange={(e) =>
-                              updateRow(row.id, "subtitle", e.target.value)
-                            }
-                            placeholder="Short subtitle"
-                          />
-                        </td>
-
-                        {/* Description */}
-                        <td className="px-3 py-2">
-                          <textarea
-                            value={row.description}
-                            onChange={(e) =>
-                              updateRow(row.id, "description", e.target.value)
-                            }
-                            placeholder="Product description"
-                            rows={2}
-                            className={`${cellInput} h-auto py-2 resize-y`}
-                          />
-                        </td>
-
-                        {/* Handle */}
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.handle}
-                            onChange={(e) =>
-                              updateRow(row.id, "handle", e.target.value)
-                            }
-                            placeholder="product-handle"
-                          />
                         </td>
 
                         {/* Status */}
@@ -1544,6 +1875,135 @@ const BulkEditPage = () => {
                           </DropdownMenu>
                         </td>
 
+                        {/* Base price (disabled - no product-level price in Medusa) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={
+                              row.variants[0]?.prices[0]?.amount ?? "—"
+                            }
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* Sale price (disabled - no product-level sale price) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={
+                              row.variants[0]?.sale_price_amount ?? "—"
+                            }
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* Client A (disabled - price range from variants) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={getVariantPriceRange(row.variants, "wcwp_client-a")}
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* Client B (disabled - price range from variants) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={getVariantPriceRange(row.variants, "wcwp_client-b")}
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* Client C (disabled - price range from variants) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={getVariantPriceRange(row.variants, "wcwp_client-c")}
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* SKU (disabled - no product-level SKU in Medusa) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={row.variants[0]?.sku ?? "—"}
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* Manage Stock (disabled - derived from variants) */}
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="text"
+                            value={
+                              row.variants.some((v) => v.manage_inventory)
+                                ? "Yes"
+                                : "No"
+                            }
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* Stock qty (disabled - total of all variant inventory) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={String(
+                              row.variants.reduce(
+                                (sum, v) =>
+                                  sum + (v.inventory_quantity ?? 0),
+                                0
+                              )
+                            )}
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
+                        {/* Subtitle */}
+                        <td className="px-3 py-2">
+                          <Input
+                            value={row.subtitle}
+                            onChange={(e) =>
+                              updateRow(row.id, "subtitle", e.target.value)
+                            }
+                            placeholder="Short subtitle"
+                          />
+                        </td>
+
+                        {/* Description */}
+                        <td className="px-3 py-2">
+                          <textarea
+                            value={row.description}
+                            onChange={(e) =>
+                              updateRow(row.id, "description", e.target.value)
+                            }
+                            placeholder="Product description"
+                            rows={2}
+                            className={`${cellInput} h-auto py-2 resize-y`}
+                          />
+                        </td>
+
+                        {/* Handle */}
+                        <td className="px-3 py-2">
+                          <Input
+                            value={row.handle}
+                            onChange={(e) =>
+                              updateRow(row.id, "handle", e.target.value)
+                            }
+                            placeholder="product-handle"
+                          />
+                        </td>
+
                         {/* Tags */}
                         <td className="px-3 py-2">
                           <Input
@@ -1594,6 +2054,16 @@ const BulkEditPage = () => {
                           />
                         </td>
 
+                        {/* Color (disabled - variant-level, blank on product) */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value=""
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+
                         {/* Dirty indicators */}
                         <td className="px-3 py-2 text-right">
                           <div className="flex flex-col items-end gap-1">
@@ -1616,161 +2086,438 @@ const BulkEditPage = () => {
                         </td>
                       </tr>
 
-                      {/* ── Variant sub-rows ── */}
-                      {isExpanded && row.variants.length > 0 && (
-                        <tr>
-                          <td
-                            colSpan={11}
-                            className="p-0 border-b border-ui-border-base"
-                          >
-                            <div className="ml-10 border-l-2 border-ui-border-interactive bg-ui-bg-subtle">
-                              <table className="w-full">
-                                <thead>
-                                  <tr className="border-b border-ui-border-base">
-                                    <th
-                                      className="px-4 py-2 text-left txt-compact-xsmall-plus text-ui-fg-muted"
-                                      style={{ width: 160 }}
+                      {/* ── Variant rows (same column level as product) ── */}
+                      {isExpanded &&
+                        row.variants.map((variant) => {
+                          const vDirty = dirtyVariantMap
+                            .get(row.id)
+                            ?.has(variant.id)
+                          const categoryLabel =
+                            row.category_ids.length > 0
+                              ? row.category_ids
+                                  .map((id) => {
+                                    const c = (categoriesData as any)
+                                      ?.product_categories?.find(
+                                        (x: any) => x.id === id
+                                      )
+                                    return c?.name ?? id
+                                  })
+                                  .join(", ")
+                              : "—"
+                          return (
+                            <tr
+                              key={variant.id}
+                              className={
+                                vDirty
+                                  ? "bg-ui-bg-highlight"
+                                  : "bg-ui-bg-subtle"
+                              }
+                            >
+                              {/* Expand (empty for variant) */}
+                              <td className="px-3 py-2" />
+                              {/* Image */}
+                              <td className="px-3 py-2">
+                                <DropdownMenu>
+                                  <DropdownMenu.Trigger asChild>
+                                    <button
+                                      type="button"
+                                      className="flex items-center gap-1.5 rounded border border-ui-border-base hover:border-ui-border-interactive transition-colors overflow-hidden focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
                                     >
-                                      Variant
-                                    </th>
-                                    <th
-                                      className="px-4 py-2 text-left txt-compact-xsmall-plus text-ui-fg-muted"
-                                      style={{ minWidth: 160 }}
-                                    >
-                                      SKU
-                                    </th>
-                                    {currencies.map((cc) => (
-                                      <th
-                                        key={cc}
-                                        className="px-4 py-2 text-left txt-compact-xsmall-plus text-ui-fg-muted"
-                                        style={{ minWidth: 130 }}
-                                      >
-                                        Price ({cc.toUpperCase()})
-                                      </th>
-                                    ))}
-                                    {SALE_PRICE_LIST_ID && (
-                                      <th
-                                        className="px-4 py-2 text-left txt-compact-xsmall-plus text-ui-fg-muted"
-                                        style={{ minWidth: 150 }}
-                                      >
-                                        Sale ({SALE_PRICE_CURRENCY.toUpperCase()})
-                                      </th>
-                                    )}
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-ui-border-base">
-                                  {row.variants.map((variant) => {
-                                    const vDirty = dirtyVariantMap
-                                      .get(row.id)
-                                      ?.has(variant.id)
-                                    return (
-                                      <tr
-                                        key={variant.id}
-                                        className={
-                                          vDirty
-                                            ? "bg-ui-bg-highlight"
-                                            : "bg-ui-bg-subtle"
+                                      {variant.thumbnail ? (
+                                        <img
+                                          src={variant.thumbnail}
+                                          alt=""
+                                          className="w-8 h-8 object-contain"
+                                        />
+                                      ) : (
+                                        <div className="w-8 h-8 bg-ui-bg-base" />
+                                      )}
+                                      <PencilSquare className="w-4 h-4 text-ui-fg-muted shrink-0 mr-1" />
+                                    </button>
+                                  </DropdownMenu.Trigger>
+                                  <DropdownMenu.Content align="start" className="w-64">
+                                    <div className="p-2 flex flex-col gap-2">
+                                      <Button
+                                        size="small"
+                                        variant="secondary"
+                                        className="w-full"
+                                        disabled={
+                                          uploadingVariantThumbnailFor?.productId === row.id &&
+                                          uploadingVariantThumbnailFor?.variantId === variant.id
                                         }
+                                        onClick={() => {
+                                          setUploadingVariantThumbnailFor({
+                                            productId: row.id,
+                                            variantId: variant.id,
+                                          })
+                                          variantThumbnailInputRef.current?.click()
+                                        }}
                                       >
-                                        {/* Variant name */}
-                                        <td className="px-4 py-2">
-                                          <div className="flex items-center gap-2">
-                                            <Text
-                                              size="small"
-                                              className="text-ui-fg-base font-medium"
-                                            >
-                                              {variant.title}
-                                            </Text>
-                                            {vDirty && (
-                                              <Badge
-                                                color="orange"
-                                                className="whitespace-nowrap"
-                                              >
-                                                Changed
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        </td>
-
-                                        {/* SKU */}
-                                        <td className="px-4 py-2">
-                                          <Input
-                                            value={variant.sku}
-                                            onChange={(e) =>
-                                              updateVariantSku(
-                                                row.id,
-                                                variant.id,
-                                                e.target.value
-                                              )
-                                            }
-                                            placeholder="SKU-001"
-                                          />
-                                        </td>
-
-                                        {/* Price per currency */}
-                                        {currencies.map((cc) => {
-                                          const price = variant.prices.find(
-                                            (p) => p.currency_code === cc
-                                          )
-                                          return (
-                                            <td key={cc} className="px-4 py-2">
-                                              {price ? (
-                                                <input
-                                                  type="number"
-                                                  min={0}
-                                                  step="0.01"
-                                                  value={price.amount}
-                                                  onChange={(e) =>
-                                                    updateVariantPrice(
-                                                      row.id,
-                                                      variant.id,
-                                                      cc,
-                                                      e.target.value
-                                                    )
-                                                  }
-                                                  placeholder="0.00"
-                                                  className={cellInput}
-                                                />
-                                              ) : (
-                                                <Text
-                                                  size="small"
-                                                  className="text-ui-fg-muted px-3"
-                                                >
-                                                  —
-                                                </Text>
-                                              )}
-                                            </td>
-                                          )
-                                        })}
-
-                                        {SALE_PRICE_LIST_ID && (
-                                          <td className="px-4 py-2">
-                                            <input
-                                              type="number"
-                                              min={0}
-                                              step="0.01"
-                                              value={variant.sale_price_amount}
-                                              onChange={(e) =>
-                                                updateVariantSalePrice(
-                                                  row.id,
-                                                  variant.id,
-                                                  e.target.value
-                                                )
-                                              }
-                                              placeholder="0.00"
-                                              className={cellInput}
-                                            />
-                                          </td>
-                                        )}
-                                      </tr>
+                                        {uploadingVariantThumbnailFor?.productId === row.id &&
+                                        uploadingVariantThumbnailFor?.variantId === variant.id
+                                          ? "Uploading…"
+                                          : "Upload image"}
+                                      </Button>
+                                      <div className="flex flex-col gap-1">
+                                        <Text size="xsmall" className="text-ui-fg-muted">
+                                          Or paste URL
+                                        </Text>
+                                        <Input
+                                          size="small"
+                                          placeholder="https://..."
+                                          value={variant.thumbnail ?? ""}
+                                          onChange={(e) =>
+                                            updateVariantThumbnail(
+                                              row.id,
+                                              variant.id,
+                                              e.target.value || null
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                      {variant.thumbnail && (
+                                        <Button
+                                          size="small"
+                                          variant="transparent"
+                                          className="w-full text-ui-fg-error"
+                                          onClick={() =>
+                                            updateVariantThumbnail(
+                                              row.id,
+                                              variant.id,
+                                              null
+                                            )
+                                          }
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </DropdownMenu.Content>
+                                </DropdownMenu>
+                              </td>
+                              {/* Title */}
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <Text
+                                    size="small"
+                                    className="text-ui-fg-base font-medium"
+                                  >
+                                    {variant.title}
+                                  </Text>
+                                  {vDirty && (
+                                    <Badge
+                                      color="orange"
+                                      className="whitespace-nowrap"
+                                    >
+                                      Changed
+                                    </Badge>
+                                  )}
+                                </div>
+                              </td>
+                              {/* Status (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.status}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Category (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={categoryLabel}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Base price */}
+                              <td className="px-3 py-2">
+                                {variant.prices[0] ? (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={variant.prices[0].amount}
+                                    onChange={(e) =>
+                                      updateVariantPrice(
+                                        row.id,
+                                        variant.id,
+                                        variant.prices[0].currency_code,
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    className={cellInput}
+                                  />
+                                ) : (
+                                  <Text size="small" className="text-ui-fg-muted px-3">
+                                    —
+                                  </Text>
+                                )}
+                              </td>
+                              {/* Sale price / B2B Price */}
+                              {SALE_PRICE_LIST_ID ? (
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={variant.sale_price_amount}
+                                    onChange={(e) =>
+                                      updateVariantSalePrice(
+                                        row.id,
+                                        variant.id,
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    className={cellInput}
+                                  />
+                                </td>
+                              ) : (
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={getMeta(variant.metadata, "b2b_price")}
+                                    onChange={(e) => {
+                                      const val = e.target.value.trim()
+                                      updateVariantMetadata(
+                                        row.id,
+                                        variant.id,
+                                        "b2b_price",
+                                        val ? (Number.isFinite(Number(val)) ? Number(val) : val) : null
+                                      )
+                                    }
+                                    }
+                                    placeholder="0.00"
+                                    className={cellInput}
+                                  />
+                                </td>
+                              )}
+                              {/* Client A */}
+                              <td className="px-3 py-2">
+                                <Input
+                                  size="small"
+                                  value={getMeta(variant.metadata, "wcwp_client-a")}
+                                  onChange={(e) =>
+                                    updateVariantMetadata(
+                                      row.id,
+                                      variant.id,
+                                      "wcwp_client-a",
+                                      e.target.value || null
                                     )
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+                                  }
+                                  placeholder="—"
+                                />
+                              </td>
+                              {/* Client B */}
+                              <td className="px-3 py-2">
+                                <Input
+                                  size="small"
+                                  value={getMeta(variant.metadata, "wcwp_client-b")}
+                                  onChange={(e) =>
+                                    updateVariantMetadata(
+                                      row.id,
+                                      variant.id,
+                                      "wcwp_client-b",
+                                      e.target.value || null
+                                    )
+                                  }
+                                  placeholder="—"
+                                />
+                              </td>
+                              {/* Client C */}
+                              <td className="px-3 py-2">
+                                <Input
+                                  size="small"
+                                  value={getMeta(variant.metadata, "wcwp_client-c")}
+                                  onChange={(e) =>
+                                    updateVariantMetadata(
+                                      row.id,
+                                      variant.id,
+                                      "wcwp_client-c",
+                                      e.target.value || null
+                                    )
+                                  }
+                                  placeholder="—"
+                                />
+                              </td>
+                              {/* SKU */}
+                              <td className="px-3 py-2">
+                                <Input
+                                  value={variant.sku}
+                                  onChange={(e) =>
+                                    updateVariantSku(
+                                      row.id,
+                                      variant.id,
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="SKU-001"
+                                />
+                              </td>
+                              {/* Manage Stock */}
+                              <td className="px-3 py-2 text-center">
+                                <Checkbox
+                                  checked={variant.manage_inventory}
+                                  onCheckedChange={(checked) =>
+                                    updateVariantManageInventory(
+                                      row.id,
+                                      variant.id,
+                                      checked === true
+                                    )
+                                  }
+                                />
+                              </td>
+                              {/* Stock Qty */}
+                              <td className="px-3 py-2">
+                                {variant.manage_inventory ? (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    value={
+                                      variant.inventory_quantity ?? ""
+                                    }
+                                    onChange={(e) => {
+                                      const val = e.target.value.trim()
+                                      const num = val
+                                        ? Math.max(0, Math.floor(Number(val)))
+                                        : NaN
+                                      updateVariantInventoryQuantity(
+                                        row.id,
+                                        variant.id,
+                                        val
+                                          ? Number.isFinite(num)
+                                            ? num
+                                            : variant.inventory_quantity ?? null
+                                          : null
+                                      )
+                                    }
+                                    }
+                                    placeholder="0"
+                                    className={cellInput}
+                                  />
+                                ) : (
+                                  <Text size="small" className="text-ui-fg-muted px-3">
+                                    —
+                                  </Text>
+                                )}
+                              </td>
+                              {/* Subtitle (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.subtitle}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Description (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.description}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Handle (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.handle}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Tags (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.tags}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Material (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.material}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Weight (disabled - inherit) */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.weight}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Discountable (disabled - inherit) */}
+                              <td className="px-3 py-2 text-center">
+                                <input
+                                  type="text"
+                                  value={row.discountable ? "Yes" : "No"}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              {/* Color */}
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="color"
+                                    value={
+                                      getMeta(variant.metadata, "color_hex") ||
+                                      "#000000"
+                                    }
+                                    onChange={(e) =>
+                                      updateVariantMetadata(
+                                        row.id,
+                                        variant.id,
+                                        "color_hex",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-8 h-8 rounded border border-ui-border-base cursor-pointer p-0"
+                                    title="Color"
+                                  />
+                                  <Input
+                                    size="small"
+                                    value={getMeta(variant.metadata, "color_hex")}
+                                    onChange={(e) =>
+                                      updateVariantMetadata(
+                                        row.id,
+                                        variant.id,
+                                        "color_hex",
+                                        e.target.value || null
+                                      )
+                                    }
+                                    placeholder="#hex"
+                                    className="w-20"
+                                  />
+                                </div>
+                              </td>
+                              {/* Changed */}
+                              <td className="px-3 py-2 text-right">
+                                {vDirty && (
+                                  <Badge color="orange" className="whitespace-nowrap">
+                                    Changed
+                                  </Badge>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                     </React.Fragment>
                   )
                 })}
