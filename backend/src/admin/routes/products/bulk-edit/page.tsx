@@ -18,6 +18,34 @@ import { sdk } from "../../../lib/sdk"
 const PAGE_SIZE = 20
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 
+/** Toggleable columns for Manage columns (Image, Title, Status are always visible) */
+const TOGGLEABLE_COLUMNS = [
+  { id: "category", label: "Category" },
+  { id: "sku", label: "SKU" },
+  { id: "basePrice", label: "Base price" },
+  { id: "salePrice", label: "Sale price" },
+  { id: "clientA", label: "Client A" },
+  { id: "clientB", label: "Client B" },
+  { id: "clientC", label: "Client C" },
+  { id: "manageStock", label: "Manage Stock" },
+  { id: "stockQty", label: "Stock qty" },
+  { id: "subtitle", label: "Subtitle" },
+  { id: "description", label: "Description" },
+  { id: "handle", label: "Handle" },
+  { id: "tags", label: "Tags" },
+  { id: "material", label: "Material" },
+  { id: "weight", label: "Weight (g)" },
+  { id: "width", label: "Width" },
+  { id: "height", label: "Height" },
+  { id: "discountable", label: "Discountable" },
+  { id: "color", label: "Color" },
+  { id: "changed", label: "Changed" },
+] as const
+
+const DEFAULT_VISIBLE_COLUMNS = new Set(
+  TOGGLEABLE_COLUMNS.map((c) => c.id)
+)
+
 /** Variant metadata keys editable in bulk */
 const VARIANT_METADATA_KEYS = [
   "b2b_price",
@@ -91,6 +119,8 @@ type ProductRow = {
   material: string
   tags: string      // comma-separated
   weight: string    // as string for input control
+  width: string     // as string for input control
+  height: string    // as string for input control
   discountable: boolean
   thumbnail: string | null
   variants: VariantRow[]
@@ -124,6 +154,8 @@ type ApiProduct = {
   categories?: { id?: string; name?: string }[] | null
   material?: string | null
   weight?: number | null
+  width?: number | null
+  height?: number | null
   discountable?: boolean | null
   thumbnail?: string | null
   tags?: { id?: string; value?: string }[] | null
@@ -195,6 +227,8 @@ function toRow(p: ApiProduct): ProductRow {
     material: p.material ?? "",
     tags: tagsToString(p.tags),
     weight: p.weight != null ? String(p.weight) : "",
+    width: p.width != null ? String(p.width) : "",
+    height: p.height != null ? String(p.height) : "",
     discountable: p.discountable ?? true,
     thumbnail: p.thumbnail ?? null,
     variants: (p.variants ?? []).map(toVariantRow),
@@ -245,6 +279,20 @@ const BulkEditPage = () => {
   const [working, setWorking] = useState<ProductRow[]>([])
   const [errors, setErrors] = useState<RowErrors>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [columnMode, setColumnMode] = useState<"default" | "custom">("default")
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
+    () => new Set(DEFAULT_VISIBLE_COLUMNS)
+  )
+
+  const isColumnVisible = useCallback(
+    (id: string) => {
+      if (id === "expand" || id === "image" || id === "title" || id === "status")
+        return true
+      if (columnMode === "default") return true
+      return visibleColumns.has(id)
+    },
+    [columnMode, visibleColumns]
+  )
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -280,7 +328,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+discountable,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+discountable,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     refetchOnWindowFocus: false,
   })
@@ -409,6 +457,8 @@ const BulkEditPage = () => {
         row.material !== orig.material ||
         row.tags !== orig.tags ||
         row.weight !== orig.weight ||
+        row.width !== orig.width ||
+        row.height !== orig.height ||
         row.discountable !== orig.discountable ||
         row.thumbnail !== orig.thumbnail
       ) {
@@ -869,6 +919,12 @@ const BulkEditPage = () => {
         }
         if (row.weight !== orig.weight) {
           patch.weight = row.weight === "" ? null : Number(row.weight)
+        }
+        if (row.width !== orig.width) {
+          patch.width = row.width === "" ? null : Number(row.width)
+        }
+        if (row.height !== orig.height) {
+          patch.height = row.height === "" ? null : Number(row.height)
         }
         if (row.thumbnail !== orig.thumbnail) {
           patch.thumbnail = row.thumbnail || null
@@ -1460,6 +1516,70 @@ const BulkEditPage = () => {
               </DropdownMenu.Content>
             </DropdownMenu>
 
+            <DropdownMenu>
+              <DropdownMenu.Trigger asChild>
+                <Button variant="secondary" size="small" disabled={isSaving}>
+                  Manage columns <ChevronDown className="ml-1" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content className="w-[280px]">
+                <div className="p-3 flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="columnMode"
+                        checked={columnMode === "default"}
+                        onChange={() => setColumnMode("default")}
+                        className="rounded-full"
+                      />
+                      <Text size="small">Default (all columns)</Text>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="columnMode"
+                        checked={columnMode === "custom"}
+                        onChange={() => setColumnMode("custom")}
+                        className="rounded-full"
+                      />
+                      <Text size="small">Custom</Text>
+                    </label>
+                  </div>
+                  {columnMode === "custom" && (
+                    <>
+                      <div className="border-t border-ui-border-base pt-2">
+                        <Text size="xsmall" className="text-ui-fg-muted mb-2 block">
+                          Select columns to display:
+                        </Text>
+                        <div className="max-h-[240px] overflow-auto flex flex-col gap-1">
+                          {TOGGLEABLE_COLUMNS.map((col) => (
+                            <label
+                              key={col.id}
+                              className="flex items-center gap-2 cursor-pointer py-1"
+                            >
+                              <Checkbox
+                                checked={visibleColumns.has(col.id)}
+                                onCheckedChange={(checked) => {
+                                  setVisibleColumns((prev) => {
+                                    const next = new Set(prev)
+                                    if (checked) next.add(col.id)
+                                    else next.delete(col.id)
+                                    return next
+                                  })
+                                }}
+                              />
+                              <Text size="small">{col.label}</Text>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </DropdownMenu.Content>
+            </DropdownMenu>
+
             {hasAnyFilters && (
               <Button
                 variant="transparent"
@@ -1538,7 +1658,7 @@ const BulkEditPage = () => {
             <table className="w-full" style={{ minWidth: 1400 }}>
               <thead>
                 <tr className="border-b border-ui-border-base bg-ui-bg-subtle">
-                  {/* Expand-all toggle */}
+                  {isColumnVisible("expand") && (
                   <th className="px-3 py-3" style={{ minWidth: 40 }}>
                     <button
                       onClick={toggleExpandAll}
@@ -1548,131 +1668,190 @@ const BulkEditPage = () => {
                       {allExpanded ? <ChevronDown /> : <ChevronRight />}
                     </button>
                   </th>
+                  )}
+                  {isColumnVisible("image") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 56 }}
                   >
                     Image
                   </th>
+                  )}
+                  {isColumnVisible("title") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 180 }}
                   >
                     Title
                   </th>
+                  )}
+                  {isColumnVisible("status") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 130 }}
                   >
                     Status
                   </th>
+                  )}
+                  {isColumnVisible("category") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 200 }}
                   >
                     Category
                   </th>
+                  )}
+                  {isColumnVisible("sku") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 150 }}
+                  >
+                    SKU
+                  </th>
+                  )}
+                  {isColumnVisible("basePrice") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 100 }}
                   >
                     Base price
                   </th>
+                  )}
+                  {isColumnVisible("salePrice") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 100 }}
                   >
                     Sale price
                   </th>
+                  )}
+                  {isColumnVisible("clientA") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 90 }}
                   >
                     Client A
                   </th>
+                  )}
+                  {isColumnVisible("clientB") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 90 }}
                   >
                     Client B
                   </th>
+                  )}
+                  {isColumnVisible("clientC") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 90 }}
                   >
                     Client C
                   </th>
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 120 }}
-                  >
-                    SKU
-                  </th>
+                  )}
+                  {isColumnVisible("manageStock") && (
                   <th
                     className="px-3 py-3 text-center txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 100 }}
                   >
                     Manage Stock
                   </th>
+                  )}
+                  {isColumnVisible("stockQty") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 90 }}
                   >
                     Stock qty
                   </th>
+                  )}
+                  {isColumnVisible("subtitle") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 150 }}
                   >
                     Subtitle
                   </th>
+                  )}
+                  {isColumnVisible("description") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 260 }}
                   >
                     Description
                   </th>
+                  )}
+                  {isColumnVisible("handle") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 150 }}
                   >
                     Handle
                   </th>
+                  )}
+                  {isColumnVisible("tags") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 170 }}
                   >
                     Tags
                   </th>
+                  )}
+                  {isColumnVisible("material") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 120 }}
                   >
                     Material
                   </th>
+                  )}
+                  {isColumnVisible("weight") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 100 }}
                   >
                     Weight (g)
                   </th>
+                  )}
+                  {isColumnVisible("width") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 80 }}
+                  >
+                    Width
+                  </th>
+                  )}
+                  {isColumnVisible("height") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 80 }}
+                  >
+                    Height
+                  </th>
+                  )}
+                  {isColumnVisible("discountable") && (
                   <th
                     className="px-3 py-3 text-center txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 110 }}
                   >
                     Discountable
                   </th>
+                  )}
+                  {isColumnVisible("color") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
                     style={{ minWidth: 90 }}
                   >
                     Color
                   </th>
+                  )}
+                  {isColumnVisible("changed") && (
                   <th
                     className="px-3 py-3"
                     style={{ minWidth: 90 }}
                     aria-label="Changed"
                   />
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-ui-border-base">
@@ -1692,7 +1871,7 @@ const BulkEditPage = () => {
                           isDirty ? "bg-ui-bg-highlight" : "bg-ui-bg-base"
                         }
                       >
-                        {/* Expand toggle */}
+                        {isColumnVisible("expand") && (
                         <td className="px-3 py-2">
                           {row.variants.length > 0 && (
                             <button
@@ -1712,8 +1891,8 @@ const BulkEditPage = () => {
                             </button>
                           )}
                         </td>
-
-                        {/* Thumbnail */}
+                        )}
+                        {isColumnVisible("image") && (
                         <td className="px-3 py-2">
                           <DropdownMenu>
                             <DropdownMenu.Trigger asChild>
@@ -1782,8 +1961,8 @@ const BulkEditPage = () => {
                             </DropdownMenu.Content>
                           </DropdownMenu>
                         </td>
-
-                        {/* Title */}
+                        )}
+                        {isColumnVisible("title") && (
                         <td className="px-3 py-2">
                           <Input
                             value={row.title}
@@ -1798,8 +1977,8 @@ const BulkEditPage = () => {
                             </p>
                           )}
                         </td>
-
-                        {/* Status */}
+                        )}
+                        {isColumnVisible("status") && (
                         <td className="px-3 py-2">
                           <select
                             value={row.status}
@@ -1814,8 +1993,8 @@ const BulkEditPage = () => {
                             <option value="rejected">Rejected</option>
                           </select>
                         </td>
-
-                        {/* Category */}
+                        )}
+                        {isColumnVisible("category") && (
                         <td className="px-3 py-2">
                           <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
                             <DropdownMenu.Trigger asChild>
@@ -1874,8 +2053,18 @@ const BulkEditPage = () => {
                             </DropdownMenu.Content>
                           </DropdownMenu>
                         </td>
-
-                        {/* Base price (disabled - no product-level price in Medusa) */}
+                        )}
+                        {isColumnVisible("sku") && (
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value="—"
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+                        )}
+                        {isColumnVisible("basePrice") && (
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -1886,8 +2075,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* Sale price (disabled - no product-level sale price) */}
+                        )}
+                        {isColumnVisible("salePrice") && (
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -1898,8 +2087,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* Client A (disabled - price range from variants) */}
+                        )}
+                        {isColumnVisible("clientA") && (
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -1908,8 +2097,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* Client B (disabled - price range from variants) */}
+                        )}
+                        {isColumnVisible("clientB") && (
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -1918,8 +2107,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* Client C (disabled - price range from variants) */}
+                        )}
+                        {isColumnVisible("clientC") && (
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -1928,18 +2117,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* SKU (disabled - no product-level SKU in Medusa) */}
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={row.variants[0]?.sku ?? "—"}
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-
-                        {/* Manage Stock (disabled - derived from variants) */}
+                        )}
+                        {isColumnVisible("manageStock") && (
                         <td className="px-3 py-2 text-center">
                           <input
                             type="text"
@@ -1952,8 +2131,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* Stock qty (disabled - total of all variant inventory) */}
+                        )}
+                        {isColumnVisible("stockQty") && (
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -1968,8 +2147,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* Subtitle */}
+                        )}
+                        {isColumnVisible("subtitle") && (
                         <td className="px-3 py-2">
                           <Input
                             value={row.subtitle}
@@ -1979,8 +2158,8 @@ const BulkEditPage = () => {
                             placeholder="Short subtitle"
                           />
                         </td>
-
-                        {/* Description */}
+                        )}
+                        {isColumnVisible("description") && (
                         <td className="px-3 py-2">
                           <textarea
                             value={row.description}
@@ -1992,8 +2171,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} h-auto py-2 resize-y`}
                           />
                         </td>
-
-                        {/* Handle */}
+                        )}
+                        {isColumnVisible("handle") && (
                         <td className="px-3 py-2">
                           <Input
                             value={row.handle}
@@ -2003,8 +2182,8 @@ const BulkEditPage = () => {
                             placeholder="product-handle"
                           />
                         </td>
-
-                        {/* Tags */}
+                        )}
+                        {isColumnVisible("tags") && (
                         <td className="px-3 py-2">
                           <Input
                             value={row.tags}
@@ -2014,8 +2193,8 @@ const BulkEditPage = () => {
                             placeholder="tag1, tag2"
                           />
                         </td>
-
-                        {/* Material */}
+                        )}
+                        {isColumnVisible("material") && (
                         <td className="px-3 py-2">
                           <Input
                             value={row.material}
@@ -2025,8 +2204,8 @@ const BulkEditPage = () => {
                             placeholder="e.g. Cotton"
                           />
                         </td>
-
-                        {/* Weight */}
+                        )}
+                        {isColumnVisible("weight") && (
                         <td className="px-3 py-2">
                           <input
                             type="number"
@@ -2039,8 +2218,36 @@ const BulkEditPage = () => {
                             className={cellInput}
                           />
                         </td>
-
-                        {/* Discountable */}
+                        )}
+                        {isColumnVisible("width") && (
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.width}
+                            onChange={(e) =>
+                              updateRow(row.id, "width", e.target.value)
+                            }
+                            placeholder="0"
+                            className={cellInput}
+                          />
+                        </td>
+                        )}
+                        {isColumnVisible("height") && (
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.height}
+                            onChange={(e) =>
+                              updateRow(row.id, "height", e.target.value)
+                            }
+                            placeholder="0"
+                            className={cellInput}
+                          />
+                        </td>
+                        )}
+                        {isColumnVisible("discountable") && (
                         <td className="px-3 py-2 text-center">
                           <Checkbox
                             checked={row.discountable}
@@ -2053,8 +2260,8 @@ const BulkEditPage = () => {
                             }
                           />
                         </td>
-
-                        {/* Color (disabled - variant-level, blank on product) */}
+                        )}
+                        {isColumnVisible("color") && (
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -2063,8 +2270,8 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
-
-                        {/* Dirty indicators */}
+                        )}
+                        {isColumnVisible("changed") && (
                         <td className="px-3 py-2 text-right">
                           <div className="flex flex-col items-end gap-1">
                             {dirtyProductIds.has(row.id) && (
@@ -2084,6 +2291,7 @@ const BulkEditPage = () => {
                             )}
                           </div>
                         </td>
+                        )}
                       </tr>
 
                       {/* ── Variant rows (same column level as product) ── */}
@@ -2113,9 +2321,10 @@ const BulkEditPage = () => {
                                   : "bg-ui-bg-subtle"
                               }
                             >
-                              {/* Expand (empty for variant) */}
+                              {isColumnVisible("expand") && (
                               <td className="px-3 py-2" />
-                              {/* Image */}
+                              )}
+                              {isColumnVisible("image") && (
                               <td className="px-3 py-2">
                                 <DropdownMenu>
                                   <DropdownMenu.Trigger asChild>
@@ -2195,7 +2404,8 @@ const BulkEditPage = () => {
                                   </DropdownMenu.Content>
                                 </DropdownMenu>
                               </td>
-                              {/* Title */}
+                              )}
+                              {isColumnVisible("title") && (
                               <td className="px-3 py-2">
                                 <div className="flex items-center gap-2">
                                   <Text
@@ -2214,7 +2424,8 @@ const BulkEditPage = () => {
                                   )}
                                 </div>
                               </td>
-                              {/* Status (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("status") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2223,7 +2434,8 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Category (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("category") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2232,7 +2444,23 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Base price */}
+                              )}
+                              {isColumnVisible("sku") && (
+                              <td className="px-3 py-2">
+                                <Input
+                                  value={variant.sku}
+                                  onChange={(e) =>
+                                    updateVariantSku(
+                                      row.id,
+                                      variant.id,
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="SKU-001"
+                                />
+                              </td>
+                              )}
+                              {isColumnVisible("basePrice") && (
                               <td className="px-3 py-2">
                                 {variant.prices[0] ? (
                                   <input
@@ -2257,8 +2485,8 @@ const BulkEditPage = () => {
                                   </Text>
                                 )}
                               </td>
-                              {/* Sale price / B2B Price */}
-                              {SALE_PRICE_LIST_ID ? (
+                              )}
+                              {isColumnVisible("salePrice") && SALE_PRICE_LIST_ID ? (
                                 <td className="px-3 py-2">
                                   <input
                                     type="number"
@@ -2276,7 +2504,7 @@ const BulkEditPage = () => {
                                     className={cellInput}
                                   />
                                 </td>
-                              ) : (
+                              ) : isColumnVisible("salePrice") ? (
                                 <td className="px-3 py-2">
                                   <input
                                     type="number"
@@ -2297,8 +2525,8 @@ const BulkEditPage = () => {
                                     className={cellInput}
                                   />
                                 </td>
-                              )}
-                              {/* Client A */}
+                              ) : null}
+                              {isColumnVisible("clientA") && (
                               <td className="px-3 py-2">
                                 <Input
                                   size="small"
@@ -2314,7 +2542,8 @@ const BulkEditPage = () => {
                                   placeholder="—"
                                 />
                               </td>
-                              {/* Client B */}
+                              )}
+                              {isColumnVisible("clientB") && (
                               <td className="px-3 py-2">
                                 <Input
                                   size="small"
@@ -2330,7 +2559,8 @@ const BulkEditPage = () => {
                                   placeholder="—"
                                 />
                               </td>
-                              {/* Client C */}
+                              )}
+                              {isColumnVisible("clientC") && (
                               <td className="px-3 py-2">
                                 <Input
                                   size="small"
@@ -2346,21 +2576,8 @@ const BulkEditPage = () => {
                                   placeholder="—"
                                 />
                               </td>
-                              {/* SKU */}
-                              <td className="px-3 py-2">
-                                <Input
-                                  value={variant.sku}
-                                  onChange={(e) =>
-                                    updateVariantSku(
-                                      row.id,
-                                      variant.id,
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="SKU-001"
-                                />
-                              </td>
-                              {/* Manage Stock */}
+                              )}
+                              {isColumnVisible("manageStock") && (
                               <td className="px-3 py-2 text-center">
                                 <Checkbox
                                   checked={variant.manage_inventory}
@@ -2373,7 +2590,8 @@ const BulkEditPage = () => {
                                   }
                                 />
                               </td>
-                              {/* Stock Qty */}
+                              )}
+                              {isColumnVisible("stockQty") && (
                               <td className="px-3 py-2">
                                 {variant.manage_inventory ? (
                                   <input
@@ -2408,7 +2626,8 @@ const BulkEditPage = () => {
                                   </Text>
                                 )}
                               </td>
-                              {/* Subtitle (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("subtitle") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2417,7 +2636,8 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Description (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("description") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2426,7 +2646,8 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Handle (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("handle") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2435,7 +2656,8 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Tags (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("tags") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2444,7 +2666,8 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Material (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("material") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2453,7 +2676,8 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Weight (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("weight") && (
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
@@ -2462,7 +2686,28 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Discountable (disabled - inherit) */}
+                              )}
+                              {isColumnVisible("width") && (
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.width}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              )}
+                              {isColumnVisible("height") && (
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.height}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              )}
+                              {isColumnVisible("discountable") && (
                               <td className="px-3 py-2 text-center">
                                 <input
                                   type="text"
@@ -2471,7 +2716,8 @@ const BulkEditPage = () => {
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />
                               </td>
-                              {/* Color */}
+                              )}
+                              {isColumnVisible("color") && (
                               <td className="px-3 py-2">
                                 <div className="flex items-center gap-1">
                                   <input
@@ -2507,7 +2753,8 @@ const BulkEditPage = () => {
                                   />
                                 </div>
                               </td>
-                              {/* Changed */}
+                              )}
+                              {isColumnVisible("changed") && (
                               <td className="px-3 py-2 text-right">
                                 {vDirty && (
                                   <Badge color="orange" className="whitespace-nowrap">
@@ -2515,6 +2762,7 @@ const BulkEditPage = () => {
                                   </Badge>
                                 )}
                               </td>
+                              )}
                             </tr>
                           )
                         })}
