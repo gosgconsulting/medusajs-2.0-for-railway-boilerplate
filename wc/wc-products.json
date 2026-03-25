@@ -1,0 +1,2601 @@
+[{
+    "id": 14377,
+    "name": "Chemise 100% Lin - JU6905",
+    "slug": "chemise-100-lin-6905",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/chemise-100-lin-6905\/",
+    "date_created": "2026-03-03T17:39:51",
+    "date_created_gmt": "2026-03-03T17:39:51",
+    "date_modified": "2026-03-04T11:28:34",
+    "date_modified_gmt": "2026-03-04T11:28:34",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Chemise ray\u00e9e en lin<br \/>\n- Manches 3\/4<br \/>\n- Fermeture avec boutons<br \/>\n- Fabriqu\u00e9 en Italie<\/p>\n",
+    "short_description": "<p>Chemise ray\u00e9e 100% Lin<\/p>\n",
+    "sku": "JU6905",
+    "price": "65",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 380,
+        "name": "Chemises",
+        "slug": "chemises"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 60,
+        "name": "b2c",
+        "slug": "b2c"
+    }, {
+        "id": 231,
+        "name": "lin",
+        "slug": "lin"
+    }, {
+        "id": 76,
+        "name": "Made in Italy",
+        "slug": "made-in-italy"
+    }],
+    "images": [{
+        "id": 14597,
+        "date_created": "2026-03-04T10:33:43",
+        "date_created_gmt": "2026-03-04T10:33:43",
+        "date_modified": "2026-03-04T10:33:43",
+        "date_modified_gmt": "2026-03-04T10:33:43",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/CHEMISE-JU6205-BEIGE-57-1-scaled.jpg?fit=1829%2C2560&ssl=1",
+        "name": "CHEMISE JU6205 BEIGE 57 (1)",
+        "alt": ""
+    }, {
+        "id": 14599,
+        "date_created": "2026-03-04T10:34:31",
+        "date_created_gmt": "2026-03-04T10:34:31",
+        "date_modified": "2026-03-04T10:34:31",
+        "date_modified_gmt": "2026-03-04T10:34:31",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/CHEMISE-JU6205-BEIGE-57-3-scaled.jpg?fit=1829%2C2560&ssl=1",
+        "name": "CHEMISE JU6205 BEIGE 57 (3)",
+        "alt": ""
+    }, {
+        "id": 14598,
+        "date_created": "2026-03-04T10:34:08",
+        "date_created_gmt": "2026-03-04T10:34:08",
+        "date_modified": "2026-03-04T10:34:08",
+        "date_modified_gmt": "2026-03-04T10:34:08",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/CHEMISE-JU6205-BEIGE-57-2-scaled.jpg?fit=1828%2C2560&ssl=1",
+        "name": "CHEMISE JU6205 BEIGE 57 (2)",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Beige", "Blanc", "Kaki"],
+        "option_colors": ["#d6c8b1", "#ffffff", "#665c34"],
+        "options_with_colors": [{
+            "name": "Beige",
+            "hex": "#d6c8b1"
+        }, {
+            "name": "Blanc",
+            "hex": "#ffffff"
+        }, {
+            "name": "Kaki",
+            "hex": "#665c34"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14385, 14386, 14387],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>54,17&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [175, 4906, 4904, 4872, 4628],
+    "meta_data": [{
+        "id": 276058,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276059,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 100% Lin.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276487,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276488,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : JU6905\r\nMati\u00e8res : Lin\r\nFabriqu\u00e9 en : Italie"
+    }, {
+        "id": 276492,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276493,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276494,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276495,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282068,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282069,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282070,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282071,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282072,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282073,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282074,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282075,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282076,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282077,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282078,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282079,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282080,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14377",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14378,
+    "name": "Robe en coton -  5284",
+    "slug": "robe-en-coton-5284",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/robe-en-coton-5284\/",
+    "date_created": "2026-03-03T17:39:51",
+    "date_created_gmt": "2026-03-03T17:39:51",
+    "date_modified": "2026-03-10T14:05:49",
+    "date_modified_gmt": "2026-03-10T14:05:49",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Robe brod\u00e9e en coton<br \/>\n- Robe courte manches 3\/4<br \/>\n- Robe avec boutons \u00e0 l'avant<br \/>\n- Petits volants au niveau des manches<br \/>\n- Mati\u00e8re : 100% Coton<br \/>\n- Notre mannequin mesure 1m80<\/p>\n",
+    "short_description": "<p>Robe courte brod\u00e9e 100% coton style boh\u00eame<\/p>\n",
+    "sku": "5284",
+    "price": "84",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 44,
+        "name": "Robes",
+        "slug": "robes"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 233,
+        "name": "Coton",
+        "slug": "coton"
+    }],
+    "images": [{
+        "id": 14591,
+        "date_created": "2026-03-04T09:56:26",
+        "date_created_gmt": "2026-03-04T09:56:26",
+        "date_modified": "2026-03-04T09:56:26",
+        "date_modified_gmt": "2026-03-04T09:56:26",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/ROBE-5284-KAKI-4%C2%B5%C2%B5-scaled.jpg?fit=1829%2C2560&ssl=1",
+        "name": "ROBE 5284 KAKI (4)\u00b5\u00b5",
+        "alt": ""
+    }, {
+        "id": 14590,
+        "date_created": "2026-03-04T09:56:04",
+        "date_created_gmt": "2026-03-04T09:56:04",
+        "date_modified": "2026-03-04T09:56:04",
+        "date_modified_gmt": "2026-03-04T09:56:04",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/ROBE-5284-KAKI-2%C2%B5-scaled.jpg?fit=1707%2C2560&ssl=1",
+        "name": "ROBE 5284 KAKI (2)\u00b5",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Camel", "Kaki", "Noir"],
+        "option_colors": ["#af7d48", "#665c34", "#000000"],
+        "options_with_colors": [{
+            "name": "Camel",
+            "hex": "#af7d48"
+        }, {
+            "name": "Kaki",
+            "hex": "#665c34"
+        }, {
+            "name": "Noir",
+            "hex": "#000000"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["L\/XL", "Pack (1 S\/M &amp; 1 L\/XL)", "S\/M"]
+    }],
+    "default_attributes": [],
+    "variations": [14588, 14587, 14586],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>70,00&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [4158, 2633, 14335, 2635, 2634],
+    "meta_data": [{
+        "id": 276064,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276065,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 100% Coton.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276496,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276497,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : 5284\r\nMati\u00e8res : Coton\r\nFabriqu\u00e9 en : Inde"
+    }, {
+        "id": 276501,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276502,
+        "key": "moq",
+        "value": "1"
+    }, {
+        "id": 276503,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276504,
+        "key": "osq",
+        "value": "1"
+    }, {
+        "id": 281860,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 281862,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 281863,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 281864,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 281865,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 281866,
+        "key": "size_guide_button_visibility",
+        "value": "1"
+    }, {
+        "id": 281867,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 281868,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 281869,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 281870,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 281871,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 281872,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 281873,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14378",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14375,
+    "name": "Robe 100% Lin - JU6908",
+    "slug": "robe-100-lin-ju6908",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/robe-100-lin-ju6908\/",
+    "date_created": "2026-03-03T17:39:50",
+    "date_created_gmt": "2026-03-03T17:39:50",
+    "date_modified": "2026-03-04T11:30:11",
+    "date_modified_gmt": "2026-03-04T11:30:11",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Robe longue ray\u00e9e en lin<br \/>\n- Manches courtes<br \/>\n- Fentes lat\u00e9rales des deux c\u00f4t\u00e9s<br \/>\n- Fermeture avec boutons<br \/>\n- Ceinture fine amovible et r\u00e9glable style raphia permettant de ceinturer la taille et de marquer la silhouette<br \/>\n- Robe 100% Lin<br \/>\n- Fabriqu\u00e9 en Italie<\/p>\n",
+    "short_description": "<p>Robe ray\u00e9e 100% Lin<\/p>\n",
+    "sku": "JU6908",
+    "price": "75",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 44,
+        "name": "Robes",
+        "slug": "robes"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 60,
+        "name": "b2c",
+        "slug": "b2c"
+    }, {
+        "id": 231,
+        "name": "lin",
+        "slug": "lin"
+    }, {
+        "id": 76,
+        "name": "Made in Italy",
+        "slug": "made-in-italy"
+    }],
+    "images": [{
+        "id": 14620,
+        "date_created": "2026-03-04T11:15:12",
+        "date_created_gmt": "2026-03-04T11:15:12",
+        "date_modified": "2026-03-04T11:15:12",
+        "date_modified_gmt": "2026-03-04T11:15:12",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/ROBE-JU6908-BLEU-57-2-scaled.jpg?fit=1828%2C2560&ssl=1",
+        "name": "ROBE JU6908 BLEU 57 (2)",
+        "alt": ""
+    }, {
+        "id": 14619,
+        "date_created": "2026-03-04T11:14:44",
+        "date_created_gmt": "2026-03-04T11:14:44",
+        "date_modified": "2026-03-04T11:14:44",
+        "date_modified_gmt": "2026-03-04T11:14:44",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/ROBE-JU6908-BLEU-57-1-scaled.jpg?fit=1829%2C2560&ssl=1",
+        "name": "ROBE JU6908 BLEU 57 (1)",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Beige", "Blanc", "Bleu"],
+        "option_colors": ["#d6c8b1", "#ffffff", "#5f92bf"],
+        "options_with_colors": [{
+            "name": "Beige",
+            "hex": "#d6c8b1"
+        }, {
+            "name": "Blanc",
+            "hex": "#ffffff"
+        }, {
+            "name": "Bleu",
+            "hex": "#5f92bf"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14393, 14394, 14395],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>62,50&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [4161, 4424, 14378, 12957, 4139],
+    "meta_data": [{
+        "id": 276046,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276047,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 100% Lin.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276469,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276470,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : JU6908\r\nMati\u00e8res : Lin\r\nFabriqu\u00e9 en : Italie"
+    }, {
+        "id": 276474,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276475,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276476,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276477,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282108,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282110,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282111,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282112,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282113,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282114,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282115,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282116,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282117,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282118,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282119,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282120,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282121,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14375",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14376,
+    "name": "Pantalon 100% Lin - JU6906",
+    "slug": "pantalon-100-lin-ju6906",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/pantalon-100-lin-ju6906\/",
+    "date_created": "2026-03-03T17:39:50",
+    "date_created_gmt": "2026-03-03T17:39:50",
+    "date_modified": "2026-03-04T11:27:38",
+    "date_modified_gmt": "2026-03-04T11:27:38",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Pantalon ray\u00e9 en lin \u00e0 \u00e9lastique<br \/>\n- Coupe \u00e9vas\u00e9e<br \/>\n- 2 poches<br \/>\n- 100% Lin<br \/>\n- Fabriqu\u00e9 en Italie<\/p>\n",
+    "short_description": "<p>Pantalon 100% Lin avec poches<\/p>\n",
+    "sku": "JU6906",
+    "price": "65",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 41,
+        "name": "Pantalons",
+        "slug": "pantalons"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 60,
+        "name": "b2c",
+        "slug": "b2c"
+    }, {
+        "id": 231,
+        "name": "lin",
+        "slug": "lin"
+    }, {
+        "id": 76,
+        "name": "Made in Italy",
+        "slug": "made-in-italy"
+    }],
+    "images": [{
+        "id": 14610,
+        "date_created": "2026-03-04T11:04:45",
+        "date_created_gmt": "2026-03-04T11:04:45",
+        "date_modified": "2026-03-04T11:04:45",
+        "date_modified_gmt": "2026-03-04T11:04:45",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PANTALON-JU6909-MARINE-2-scaled.jpg?fit=1829%2C2560&ssl=1",
+        "name": "PANTALON JU6909 MARINE (2)",
+        "alt": ""
+    }, {
+        "id": 14611,
+        "date_created": "2026-03-04T11:05:12",
+        "date_created_gmt": "2026-03-04T11:05:12",
+        "date_modified": "2026-03-04T11:05:12",
+        "date_modified_gmt": "2026-03-04T11:05:12",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PANTALON-JU6909-MARINE-3-scaled.jpg?fit=1829%2C2560&ssl=1",
+        "name": "PANTALON JU6909 MARINE (3)",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Beige", "Blanc", "Kaki", "Marine", "Marron"],
+        "option_colors": ["#d6c8b1", "#ffffff", "#665c34", "#03224c", "#593414"],
+        "options_with_colors": [{
+            "name": "Beige",
+            "hex": "#d6c8b1"
+        }, {
+            "name": "Blanc",
+            "hex": "#ffffff"
+        }, {
+            "name": "Kaki",
+            "hex": "#665c34"
+        }, {
+            "name": "Marine",
+            "hex": "#03224c"
+        }, {
+            "name": "Marron",
+            "hex": "#593414"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14388, 14389, 14390, 14391, 14392],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>54,17&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [4917, 5276, 4870, 4163, 4161],
+    "meta_data": [{
+        "id": 276052,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276053,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 100% Lin.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276478,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276479,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : JU6906\r\nMati\u00e8res : Lin\r\nFabriqu\u00e9 en : Italie"
+    }, {
+        "id": 276483,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276484,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276485,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276486,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282089,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282091,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282092,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282093,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282094,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282095,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282096,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282097,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282098,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282099,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282100,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282101,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282102,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14376",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14373,
+    "name": "Pull - 8197",
+    "slug": "pull-8197",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/pull-8197\/",
+    "date_created": "2026-03-03T17:39:49",
+    "date_created_gmt": "2026-03-03T17:39:49",
+    "date_modified": "2026-03-04T12:34:47",
+    "date_modified_gmt": "2026-03-04T12:34:47",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Pull en maille l\u00e9g\u00e8re c\u00f4tel\u00e9e<br \/>\n- Encolure d\u00e9gag\u00e9e<br \/>\n- Coupe oversize<br \/>\n- Ouvertures lat\u00e9rales<br \/>\n- Finitions bords c\u00f4tes au col et bas v\u00eatement<br \/>\n- Taille Unique<\/p>\n",
+    "short_description": "<p>Pull col rond en maille viscose l\u00e9ger<\/p>\n",
+    "sku": "8197",
+    "price": "75",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 18,
+        "name": "Maille",
+        "slug": "maille"
+    }, {
+        "id": 61,
+        "name": "Maille Collection",
+        "slug": "maille-collection"
+    }, {
+        "id": 168,
+        "name": "Pulls",
+        "slug": "pulls-maille"
+    }, {
+        "id": 72,
+        "name": "Pulls",
+        "slug": "pulls"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 207,
+        "name": "Viscose l\u00e9ger",
+        "slug": "viscose-leger"
+    }],
+    "images": [{
+        "id": 14634,
+        "date_created": "2026-03-04T12:31:17",
+        "date_created_gmt": "2026-03-04T12:31:17",
+        "date_modified": "2026-03-04T12:31:17",
+        "date_modified_gmt": "2026-03-04T12:31:17",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-REF-8197-VERT-2.jpg?fit=1142%2C1600&ssl=1",
+        "name": "PULL REF 8197 VERT 2",
+        "alt": ""
+    }, {
+        "id": 14633,
+        "date_created": "2026-03-04T12:31:11",
+        "date_created_gmt": "2026-03-04T12:31:11",
+        "date_modified": "2026-03-04T12:31:11",
+        "date_modified_gmt": "2026-03-04T12:31:11",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-REF-8197-VERT-1.jpg?fit=1142%2C1600&ssl=1",
+        "name": "PULL REF 8197 VERT 1",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Rose", "Vert"],
+        "option_colors": ["#e34e99", "#5fa059"],
+        "options_with_colors": [{
+            "name": "Rose",
+            "hex": "#e34e99"
+        }, {
+            "name": "Vert",
+            "hex": "#5fa059"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14400, 14399],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>62,50&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [2636, 2647, 481, 521, 2637],
+    "meta_data": [{
+        "id": 276034,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276035,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 75% Viscose, 25% Polyamide.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276451,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276452,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : 8197\r\nMati\u00e8res : Viscose L\u00e9ger\r\nFabriqu\u00e9 en : Chine"
+    }, {
+        "id": 276456,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276457,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276458,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276459,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282194,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282196,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282197,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282198,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282199,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282200,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282201,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282202,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282203,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282204,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282205,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282206,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282207,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14373",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14374,
+    "name": "Veste 100% Coton - 7224",
+    "slug": "veste-100-coton-7224",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/veste-100-coton-7224\/",
+    "date_created": "2026-03-03T17:39:49",
+    "date_created_gmt": "2026-03-03T17:39:49",
+    "date_modified": "2026-03-04T12:32:49",
+    "date_modified_gmt": "2026-03-04T12:32:49",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Veste sans manches style boh\u00e8me en coton d\u00e9clin\u00e9e en 3 coloris<br \/>\n- Veste avec deux poches<br \/>\n- Ceinture en coton amovible<br \/>\n- Fermeture avec 4 boutons<br \/>\n- 100% coton<br \/>\n- Taille Unique<\/p>\n",
+    "short_description": "<p>Veste boh\u00eame 100% Coton avec poches<\/p>\n",
+    "sku": "JU7224",
+    "price": "80",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 99,
+        "name": "Vestes et Manteaux",
+        "slug": "vestes-manteaux"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 233,
+        "name": "Coton",
+        "slug": "coton"
+    }],
+    "images": [{
+        "id": 14629,
+        "date_created": "2026-03-04T12:30:20",
+        "date_created_gmt": "2026-03-04T12:30:20",
+        "date_modified": "2026-03-04T12:30:20",
+        "date_modified_gmt": "2026-03-04T12:30:20",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/VESTE-7224-KAKI-5%C2%B5-scaled.jpg?fit=1707%2C2560&ssl=1",
+        "name": "VESTE 7224 KAKI (5)\u00b5",
+        "alt": ""
+    }, {
+        "id": 14627,
+        "date_created": "2026-03-04T12:29:36",
+        "date_created_gmt": "2026-03-04T12:29:36",
+        "date_modified": "2026-03-04T12:29:36",
+        "date_modified_gmt": "2026-03-04T12:29:36",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/VESTE-7224-ORANGE-5%C2%B5%C2%B5-scaled.jpg?fit=1706%2C2560&ssl=1",
+        "name": "VESTE 7224 ORANGE (5)\u00b5\u00b5",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Kaki", "Orange", "Vert"],
+        "option_colors": ["#665c34", "#ed7f10", "#5fa059"],
+        "options_with_colors": [{
+            "name": "Kaki",
+            "hex": "#665c34"
+        }, {
+            "name": "Orange",
+            "hex": "#ed7f10"
+        }, {
+            "name": "Vert",
+            "hex": "#5fa059"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14396, 14397, 14398],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>66,67&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [4423, 2636, 4161, 4164, 4162],
+    "meta_data": [{
+        "id": 276040,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276041,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 100% Coton.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276460,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276461,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : JU7224\r\nMati\u00e8res : Coton\r\nFabriqu\u00e9 en : Inde"
+    }, {
+        "id": 276465,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276466,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276467,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276468,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282175,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282177,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282178,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282179,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282180,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282181,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282182,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282183,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282184,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282185,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282186,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282187,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282188,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14374",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14371,
+    "name": "Pull - 8258",
+    "slug": "pull-8258",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/pull-8258\/",
+    "date_created": "2026-03-03T17:39:48",
+    "date_created_gmt": "2026-03-03T17:39:48",
+    "date_modified": "2026-03-04T15:48:02",
+    "date_modified_gmt": "2026-03-04T15:48:02",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Pull en maille manches longues<br \/>\n- Maille viscose l\u00e9g\u00e8re<br \/>\n- Encolure col V<br \/>\n- Maille c\u00f4tel\u00e9e<\/p>\n",
+    "short_description": "<p>Pull col rond en maille viscose l\u00e9ger<\/p>\n",
+    "sku": "8258",
+    "price": "59",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 18,
+        "name": "Maille",
+        "slug": "maille"
+    }, {
+        "id": 61,
+        "name": "Maille Collection",
+        "slug": "maille-collection"
+    }, {
+        "id": 168,
+        "name": "Pulls",
+        "slug": "pulls-maille"
+    }, {
+        "id": 72,
+        "name": "Pulls",
+        "slug": "pulls"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 207,
+        "name": "Viscose l\u00e9ger",
+        "slug": "viscose-leger"
+    }],
+    "images": [{
+        "id": 14653,
+        "date_created": "2026-03-04T15:05:50",
+        "date_created_gmt": "2026-03-04T15:05:50",
+        "date_modified": "2026-03-04T15:05:50",
+        "date_modified_gmt": "2026-03-04T15:05:50",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-REF-8258-TAUPE-1.jpg?fit=1143%2C1600&ssl=1",
+        "name": "PULL REF 8258 TAUPE 1",
+        "alt": ""
+    }, {
+        "id": 14655,
+        "date_created": "2026-03-04T15:06:03",
+        "date_created_gmt": "2026-03-04T15:06:03",
+        "date_modified": "2026-03-04T15:06:03",
+        "date_modified_gmt": "2026-03-04T15:06:03",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-REF-8258-TAUPE-4.jpg?fit=1122%2C1573&ssl=1",
+        "name": "PULL REF 8258 TAUPE 4",
+        "alt": ""
+    }, {
+        "id": 14654,
+        "date_created": "2026-03-04T15:05:56",
+        "date_created_gmt": "2026-03-04T15:05:56",
+        "date_modified": "2026-03-04T15:05:56",
+        "date_modified_gmt": "2026-03-04T15:05:56",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-REF-8258-TAUPE-3.jpg?fit=1143%2C1600&ssl=1",
+        "name": "PULL REF 8258 TAUPE 3",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Taupe"],
+        "option_colors": ["#c0b5ab"],
+        "options_with_colors": [{
+            "name": "Taupe",
+            "hex": "#c0b5ab"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14412],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>49,17&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [175, 2638, 2644, 481, 2641],
+    "meta_data": [{
+        "id": 276014,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276015,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 75% Viscose, 25% Polyamide.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276433,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276434,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : 8258\r\nMati\u00e8res : Viscose\r\nFabriqu\u00e9 en : Chine"
+    }, {
+        "id": 276438,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276439,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276440,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276441,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282391,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282393,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282394,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282395,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282396,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282397,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282398,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282399,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282400,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282401,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282402,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282403,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282404,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14371",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14372,
+    "name": "Pull - 8226",
+    "slug": "pull-8226",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/pull-8226\/",
+    "date_created": "2026-03-03T17:39:48",
+    "date_created_gmt": "2026-03-03T17:39:48",
+    "date_modified": "2026-03-04T13:38:46",
+    "date_modified_gmt": "2026-03-04T13:38:46",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Pull col rond manches longues<br \/>\n- Pull en maille fine et agr\u00e9able au port\u00e9<br \/>\n- Finitions bords c\u00f4tes au col, manches et bas du v\u00eatement<\/p>\n",
+    "short_description": "<p>Pull col rond en maille viscose l\u00e9ger<\/p>\n",
+    "sku": "8226",
+    "price": "80.7",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 18,
+        "name": "Maille",
+        "slug": "maille"
+    }, {
+        "id": 61,
+        "name": "Maille Collection",
+        "slug": "maille-collection"
+    }, {
+        "id": 168,
+        "name": "Pulls",
+        "slug": "pulls-maille"
+    }, {
+        "id": 72,
+        "name": "Pulls",
+        "slug": "pulls"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 207,
+        "name": "Viscose l\u00e9ger",
+        "slug": "viscose-leger"
+    }],
+    "images": [{
+        "id": 14648,
+        "date_created": "2026-03-04T13:30:16",
+        "date_created_gmt": "2026-03-04T13:30:16",
+        "date_modified": "2026-03-04T13:30:16",
+        "date_modified_gmt": "2026-03-04T13:30:16",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/8226-BLANC-4.jpg?fit=1728%2C2432&ssl=1",
+        "name": "8226 BLANC 4",
+        "alt": ""
+    }, {
+        "id": 14637,
+        "date_created": "2026-03-04T12:47:01",
+        "date_created_gmt": "2026-03-04T12:47:01",
+        "date_modified": "2026-03-04T12:47:01",
+        "date_modified_gmt": "2026-03-04T12:47:01",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-8226-TURQUOISE-7%C2%B5%C2%B5-scaled.jpg?fit=1706%2C2560&ssl=1",
+        "name": "PULL 8226 TURQUOISE (7)\u00b5\u00b5",
+        "alt": ""
+    }, {
+        "id": 14636,
+        "date_created": "2026-03-04T12:46:45",
+        "date_created_gmt": "2026-03-04T12:46:45",
+        "date_modified": "2026-03-04T12:46:45",
+        "date_modified_gmt": "2026-03-04T12:46:45",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-8226-TURQUOISE-1%C2%B5%C2%B5-scaled.jpg?fit=1707%2C2560&ssl=1",
+        "name": "PULL 8226 TURQUOISE (1)\u00b5\u00b5",
+        "alt": ""
+    }, {
+        "id": 14638,
+        "date_created": "2026-03-04T12:47:19",
+        "date_created_gmt": "2026-03-04T12:47:19",
+        "date_modified": "2026-03-04T12:47:19",
+        "date_modified_gmt": "2026-03-04T12:47:19",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-8226-TURQUOISE-10%C2%B5%C2%B5-scaled.jpg?fit=1707%2C2560&ssl=1",
+        "name": "PULL 8226 TURQUOISE (10)\u00b5\u00b5",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Beige", "Blanc", "Bleu Roi", "Ecru", "Lilas", "Marine", "Noir", "Orange", "Taupe", "Turquoise", "Vert"],
+        "option_colors": ["#d6c8b1", "#ffffff", "#2535e8", "#fffff0", "#d3a3e4", "#03224c", "#000000", "#ed7f10", "#c0b5ab", "#40e0d0", "#5fa059"],
+        "options_with_colors": [{
+            "name": "Beige",
+            "hex": "#d6c8b1"
+        }, {
+            "name": "Blanc",
+            "hex": "#ffffff"
+        }, {
+            "name": "Bleu Roi",
+            "hex": "#2535e8"
+        }, {
+            "name": "Ecru",
+            "hex": "#fffff0"
+        }, {
+            "name": "Lilas",
+            "hex": "#d3a3e4"
+        }, {
+            "name": "Marine",
+            "hex": "#03224c"
+        }, {
+            "name": "Noir",
+            "hex": "#000000"
+        }, {
+            "name": "Orange",
+            "hex": "#ed7f10"
+        }, {
+            "name": "Taupe",
+            "hex": "#c0b5ab"
+        }, {
+            "name": "Turquoise",
+            "hex": "#40e0d0"
+        }, {
+            "name": "Vert",
+            "hex": "#5fa059"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14402, 14410, 14406, 14403, 14404, 14408, 14409, 14411, 14405, 14407],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>67,25&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [2634, 481, 2649, 2633, 2639],
+    "meta_data": [{
+        "id": 276020,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276021,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 75% Viscose, 25% Polyamide.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276442,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276443,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : 8226\r\nMati\u00e8res : Viscose L\u00e9ger\r\nFabriqu\u00e9 en : Chine"
+    }, {
+        "id": 276447,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276448,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276449,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276450,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282328,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282330,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282331,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282332,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282333,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282334,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282335,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282336,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282337,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282338,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282339,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282340,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282341,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14372",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14369,
+    "name": "Pantalon - 8467",
+    "slug": "",
+    "permalink": "https:\/\/cms.juliaparis.fr\/?post_type=product&p=14369",
+    "date_created": "2026-03-03T17:39:47",
+    "date_created_gmt": "2026-03-03T17:39:47",
+    "date_modified": "2026-03-04T15:57:36",
+    "date_modified_gmt": "2026-03-04T15:57:36",
+    "type": "variable",
+    "status": "draft",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Pantalon fluide en maille viscose<br \/>\n- Maille viscose l\u00e9g\u00e8re agr\u00e9able au port\u00e9<br \/>\n- Pantalon long<br \/>\n- Pantalon avec cordon \u00e0 la taille<\/p>\n",
+    "short_description": "<p>Pantalon en viscose l\u00e9ger avec cordon<\/p>\n",
+    "sku": "8467",
+    "price": "82",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 18,
+        "name": "Maille",
+        "slug": "maille"
+    }, {
+        "id": 61,
+        "name": "Maille Collection",
+        "slug": "maille-collection"
+    }, {
+        "id": 41,
+        "name": "Pantalons",
+        "slug": "pantalons"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 207,
+        "name": "Viscose l\u00e9ger",
+        "slug": "viscose-leger"
+    }],
+    "images": [],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Bleu Roi", "Marine", "Pistache", "Rose poudr\u00e9", "Vert Amande", "Vert Anis"],
+        "option_colors": ["#2535e8", "#03224c", "#b6c96a", "#f9dbea", "#b0d7a7", "#c2c107"],
+        "options_with_colors": [{
+            "name": "Bleu Roi",
+            "hex": "#2535e8"
+        }, {
+            "name": "Marine",
+            "hex": "#03224c"
+        }, {
+            "name": "Pistache",
+            "hex": "#b6c96a"
+        }, {
+            "name": "Rose poudr\u00e9",
+            "hex": "#f9dbea"
+        }, {
+            "name": "Vert Amande",
+            "hex": "#b0d7a7"
+        }, {
+            "name": "Vert Anis",
+            "hex": "#c2c107"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14579, 14580, 14581, 14583],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>68,33&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [2638, 2639, 2645, 2640, 230],
+    "meta_data": [{
+        "id": 276002,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276003,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 75% Viscose, 25% Polyamide.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276415,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276416,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : 8467\r\nMati\u00e8res : Viscose l\u00e9ger\r\nFabriqu\u00e9 en : Chine"
+    }, {
+        "id": 276420,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276421,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276422,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276423,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282500,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282501,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282502,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282503,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282504,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282505,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282506,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282507,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282508,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282509,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282510,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282511,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282512,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14369",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}, {
+    "id": 14370,
+    "name": "Pull - 8466",
+    "slug": "pull-8466",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/pull-8466\/",
+    "date_created": "2026-03-03T17:39:47",
+    "date_created_gmt": "2026-03-03T17:39:47",
+    "date_modified": "2026-03-04T15:46:36",
+    "date_modified_gmt": "2026-03-04T15:46:36",
+    "type": "variable",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>- Pull en maille viscose l\u00e9ger<br \/>\n- Mati\u00e8re l\u00e9g\u00e8re et agr\u00e9able au port\u00e9<br \/>\n- Manches courtes<\/p>\n",
+    "short_description": "<p>Pull col rond en maille viscose l\u00e9ger<\/p>\n",
+    "sku": "8466",
+    "price": "75",
+    "regular_price": "",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [{
+        "id": 18,
+        "name": "Maille",
+        "slug": "maille"
+    }, {
+        "id": 61,
+        "name": "Maille Collection",
+        "slug": "maille-collection"
+    }, {
+        "id": 72,
+        "name": "Pulls",
+        "slug": "pulls"
+    }, {
+        "id": 168,
+        "name": "Pulls",
+        "slug": "pulls-maille"
+    }],
+    "brands": [],
+    "tags": [{
+        "id": 86,
+        "name": "b2b",
+        "slug": "b2b"
+    }, {
+        "id": 207,
+        "name": "Viscose l\u00e9ger",
+        "slug": "viscose-leger"
+    }],
+    "images": [{
+        "id": 14656,
+        "date_created": "2026-03-04T15:08:43",
+        "date_created_gmt": "2026-03-04T15:08:43",
+        "date_modified": "2026-03-04T15:08:43",
+        "date_modified_gmt": "2026-03-04T15:08:43",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-8466-JAUNE-5%C2%B5-scaled.jpg?fit=1707%2C2560&ssl=1",
+        "name": "PULL 8466 JAUNE (5)\u00b5",
+        "alt": ""
+    }, {
+        "id": 14658,
+        "date_created": "2026-03-04T15:10:30",
+        "date_created_gmt": "2026-03-04T15:10:30",
+        "date_modified": "2026-03-04T15:10:30",
+        "date_modified_gmt": "2026-03-04T15:10:30",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2026\/03\/PULL-8466-JAUNE-9%C2%B5-scaled.jpg?fit=1707%2C2560&ssl=1",
+        "name": "PULL 8466 JAUNE (9)\u00b5",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "position": 0,
+        "visible": true,
+        "variation": true,
+        "options": ["Blanc", "Ecru", "Jaune", "Marine", "Noir", "Peach", "Taupe"],
+        "option_colors": ["#ffffff", "#fffff0", "#f2eb8a", "#03224c", "#000000", "#ffdab9", "#c0b5ab"],
+        "options_with_colors": [{
+            "name": "Blanc",
+            "hex": "#ffffff"
+        }, {
+            "name": "Ecru",
+            "hex": "#fffff0"
+        }, {
+            "name": "Jaune",
+            "hex": "#f2eb8a"
+        }, {
+            "name": "Marine",
+            "hex": "#03224c"
+        }, {
+            "name": "Noir",
+            "hex": "#000000"
+        }, {
+            "name": "Peach",
+            "hex": "#ffdab9"
+        }, {
+            "name": "Taupe",
+            "hex": "#c0b5ab"
+        }]
+    }, {
+        "id": 2,
+        "name": "Taille",
+        "slug": "pa_taille",
+        "position": 1,
+        "visible": true,
+        "variation": true,
+        "options": ["TU"]
+    }],
+    "default_attributes": [],
+    "variations": [14416, 14415, 14413, 14414, 14417, 14418, 14419],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>62,50&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [2640, 2639, 203, 2641, 175],
+    "meta_data": [{
+        "id": 276008,
+        "key": "_fabrication_et_composition",
+        "value": "field_68e78450f787b"
+    }, {
+        "id": 276009,
+        "key": "fabrication_et_composition",
+        "value": "Composition : 75% Viscose, 25% Polyamide.\r\n\r\nEntretien :\r\n<ul>\r\n \t<li>Lavage \u00e0 la main<\/li>\r\n \t<li>Ne pas utiliser de javel<\/li>\r\n \t<li>S\u00e9chage \u00e0 plat recommand\u00e9<\/li>\r\n \t<li>Repassage \u00e0 basse temp\u00e9rature<\/li>\r\n<\/ul>"
+    }, {
+        "id": 276424,
+        "key": "_product_information_detail",
+        "value": "field_68e7841df787a"
+    }, {
+        "id": 276425,
+        "key": "product_information_detail",
+        "value": "R\u00e9f\u00e9rence : 8466\r\nMati\u00e8res : Viscose l\u00e9ger\r\nFabriqu\u00e9 en : Chine"
+    }, {
+        "id": 276429,
+        "key": "_moq",
+        "value": "field_69450d2024f28"
+    }, {
+        "id": 276430,
+        "key": "moq",
+        "value": "2"
+    }, {
+        "id": 276431,
+        "key": "_osq",
+        "value": "field_69450d5f24f29"
+    }, {
+        "id": 276432,
+        "key": "osq",
+        "value": "2"
+    }, {
+        "id": 282463,
+        "key": "_wwp_wholesale_visibility",
+        "value": ""
+    }, {
+        "id": 282465,
+        "key": "la_silhouete_julia_image",
+        "value": ""
+    }, {
+        "id": 282466,
+        "key": "_la_silhouete_julia_image",
+        "value": "field_68edd6509f776"
+    }, {
+        "id": 282467,
+        "key": "size_guide_description",
+        "value": ""
+    }, {
+        "id": 282468,
+        "key": "_size_guide_description",
+        "value": "field_694a02fcdd233"
+    }, {
+        "id": 282469,
+        "key": "size_guide_button_visibility",
+        "value": "0"
+    }, {
+        "id": 282470,
+        "key": "_size_guide_button_visibility",
+        "value": "field_6953833ead295"
+    }, {
+        "id": 282471,
+        "key": "b2c_product_description",
+        "value": ""
+    }, {
+        "id": 282472,
+        "key": "_b2c_product_description",
+        "value": "field_6989bc49d015a"
+    }, {
+        "id": 282473,
+        "key": "_wpcode_header_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282474,
+        "key": "_wpcode_footer_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282475,
+        "key": "_wpcode_body_scripts",
+        "value": {
+            "disable_global": false,
+            "any": "",
+            "desktop": "",
+            "mobile": ""
+        }
+    }, {
+        "id": 282476,
+        "key": "_wpcode_page_snippets",
+        "value": []
+    }],
+    "stock_status": "instock",
+    "has_options": true,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": false
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/14370",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }]
+    }
+}]

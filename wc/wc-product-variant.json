@@ -1,0 +1,124 @@
+{
+    "id": 7421,
+    "name": "Sac Cuir tress\u00e9 - 30821<span> - <\/span>Camel",
+    "slug": "sac-cuir-tresse-30821-camel",
+    "permalink": "https:\/\/cms.juliaparis.fr\/product\/sac-cuir-tresse-30821\/?attribute_pa_couleur=camel",
+    "date_created": "2025-12-09T20:09:43",
+    "date_created_gmt": "2025-12-09T20:09:43",
+    "date_modified": "2025-12-10T14:18:24",
+    "date_modified_gmt": "2025-12-10T14:18:24",
+    "type": "variation",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "",
+    "short_description": "",
+    "sku": "30821",
+    "price": 269,
+    "regular_price": "269",
+    "sale_price": 269,
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": "0",
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": false,
+    "stock_quantity": null,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 6929,
+    "purchase_note": "",
+    "categories": [],
+    "brands": [],
+    "tags": [],
+    "images": [{
+        "id": 5333,
+        "date_created": "2025-12-04T14:18:27",
+        "date_created_gmt": "2025-12-04T14:18:27",
+        "date_modified": "2025-12-04T14:18:27",
+        "date_modified_gmt": "2025-12-04T14:18:27",
+        "src": "https:\/\/i0.wp.com\/cms.juliaparis.fr\/wp-content\/uploads\/2025\/12\/SAC-30821-CAMEL-3-scaled.jpg?fit=1707%2C2560&ssl=1",
+        "name": "SAC 30821 CAMEL (3)",
+        "alt": ""
+    }],
+    "attributes": [{
+        "id": 1,
+        "name": "Couleur",
+        "slug": "pa_couleur",
+        "option": "Camel"
+    }],
+    "default_attributes": [],
+    "variations": [],
+    "grouped_products": [],
+    "menu_order": 1,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi>224,17&nbsp;<span class=\"woocommerce-Price-currencySymbol\">&euro;<\/span><\/bdi><\/span>",
+    "related_ids": [],
+    "meta_data": [{
+        "id": 152950,
+        "key": "wcwp_client-a",
+        "value": "89"
+    }, {
+        "id": 152951,
+        "key": "wcwp_client-b",
+        "value": "89"
+    }, {
+        "id": 152952,
+        "key": "wcwp_client-c",
+        "value": "109"
+    }, {
+        "id": 157008,
+        "key": "woo_variation_gallery_images",
+        "value": [5334, 5332]
+    }],
+    "stock_status": "instock",
+    "has_options": false,
+    "post_password": "",
+    "global_unique_id": "",
+    "jetpack_sharing_enabled": true,
+    "acf": {
+        "la_silhouete_julia_image": null
+    },
+    "_links": {
+        "self": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/7421",
+            "targetHints": {
+                "allow": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+        }],
+        "collection": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products"
+        }],
+        "up": [{
+            "href": "https:\/\/cms.juliaparis.fr\/wp-json\/wc\/v3\/products\/6929"
+        }]
+    }
+}

@@ -235,10 +235,127 @@ function toRow(p: ApiProduct): ProductRow {
   }
 }
 
+/** Flat API categories → depth-first order with trail for search / labels. */
+function buildHierarchicalCategoryRows(
+  categories: Array<{
+    id?: string
+    name?: string
+    parent_category_id?: string | null
+    parent_category?: { id?: string } | null
+    rank?: number | null
+  }>
+): { id: string; name: string; depth: number; breadcrumb: string }[] {
+  type Node = {
+    id: string
+    name: string
+    parentId: string | null
+    rank: number
+  }
+  const nodes: Node[] = (categories ?? [])
+    .filter((c) => c?.id)
+    .map((c) => ({
+      id: c.id as string,
+      name: c.name ?? "",
+      parentId:
+        (c.parent_category_id ?? c.parent_category?.id ?? null) || null,
+      rank: typeof c.rank === "number" ? c.rank : 0,
+    }))
+
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const children = new Map<string | null, Node[]>()
+  for (const n of nodes) {
+    const pid =
+      n.parentId && byId.has(n.parentId) ? n.parentId : null
+    if (!children.has(pid)) children.set(pid, [])
+    children.get(pid)!.push(n)
+  }
+  for (const [, arr] of children) {
+    arr.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+  }
+
+  const out: { id: string; name: string; depth: number; breadcrumb: string }[] =
+    []
+  const walk = (pid: string | null, depth: number, prefix: string[]) => {
+    for (const n of children.get(pid) ?? []) {
+      const trail = [...prefix, n.name]
+      out.push({
+        id: n.id,
+        name: n.name,
+        depth,
+        breadcrumb: trail.join(" › "),
+      })
+      walk(n.id, depth + 1, trail)
+    }
+  }
+  walk(null, 0, [])
+  return out
+}
+
 type RowErrors = Record<string, string>
 
 const cellInput =
   "flex h-8 w-full rounded-md border border-ui-border-base bg-ui-bg-field px-3 py-1.5 txt-small focus:border-ui-border-interactive focus:outline-none"
+
+/**
+ * Category picker row: flex layout, fixed-size icon slot (check only when selected).
+ * Used with DropdownMenu.Item asChild so Radix can merge focus / keyboard behavior.
+ */
+const CategoryMenuCheckboxRow = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & {
+    checked: boolean
+    depth: number
+    breadcrumb: string
+    name: string
+  }
+>(function CategoryMenuCheckboxRow(
+  { checked, depth, breadcrumb, name, className, style, ...rest },
+  ref
+) {
+  return (
+    <div
+      ref={ref}
+      role="menuitemcheckbox"
+      aria-checked={checked}
+      title={breadcrumb}
+      className={[
+        "flex w-full min-w-0 cursor-pointer select-none items-center gap-[5px] py-1.5 pl-2 pr-2 text-left txt-small text-ui-fg-base outline-none data-[highlighted]:bg-ui-bg-base-hover",
+        className ?? "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={style}
+      {...rest}
+    >
+      <div
+        className="flex shrink-0 items-center"
+        style={{ paddingLeft: depth * 16 }}
+      >
+        <span className="inline-flex size-4 items-center justify-center text-ui-fg-interactive">
+          {checked ? (
+            <svg
+              className="size-4"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden
+            >
+              <path
+                d="M12.75 4.75L6.5 11 3.25 7.75"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : null}
+        </span>
+      </div>
+      <span className="min-w-0 flex-1 truncate">{name}</span>
+    </div>
+  )
+})
+CategoryMenuCheckboxRow.displayName = "CategoryMenuCheckboxRow"
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -360,6 +477,19 @@ const BulkEditPage = () => {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
+
+  const hierarchicalCategories = useMemo(() => {
+    const raw = (categoriesData as any)?.product_categories ?? []
+    return buildHierarchicalCategoryRows(raw)
+  }, [categoriesData])
+
+  const categoryBreadcrumbById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const row of hierarchicalCategories) {
+      m.set(row.id, row.breadcrumb)
+    }
+    return m
+  }, [hierarchicalCategories])
 
   const variantIdsOnPage = useMemo(() => {
     return (data?.products ?? [])
@@ -2006,11 +2136,13 @@ const BulkEditPage = () => {
                                   {row.category_ids.length > 0
                                     ? row.category_ids
                                         .map((id) => {
-                                          const c = (categoriesData as any)
-                                            ?.product_categories?.find(
+                                          return (
+                                            categoryBreadcrumbById.get(id) ??
+                                            (categoriesData as any)?.product_categories?.find(
                                               (x: any) => x.id === id
-                                            )
-                                          return c?.name ?? id
+                                            )?.name ??
+                                            id
+                                          )
                                         })
                                         .join(", ")
                                     : "—"}
@@ -2026,28 +2158,46 @@ const BulkEditPage = () => {
                                   placeholder="Search categories"
                                 />
                                 <div className="max-h-[260px] overflow-auto">
-                                  {((categoriesData as any)?.product_categories ?? [])
-                                    .filter((c: any) =>
-                                      (c.name ?? "")
+                                  {hierarchicalCategories
+                                    .filter((c) =>
+                                      c.breadcrumb
                                         .toLowerCase()
-                                        .includes(filterSearch.toLowerCase())
+                                        .includes(filterSearch.toLowerCase().trim())
                                     )
-                                    .map((c: any) => (
-                                      <DropdownMenu.CheckboxItem
-                                        key={c.id}
-                                        checked={row.category_ids.includes(c.id)}
-                                        onCheckedChange={(checked) => {
-                                          const next = checked
-                                            ? Array.from(
-                                                new Set([...row.category_ids, c.id])
-                                              )
-                                            : row.category_ids.filter((id) => id !== c.id)
-                                          updateRow(row.id, "category_ids", next)
-                                        }}
-                                      >
-                                        {c.name}
-                                      </DropdownMenu.CheckboxItem>
-                                    ))}
+                                    .map((c) => {
+                                      const checked = row.category_ids.includes(c.id)
+                                      return (
+                                        <DropdownMenu.Item
+                                          key={c.id}
+                                          asChild
+                                          onSelect={(e) => {
+                                            e.preventDefault()
+                                            const next = checked
+                                              ? row.category_ids.filter(
+                                                  (id) => id !== c.id
+                                                )
+                                              : Array.from(
+                                                  new Set([
+                                                    ...row.category_ids,
+                                                    c.id,
+                                                  ])
+                                                )
+                                            updateRow(
+                                              row.id,
+                                              "category_ids",
+                                              next
+                                            )
+                                          }}
+                                        >
+                                          <CategoryMenuCheckboxRow
+                                            checked={checked}
+                                            depth={c.depth}
+                                            breadcrumb={c.breadcrumb}
+                                            name={c.name}
+                                          />
+                                        </DropdownMenu.Item>
+                                      )
+                                    })}
                                 </div>
                               </div>
                             </DropdownMenu.Content>
@@ -2304,11 +2454,13 @@ const BulkEditPage = () => {
                             row.category_ids.length > 0
                               ? row.category_ids
                                   .map((id) => {
-                                    const c = (categoriesData as any)
-                                      ?.product_categories?.find(
+                                    return (
+                                      categoryBreadcrumbById.get(id) ??
+                                      (categoriesData as any)?.product_categories?.find(
                                         (x: any) => x.id === id
-                                      )
-                                    return c?.name ?? id
+                                      )?.name ??
+                                      id
+                                    )
                                   })
                                   .join(", ")
                               : "—"
