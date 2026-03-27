@@ -265,7 +265,7 @@ const ProductListBulkEditWidget = () => {
   return (
     <>
       <div className="flex justify-end gap-2 px-6 pb-3 pt-1">
-        <Button
+        {/* <Button
           size="small"
           variant="secondary"
           type="button"
@@ -274,14 +274,14 @@ const ProductListBulkEditWidget = () => {
         >
           <Plus />
           WC API Import
-        </Button>
+        </Button> */}
         <Button size="small" variant="secondary" asChild>
           <Link to="/products/bulk-edit">
             <PencilSquare />
             Bulk Edit
           </Link>
         </Button>
-        <Button
+        {/* <Button
           size="small"
           variant="secondary"
           type="button"
@@ -292,7 +292,7 @@ const ProductListBulkEditWidget = () => {
         >
           <Trash />
           Delete All Products
-        </Button>
+        </Button> */}
       </div>
 
       {resetModalOpen ? (

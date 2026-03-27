@@ -14,37 +14,17 @@ import {
 } from "@medusajs/ui"
 import { ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
 import { sdk } from "../../../lib/sdk"
+import {
+  DEFAULT_VISIBLE_COLUMNS,
+  TOGGLEABLE_COLUMNS,
+  amountToDisplay,
+  getMeta,
+  getVariantPriceRange,
+  tagsToString,
+} from "../../../lib/product-table-columns"
 
 const PAGE_SIZE = 20
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
-
-/** Toggleable columns for Manage columns (Image, Title, Status are always visible) */
-const TOGGLEABLE_COLUMNS = [
-  { id: "category", label: "Category" },
-  { id: "sku", label: "SKU" },
-  { id: "basePrice", label: "Base price" },
-  { id: "salePrice", label: "Sale price" },
-  { id: "clientA", label: "Client A" },
-  { id: "clientB", label: "Client B" },
-  { id: "clientC", label: "Client C" },
-  { id: "manageStock", label: "Manage Stock" },
-  { id: "stockQty", label: "Stock qty" },
-  { id: "subtitle", label: "Subtitle" },
-  { id: "description", label: "Description" },
-  { id: "handle", label: "Handle" },
-  { id: "tags", label: "Tags" },
-  { id: "material", label: "Material" },
-  { id: "weight", label: "Weight (g)" },
-  { id: "width", label: "Width" },
-  { id: "height", label: "Height" },
-  { id: "discountable", label: "Discountable" },
-  { id: "color", label: "Color" },
-  { id: "changed", label: "Changed" },
-] as const
-
-const DEFAULT_VISIBLE_COLUMNS = new Set(
-  TOGGLEABLE_COLUMNS.map((c) => c.id)
-)
 
 /** Variant metadata keys editable in bulk */
 const VARIANT_METADATA_KEYS = [
@@ -54,31 +34,6 @@ const VARIANT_METADATA_KEYS = [
   "wcwp_client-b",
   "wcwp_client-c",
 ] as const
-
-function getMeta(metadata: Record<string, unknown> | undefined, key: string): string {
-  const val = metadata?.[key]
-  if (val == null) return ""
-  return String(val)
-}
-
-/** Get price range string (e.g. "29 - 50") from variants' metadata key, or "" if none. */
-function getVariantPriceRange(
-  variants: VariantRow[],
-  metaKey: string
-): string {
-  const nums = variants
-    .map((v) => {
-      const val = v.metadata?.[metaKey]
-      if (val == null) return NaN
-      const n = Number(val)
-      return Number.isFinite(n) ? n : NaN
-    })
-    .filter((n) => !Number.isNaN(n))
-  if (nums.length === 0) return ""
-  const min = Math.min(...nums)
-  const max = Math.max(...nums)
-  return min === max ? String(min) : `${min} - ${max}`
-}
 
 type ProductStatus = "draft" | "proposed" | "published" | "rejected"
 
@@ -163,22 +118,6 @@ type ApiProduct = {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function tagsToString(tags?: { value?: string }[] | null): string {
-  if (!tags || tags.length === 0) return ""
-  return tags.map((t) => t.value ?? "").filter(Boolean).join(", ")
-}
-
-/**
- * Convert API amount to display.
- *
- * Note: In this project, amounts are represented in main currency units
- * (e.g. 59 => "59.00"), not minor units.
- */
-function amountToDisplay(amount?: number): string {
-  if (amount == null) return ""
-  return Number(amount).toFixed(2)
-}
 
 /** Convert human-readable amount back to API amount (main units). */
 function displayToAmount(value: string): number {

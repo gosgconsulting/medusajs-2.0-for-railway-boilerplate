@@ -26,6 +26,38 @@ import { sdk } from "../../../../lib/sdk"
 
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 
+/** Shown above Options (in order); excluded from the generic Metadata list. */
+const FABRICATION_METADATA_KEY = "fabrication_et_composition"
+const PRODUCT_INFORMATION_DETAIL_KEY = "product_information_detail"
+const SIZE_GUIDE_DESCRIPTION_KEY = "size_guide_description"
+const LA_SILHOUETE_JULIA_IMAGE_KEY = "la_silhouete_julia_image"
+const MOQ_METADATA_KEY = "moq"
+const OSQ_METADATA_KEY = "osq"
+
+const PROMOTED_METADATA_ORDER = [
+  FABRICATION_METADATA_KEY,
+  PRODUCT_INFORMATION_DETAIL_KEY,
+  SIZE_GUIDE_DESCRIPTION_KEY,
+  LA_SILHOUETE_JULIA_IMAGE_KEY,
+  MOQ_METADATA_KEY,
+  OSQ_METADATA_KEY,
+] as const
+
+const PROMOTED_METADATA_KEY_SET = new Set<string>(PROMOTED_METADATA_ORDER)
+
+function mergePromotedMetadataRows(
+  raw: { key: string; value: string }[]
+): { key: string; value: string }[] {
+  const byKey = new Map(raw.map((e) => [e.key, e]))
+  const promoted = PROMOTED_METADATA_ORDER.map(
+    (k) => byKey.get(k) ?? { key: k, value: "" }
+  )
+  const rest = raw.filter((e) => !PROMOTED_METADATA_KEY_SET.has(e.key))
+  const suffix =
+    rest.length > 0 ? rest : [{ key: "", value: "" }]
+  return [...promoted, ...suffix]
+}
+
 type LoaderData = Awaited<ReturnType<typeof loader>>
 
 async function loader({ params }: LoaderFunctionArgs): Promise<{ product: any }> {
@@ -59,7 +91,10 @@ const ProductEditPage = () => {
 
   const initialProduct = productFromLoader ?? fetchedProduct
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const silhouetteImageFileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadingSilhouetteImage, setUploadingSilhouetteImage] =
+    useState(false)
   const [updatingMedia, setUpdatingMedia] = useState(false)
 
   const [title, setTitle] = useState(initialProduct?.title ?? "")
@@ -117,10 +152,17 @@ const ProductEditPage = () => {
   const [saveMessage, setSaveMessage] = useState<"success" | "error" | null>(
     null
   )
-  const [metadataEntries, setMetadataEntries] = useState<{ key: string; value: string }[]>(() => {
-    if (!initialProduct?.metadata) return [{ key: "", value: "" }]
-    const entries = Object.entries(initialProduct.metadata).map(([k, v]) => ({ key: k, value: String(v) }))
-    return entries.length > 0 ? entries : [{ key: "", value: "" }]
+  const [metadataEntries, setMetadataEntries] = useState<
+    { key: string; value: string }[]
+  >(() => {
+    const raw = initialProduct?.metadata
+      ? Object.entries(initialProduct.metadata).map(([k, v]) => ({
+          key: k,
+          value: String(v),
+        }))
+      : []
+    const base = raw.length > 0 ? raw : [{ key: "", value: "" }]
+    return mergePromotedMetadataRows(base)
   })
 
 
@@ -162,10 +204,14 @@ const ProductEditPage = () => {
         })
       )
     )
-    const entries = initialProduct.metadata
-      ? Object.entries(initialProduct.metadata).map(([k, v]) => ({ key: k, value: String(v) }))
+    const raw = initialProduct.metadata
+      ? Object.entries(initialProduct.metadata).map(([k, v]) => ({
+          key: k,
+          value: String(v),
+        }))
       : []
-    setMetadataEntries(entries.length > 0 ? entries : [{ key: "", value: "" }])
+    const base = raw.length > 0 ? raw : [{ key: "", value: "" }]
+    setMetadataEntries(mergePromotedMetadataRows(base))
   }, [initialProduct])
 
   const handleSave = useCallback(async () => {
@@ -273,6 +319,40 @@ const ProductEditPage = () => {
       }
     },
     [id, initialProduct?.images, refetchProduct]
+  )
+
+  const handleUploadSilhouetteImage = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!files?.length) return
+      setUploadingSilhouetteImage(true)
+      try {
+        const { files: uploaded } = await sdk.admin.upload.create({
+          files: Array.from(files),
+        })
+        const url = (uploaded?.[0] as { url?: string } | undefined)?.url
+        if (!url) {
+          toast.error("Upload failed")
+          return
+        }
+        setMetadataEntries((prev) => {
+          const idx = prev.findIndex(
+            (ent) => ent.key === LA_SILHOUETE_JULIA_IMAGE_KEY
+          )
+          if (idx < 0) return prev
+          const next = [...prev]
+          next[idx] = { ...next[idx], value: url }
+          return next
+        })
+        toast.success("Silhouette image uploaded")
+      } catch {
+        toast.error("Failed to upload image")
+      } finally {
+        setUploadingSilhouetteImage(false)
+        e.target.value = ""
+      }
+    },
+    []
   )
 
   const handleDeleteImage = useCallback(
@@ -424,11 +504,35 @@ const ProductEditPage = () => {
   const images = product.images ?? []
   const variants = product.variants ?? []
   const options = product.options ?? []
+  const fabricationMetadataIndex = metadataEntries.findIndex(
+    (e) => e.key === FABRICATION_METADATA_KEY
+  )
+  const productInformationDetailMetadataIndex = metadataEntries.findIndex(
+    (e) => e.key === PRODUCT_INFORMATION_DETAIL_KEY
+  )
+  const sizeGuideDescriptionMetadataIndex = metadataEntries.findIndex(
+    (e) => e.key === SIZE_GUIDE_DESCRIPTION_KEY
+  )
+  const silhouetteImageMetadataIndex = metadataEntries.findIndex(
+    (e) => e.key === LA_SILHOUETE_JULIA_IMAGE_KEY
+  )
+  const moqMetadataIndex = metadataEntries.findIndex(
+    (e) => e.key === MOQ_METADATA_KEY
+  )
+  const osqMetadataIndex = metadataEntries.findIndex(
+    (e) => e.key === OSQ_METADATA_KEY
+  )
 
   return (
     <div className="flex flex-col gap-6 pb-8">
       {/* Header: back + breadcrumb + Save + status */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4" style={{
+        position: "sticky",
+        top: 0,
+        background: "#fff",
+        zIndex: 2,
+      }}> 
+
         <div className="flex items-center gap-3">
           <Link to={`/products/${id}`}>
             <Button variant="transparent" size="small" className="!p-0 gap-1.5">
@@ -462,7 +566,7 @@ const ProductEditPage = () => {
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8" style={{zIndex: 0}}>
         {/* Main column */}
         <div className="flex flex-col gap-6">
           {/* Media */}
@@ -585,7 +689,7 @@ const ProductEditPage = () => {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="product-description">Description (Markdown)</Label>
+                <Label htmlFor="product-description">Description</Label>
                 <SimpleMarkdownEditor
                   id="product-description"
                   value={description}
@@ -596,6 +700,258 @@ const ProductEditPage = () => {
               </div>
             </div>
           </Container>
+
+          {/* Fabrication & composition (metadata) — above Options for visibility */}
+          {fabricationMetadataIndex >= 0 ? (
+            <Container className="divide-y p-0">
+              <div className="px-6 py-4">
+                <Heading level="h2">Fabrication et composition</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Metadata key{" "}
+                  <span className="font-mono txt-compact-xsmall">
+                    {FABRICATION_METADATA_KEY}
+                  </span>
+                  . Saved when you click Save at the top of the page.
+                </Text>
+              </div>
+              <div className="px-6 py-4">
+                <div className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
+                  <Label htmlFor="metadata-fabrication-value">
+                    Value (Markdown)
+                  </Label>
+                  <SimpleMarkdownEditor
+                    id="metadata-fabrication-value"
+                    value={metadataEntries[fabricationMetadataIndex].value}
+                    onChange={(val) =>
+                      updateMetadataValue(fabricationMetadataIndex, val)
+                    }
+                    placeholder="Fabrication et composition…"
+                    minHeight={200}
+                  />
+                </div>
+              </div>
+            </Container>
+          ) : null}
+
+          {/* Product information detail (metadata) — below fabrication, above Options */}
+          {productInformationDetailMetadataIndex >= 0 ? (
+            <Container className="divide-y p-0">
+              <div className="px-6 py-4">
+                <Heading level="h2">Product information detail</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Metadata key{" "}
+                  <span className="font-mono txt-compact-xsmall">
+                    {PRODUCT_INFORMATION_DETAIL_KEY}
+                  </span>
+                  . Saved when you click Save at the top of the page.
+                </Text>
+              </div>
+              <div className="px-6 py-4">
+                <div className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
+                  <Label htmlFor="metadata-product-info-detail-value">
+                    Value (Markdown)
+                  </Label>
+                  <SimpleMarkdownEditor
+                    id="metadata-product-info-detail-value"
+                    value={
+                      metadataEntries[productInformationDetailMetadataIndex]
+                        .value
+                    }
+                    onChange={(val) =>
+                      updateMetadataValue(
+                        productInformationDetailMetadataIndex,
+                        val
+                      )
+                    }
+                    placeholder="Product information detail…"
+                    minHeight={200}
+                  />
+                </div>
+              </div>
+            </Container>
+          ) : null}
+
+          {/* Size guide description (metadata) — below product info detail, above Options */}
+          {sizeGuideDescriptionMetadataIndex >= 0 ? (
+            <Container className="divide-y p-0">
+              <div className="px-6 py-4">
+                <Heading level="h2">Size guide description</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Metadata key{" "}
+                  <span className="font-mono txt-compact-xsmall">
+                    {SIZE_GUIDE_DESCRIPTION_KEY}
+                  </span>
+                  . Saved when you click Save at the top of the page.
+                </Text>
+              </div>
+              <div className="px-6 py-4">
+                <div className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
+                  <Label htmlFor="metadata-size-guide-description-value">
+                    Value (Markdown)
+                  </Label>
+                  <SimpleMarkdownEditor
+                    id="metadata-size-guide-description-value"
+                    value={
+                      metadataEntries[sizeGuideDescriptionMetadataIndex].value
+                    }
+                    onChange={(val) =>
+                      updateMetadataValue(
+                        sizeGuideDescriptionMetadataIndex,
+                        val
+                      )
+                    }
+                    placeholder="Size guide…"
+                    minHeight={200}
+                  />
+                </div>
+              </div>
+            </Container>
+          ) : null}
+
+          {/* La silhouette Julia image (metadata URL) — below size guide */}
+          {silhouetteImageMetadataIndex >= 0 ? (
+            <Container className="divide-y p-0">
+              <div className="px-6 py-4">
+                <Heading level="h2">La silhouette Julia image</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Metadata key{" "}
+                  <span className="font-mono txt-compact-xsmall">
+                    {LA_SILHOUETE_JULIA_IMAGE_KEY}
+                  </span>
+                  . Upload or paste an image URL; saved with Save at the top.
+                </Text>
+              </div>
+              <div className="px-6 py-4">
+                <div className="flex flex-col gap-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
+                  <input
+                    ref={silhouetteImageFileRef}
+                    type="file"
+                    accept={ACCEPT_IMAGES}
+                    className="hidden"
+                    onChange={handleUploadSilhouetteImage}
+                  />
+                  <div className="flex flex-wrap items-start gap-4">
+                    {metadataEntries[silhouetteImageMetadataIndex].value ? (
+                      <div className="w-40 shrink-0 rounded-lg border border-ui-border-base overflow-hidden bg-ui-bg-base">
+                        <img
+                          src={
+                            metadataEntries[silhouetteImageMetadataIndex].value
+                          }
+                          alt=""
+                          className="w-full aspect-square object-cover"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                      <Label htmlFor="metadata-silhouette-image-url">
+                        Image URL
+                      </Label>
+                      <Input
+                        id="metadata-silhouette-image-url"
+                        value={
+                          metadataEntries[silhouetteImageMetadataIndex].value
+                        }
+                        onChange={(e) =>
+                          updateMetadataValue(
+                            silhouetteImageMetadataIndex,
+                            e.target.value
+                          )
+                        }
+                        placeholder="Paste URL or use Upload"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="small"
+                          variant="secondary"
+                          type="button"
+                          disabled={uploadingSilhouetteImage}
+                          onClick={() =>
+                            silhouetteImageFileRef.current?.click()
+                          }
+                        >
+                          {uploadingSilhouetteImage
+                            ? "Uploading…"
+                            : metadataEntries[silhouetteImageMetadataIndex]
+                                  .value
+                              ? "Replace image"
+                              : "Upload image"}
+                        </Button>
+                        {metadataEntries[silhouetteImageMetadataIndex].value ? (
+                          <Button
+                            size="small"
+                            variant="transparent"
+                            type="button"
+                            onClick={() =>
+                              updateMetadataValue(
+                                silhouetteImageMetadataIndex,
+                                ""
+                              )
+                            }
+                          >
+                            Clear
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Container>
+          ) : null}
+
+          {/* MOQ & OSQ (numeric metadata) */}
+          {moqMetadataIndex >= 0 && osqMetadataIndex >= 0 ? (
+            <Container className="divide-y p-0">
+              <div className="px-6 py-4">
+                <Heading level="h2">Order quantities</Heading>
+                <Text size="small" className="text-ui-fg-subtle mt-1">
+                  Metadata keys{" "}
+                  <span className="font-mono txt-compact-xsmall">
+                    {MOQ_METADATA_KEY}
+                  </span>{" "}
+                  and{" "}
+                  <span className="font-mono txt-compact-xsmall">
+                    {OSQ_METADATA_KEY}
+                  </span>
+                  . Saved when you click Save at the top.
+                </Text>
+              </div>
+              <div className="px-6 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="metadata-moq">MOQ</Label>
+                    <Input
+                      id="metadata-moq"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      value={metadataEntries[moqMetadataIndex].value}
+                      onChange={(e) =>
+                        updateMetadataValue(moqMetadataIndex, e.target.value)
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="metadata-osq">OSQ</Label>
+                    <Input
+                      id="metadata-osq"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      value={metadataEntries[osqMetadataIndex].value}
+                      onChange={(e) =>
+                        updateMetadataValue(osqMetadataIndex, e.target.value)
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Container>
+          ) : null}
 
           {/* Options */}
           <Container className="divide-y p-0">
@@ -751,7 +1107,11 @@ const ProductEditPage = () => {
               </Text>
             </div>
             <div className="px-6 py-4 flex flex-col gap-4">
-              {metadataEntries.map((entry, i) => (
+              {metadataEntries.map((entry, i) => {
+                if (PROMOTED_METADATA_KEY_SET.has(entry.key)) {
+                  return null
+                }
+                return (
                 <div key={i} className="flex flex-col gap-2 p-4 border border-ui-border-base rounded-lg bg-ui-bg-subtle">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1">
@@ -784,7 +1144,8 @@ const ProductEditPage = () => {
                     />
                   </div>
                 </div>
-              ))}
+                )
+              })}
               <div>
                 <Button size="small" variant="secondary" onClick={addMetadataEntry} type="button">
                   Add metadata
