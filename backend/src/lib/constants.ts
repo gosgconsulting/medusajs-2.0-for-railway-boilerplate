@@ -102,8 +102,8 @@ export const WORKER_MODE =
 export const SHOULD_DISABLE_ADMIN = process.env.MEDUSA_DISABLE_ADMIN === 'true'
 
 /**
- * WooCommerce REST API (optional). When all three are set, /admin/wc-import uses them
- * and the admin UI hides URL / consumer key / secret fields.
+ * WooCommerce REST API (optional). When all three are set, /admin/wc-import and
+ * /admin/wc-sync-variant-color-hex use them; the admin UI hides URL / keys for import.
  */
 export const WC_API_URL = process.env.WC_API_URL?.trim() || undefined
 export const WC_CONSUMER_KEY = process.env.WC_CONSUMER_KEY?.trim() || undefined

@@ -706,29 +706,17 @@ const ProductEditPage = () => {
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
                 <Heading level="h2">Fabrication et composition</Heading>
-                <Text size="small" className="text-ui-fg-subtle mt-1">
-                  Metadata key{" "}
-                  <span className="font-mono txt-compact-xsmall">
-                    {FABRICATION_METADATA_KEY}
-                  </span>
-                  . Saved when you click Save at the top of the page.
-                </Text>
               </div>
               <div className="px-6 py-4">
-                <div className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
-                  <Label htmlFor="metadata-fabrication-value">
-                    Value (Markdown)
-                  </Label>
-                  <SimpleMarkdownEditor
-                    id="metadata-fabrication-value"
-                    value={metadataEntries[fabricationMetadataIndex].value}
-                    onChange={(val) =>
-                      updateMetadataValue(fabricationMetadataIndex, val)
-                    }
-                    placeholder="Fabrication et composition…"
-                    minHeight={200}
-                  />
-                </div>
+                <SimpleMarkdownEditor
+                  id="metadata-fabrication-value"
+                  value={metadataEntries[fabricationMetadataIndex].value}
+                  onChange={(val) =>
+                    updateMetadataValue(fabricationMetadataIndex, val)
+                  }
+                  placeholder="Fabrication et composition…"
+                  minHeight={200}
+                />
               </div>
             </Container>
           ) : null}
@@ -738,19 +726,8 @@ const ProductEditPage = () => {
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
                 <Heading level="h2">Product information detail</Heading>
-                <Text size="small" className="text-ui-fg-subtle mt-1">
-                  Metadata key{" "}
-                  <span className="font-mono txt-compact-xsmall">
-                    {PRODUCT_INFORMATION_DETAIL_KEY}
-                  </span>
-                  . Saved when you click Save at the top of the page.
-                </Text>
               </div>
               <div className="px-6 py-4">
-                <div className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
-                  <Label htmlFor="metadata-product-info-detail-value">
-                    Value (Markdown)
-                  </Label>
                   <SimpleMarkdownEditor
                     id="metadata-product-info-detail-value"
                     value={
@@ -766,7 +743,6 @@ const ProductEditPage = () => {
                     placeholder="Product information detail…"
                     minHeight={200}
                   />
-                </div>
               </div>
             </Container>
           ) : null}
@@ -776,19 +752,8 @@ const ProductEditPage = () => {
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
                 <Heading level="h2">Size guide description</Heading>
-                <Text size="small" className="text-ui-fg-subtle mt-1">
-                  Metadata key{" "}
-                  <span className="font-mono txt-compact-xsmall">
-                    {SIZE_GUIDE_DESCRIPTION_KEY}
-                  </span>
-                  . Saved when you click Save at the top of the page.
-                </Text>
               </div>
               <div className="px-6 py-4">
-                <div className="flex flex-col gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
-                  <Label htmlFor="metadata-size-guide-description-value">
-                    Value (Markdown)
-                  </Label>
                   <SimpleMarkdownEditor
                     id="metadata-size-guide-description-value"
                     value={
@@ -803,7 +768,6 @@ const ProductEditPage = () => {
                     placeholder="Size guide…"
                     minHeight={200}
                   />
-                </div>
               </div>
             </Container>
           ) : null}
@@ -814,11 +778,7 @@ const ProductEditPage = () => {
               <div className="px-6 py-4">
                 <Heading level="h2">La silhouette Julia image</Heading>
                 <Text size="small" className="text-ui-fg-subtle mt-1">
-                  Metadata key{" "}
-                  <span className="font-mono txt-compact-xsmall">
-                    {LA_SILHOUETE_JULIA_IMAGE_KEY}
-                  </span>
-                  . Upload or paste an image URL; saved with Save at the top.
+                  Upload or paste an image URL.
                 </Text>
               </div>
               <div className="px-6 py-4">
@@ -904,22 +864,11 @@ const ProductEditPage = () => {
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
                 <Heading level="h2">Order quantities</Heading>
-                <Text size="small" className="text-ui-fg-subtle mt-1">
-                  Metadata keys{" "}
-                  <span className="font-mono txt-compact-xsmall">
-                    {MOQ_METADATA_KEY}
-                  </span>{" "}
-                  and{" "}
-                  <span className="font-mono txt-compact-xsmall">
-                    {OSQ_METADATA_KEY}
-                  </span>
-                  . Saved when you click Save at the top.
-                </Text>
               </div>
               <div className="px-6 py-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-4">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="metadata-moq">MOQ</Label>
+                    <Label htmlFor="metadata-moq" title="Minimum order Quantity">MOQ</Label>
                     <Input
                       id="metadata-moq"
                       type="number"
@@ -934,7 +883,7 @@ const ProductEditPage = () => {
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="metadata-osq">OSQ</Label>
+                    <Label htmlFor="metadata-osq" title="Order Sample Quantity">OSQ</Label>
                     <Input
                       id="metadata-osq"
                       type="number"

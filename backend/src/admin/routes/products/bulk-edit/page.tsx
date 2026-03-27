@@ -15,7 +15,10 @@ import {
 import { ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
 import { sdk } from "../../../lib/sdk"
 import {
-  DEFAULT_VISIBLE_COLUMNS,
+  loadColumnPrefs,
+  saveColumnPrefs,
+} from "../../../lib/product-column-prefs"
+import {
   TOGGLEABLE_COLUMNS,
   amountToDisplay,
   getMeta,
@@ -335,10 +338,16 @@ const BulkEditPage = () => {
   const [working, setWorking] = useState<ProductRow[]>([])
   const [errors, setErrors] = useState<RowErrors>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [columnMode, setColumnMode] = useState<"default" | "custom">("default")
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-    () => new Set(DEFAULT_VISIBLE_COLUMNS)
+  const [columnMode, setColumnMode] = useState<"default" | "custom">(
+    () => loadColumnPrefs().mode
   )
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
+    () => loadColumnPrefs().visible
+  )
+
+  useEffect(() => {
+    saveColumnPrefs(columnMode, visibleColumns)
+  }, [columnMode, visibleColumns])
 
   const isColumnVisible = useCallback(
     (id: string) => {
@@ -1232,6 +1241,76 @@ const BulkEditPage = () => {
           >
             {isSaving ? "Saving…" : "Save changes"}
           </Button>
+          <DropdownMenu>
+              <DropdownMenu.Trigger asChild>
+                <Button variant="secondary" size="small" disabled={isSaving}>
+                  Manage columns <ChevronDown className="ml-1" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content className="w-[300px]">
+                <div className="flex flex-col gap-3 p-3">
+                  <Text size="xsmall" className="text-ui-fg-muted">
+                    Expand, image, title, and status always stay visible. Same
+                    as the main products list.
+                  </Text>
+                  <div className="flex flex-col gap-1">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="bulk-column-mode"
+                        checked={columnMode === "default"}
+                        onChange={() => setColumnMode("default")}
+                        disabled={isSaving}
+                        className="rounded-full text-ui-fg-interactive"
+                      />
+                      <Text size="small">Default (all columns)</Text>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="bulk-column-mode"
+                        checked={columnMode === "custom"}
+                        onChange={() => setColumnMode("custom")}
+                        disabled={isSaving}
+                        className="rounded-full text-ui-fg-interactive"
+                      />
+                      <Text size="small">Custom</Text>
+                    </label>
+                  </div>
+                  {columnMode === "custom" && (
+                    <div className="border-t border-ui-border-base pt-2">
+                      <Text
+                        size="xsmall"
+                        className="mb-2 block text-ui-fg-muted"
+                      >
+                        Select columns to display:
+                      </Text>
+                      <div className="max-h-[min(320px,50vh)] flex flex-col gap-0.5 overflow-y-auto">
+                        {TOGGLEABLE_COLUMNS.map((col) => (
+                          <label
+                            key={col.id}
+                            className="flex cursor-pointer items-center gap-2 rounded-md py-1.5 pl-1 pr-1 hover:bg-ui-bg-base-hover"
+                          >
+                            <Checkbox
+                              checked={visibleColumns.has(col.id)}
+                              onCheckedChange={(checked) => {
+                                setVisibleColumns((prev) => {
+                                  const next = new Set(prev)
+                                  if (checked === true) next.add(col.id)
+                                  else next.delete(col.id)
+                                  return next
+                                })
+                              }}
+                            />
+                            <Text size="small">{col.label}</Text>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DropdownMenu.Content>
+            </DropdownMenu>
         </div>
       </div>
 
@@ -1585,69 +1664,6 @@ const BulkEditPage = () => {
               </DropdownMenu.Content>
             </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenu.Trigger asChild>
-                <Button variant="secondary" size="small" disabled={isSaving}>
-                  Manage columns <ChevronDown className="ml-1" />
-                </Button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content className="w-[280px]">
-                <div className="p-3 flex flex-col gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="columnMode"
-                        checked={columnMode === "default"}
-                        onChange={() => setColumnMode("default")}
-                        className="rounded-full"
-                      />
-                      <Text size="small">Default (all columns)</Text>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="columnMode"
-                        checked={columnMode === "custom"}
-                        onChange={() => setColumnMode("custom")}
-                        className="rounded-full"
-                      />
-                      <Text size="small">Custom</Text>
-                    </label>
-                  </div>
-                  {columnMode === "custom" && (
-                    <>
-                      <div className="border-t border-ui-border-base pt-2">
-                        <Text size="xsmall" className="text-ui-fg-muted mb-2 block">
-                          Select columns to display:
-                        </Text>
-                        <div className="max-h-[240px] overflow-auto flex flex-col gap-1">
-                          {TOGGLEABLE_COLUMNS.map((col) => (
-                            <label
-                              key={col.id}
-                              className="flex items-center gap-2 cursor-pointer py-1"
-                            >
-                              <Checkbox
-                                checked={visibleColumns.has(col.id)}
-                                onCheckedChange={(checked) => {
-                                  setVisibleColumns((prev) => {
-                                    const next = new Set(prev)
-                                    if (checked) next.add(col.id)
-                                    else next.delete(col.id)
-                                    return next
-                                  })
-                                }}
-                              />
-                              <Text size="small">{col.label}</Text>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </DropdownMenu.Content>
-            </DropdownMenu>
 
             {hasAnyFilters && (
               <Button
@@ -1679,9 +1695,9 @@ const BulkEditPage = () => {
               </Button>
             )}
 
-            <Text size="small" className="text-ui-fg-subtle whitespace-nowrap">
+            {/* <Text size="small" className="text-ui-fg-subtle whitespace-nowrap">
               {total} result{total !== 1 ? "s" : ""}
-            </Text>
+            </Text> */}
           </div>
         </div>
         {isLoading ? (
