@@ -1,0 +1,14 @@
+---
+description: Always follow medusajs-skill when changing this Medusa backend
+alwaysApply: true
+---
+
+# Medusa backend — use `/medusajs-skill`
+
+This workspace is a **MedusaJS v2** backend. For **every** task that adds, changes, or fixes code or config here:
+
+1. **Read** [`.cursor/rules/medusajs-skill/SKILL.md`](.cursor/rules/medusajs-skill/SKILL.md) first (same as slash command `/medusajs-skill`).
+2. **Follow** its patterns: modules and DI, workflows and core flows, Store vs Admin APIs, subscribers, jobs, migrations, env and deployment notes.
+3. **Open references** under [`.cursor/rules/medusajs-skill/references/`](.cursor/rules/medusajs-skill/references/) when the task touches architecture, workflows/APIs, or deployment.
+
+Do not rely on generic Medusa v1 or outdated snippets. Prefer the skill’s guidance and official Medusa v2 docs linked there.
