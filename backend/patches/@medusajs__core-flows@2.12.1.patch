@@ -1,5 +1,4 @@
 diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/cart/workflows/get-variants-and-items-with-prices.js
-index 1c38413311d10ebb3ea2b68c31d3fe4ccc71f593..06359ca5d17559bc35b3a7448e5e4b72aa293da5 100644
 --- a/dist/cart/workflows/get-variants-and-items-with-prices.js
 +++ b/dist/cart/workflows/get-variants-and-items-with-prices.js
 @@ -77,7 +77,8 @@ exports.getVariantsAndItemsWithPrices = (0, workflows_sdk_1.createWorkflow)(expo
@@ -20,6 +19,66 @@ index 1c38413311d10ebb3ea2b68c31d3fe4ccc71f593..06359ca5d17559bc35b3a7448e5e4b72
              const input = {
                  item: item_,
                  variant: variant,
+@@ -99,10 +99,15 @@ exports.getVariantsAndItemsWithPrices = (0, workflows_sdk_1.createWorkflow)(expo
+                     calculatedPriceSet?.is_calculated_price_tax_inclusive,
+                 isCustomPrice: isCustomPrice,
+             };
+-            if (variant && !isCustomPrice) {
+-                input.unitPrice = calculatedPriceSet.calculated_amount;
+-                input.isTaxInclusive =
+-                    calculatedPriceSet.is_calculated_price_tax_inclusive;
++            if (variant && !isCustomPrice && calculatedPriceSet) {
++                if ((0, utils_1.isPresent)(calculatedPriceSet.calculated_amount)) {
++                    input.unitPrice = calculatedPriceSet.calculated_amount;
++                    input.isTaxInclusive =
++                        calculatedPriceSet.is_calculated_price_tax_inclusive;
++                }
++                else if (item_.variant_id) {
++                    priceNotFound.push(item_.variant_id);
++                }
+             }
+             const preparedItem = (0, prepare_line_item_data_1.prepareLineItemData)(input);
+             return {
+diff --git a/dist/cart/workflows/refresh-cart-shipping-methods.js b/dist/cart/workflows/refresh-cart-shipping-methods.js
+--- a/dist/cart/workflows/refresh-cart-shipping-methods.js
++++ b/dist/cart/workflows/refresh-cart-shipping-methods.js
+@@ -109,7 +109,7 @@ exports.refreshCartShippingMethodsWorkflow = (0, workflows_sdk_1.createWorkflow)(
+                 const shippingOptionPrice = shippingOption?.calculated_price?.calculated_amount;
+                 // The shipping method is only valid if both the shipping option and the price is found
+                 // for the context of the cart. The invalid options will lead to a deleted shipping method
+-                if ((0, utils_1.isPresent)(shippingOption) && (0, utils_1.isDefined)(shippingOptionPrice)) {
++                if ((0, utils_1.isPresent)(shippingOption) && (0, utils_1.isPresent)(shippingOptionPrice)) {
+                     return true;
+                 }
+                 return false;
+@@ -117,16 +117,22 @@ exports.refreshCartShippingMethodsWorkflow = (0, workflows_sdk_1.createWorkflow)(
+             const shippingMethodIds = shippingMethods.map((sm) => sm.id);
+             const validShippingMethodIds = validShippingMethods.map((sm) => sm.id);
+             const invalidShippingMethodIds = shippingMethodIds.filter((id) => !validShippingMethodIds.includes(id));
+-            const shippingMethodsToUpdate = validShippingMethods.map((shippingMethod) => {
++            const shippingMethodsToUpdate = validShippingMethods
++                .map((shippingMethod) => {
+                 const shippingOption = shippingOptions.find((s) => s.id === shippingMethod.shipping_option_id);
++                const cp = shippingOption?.calculated_price;
++                const amount = cp?.calculated_amount;
++                if (!(0, utils_1.isPresent)(shippingOption) || !(0, utils_1.isPresent)(amount)) {
++                    return null;
++                }
+                 return {
+                     id: shippingMethod.id,
+                     shipping_option_id: shippingOption.id,
+-                    amount: shippingOption.calculated_price.calculated_amount,
+-                    is_tax_inclusive: shippingOption.calculated_price
+-                        .is_calculated_price_tax_inclusive,
++                    amount,
++                    is_tax_inclusive: !!cp.is_calculated_price_tax_inclusive,
+                 };
+-            });
++            })
++                .filter(Boolean);
+             return {
+                 shippingMethodsToRemove: invalidShippingMethodIds,
+                 shippingMethodsToUpdate,
 diff --git a/dist/draft-order/workflows/convert-draft-order.js b/dist/draft-order/workflows/convert-draft-order.js
 index 768bfd7aa1e3db2747a6598f6e7afd0aea8d1388..d842493e7f7f6fc401dfd500d4d8113ba9393220 100644
 --- a/dist/draft-order/workflows/convert-draft-order.js
