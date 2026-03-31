@@ -1,7 +1,7 @@
 diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/cart/workflows/get-variants-and-items-with-prices.js
 --- a/dist/cart/workflows/get-variants-and-items-with-prices.js
 +++ b/dist/cart/workflows/get-variants-and-items-with-prices.js
-@@ -7,6 +7,41 @@
+@@ -7,6 +7,49 @@
  const steps_1 = require("../steps");
  const fields_1 = require("../utils/fields");
  const prepare_line_item_data_1 = require("../utils/prepare-line-item-data");
@@ -40,10 +40,18 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
 +    const n = Number(String(raw).trim().replace(",", "."));
 +    return Number.isFinite(n) && n >= 0 ? n : null;
 +}
++function wcwpFallbackCurrencyCode() {
++    const raw = process.env.WCWP_FALLBACK_CURRENCY;
++    if (raw == null || String(raw).trim() === "") {
++        return "eur";
++    }
++    return String(raw).trim().toLowerCase();
++}
++const WCWP_FALLBACK_CURRENCY = wcwpFallbackCurrencyCode();
  exports.getVariantsAndItemsWithPricesId = "get-variant-items-with-prices-workflow";
  exports.getVariantsAndItemsWithPrices = (0, workflows_sdk_1.createWorkflow)(exports.getVariantsAndItemsWithPricesId, (input) => {
      const variantIds = (0, workflows_sdk_1.transform)({ cart: input.cart, items: input.items, variantIds: input.variants?.id }, (data) => {
-@@ -21,12 +56,13 @@
+@@ -21,12 +64,13 @@
          setPricingContextResult: input.setPricingContextResult,
      }, (data) => {
          const cart = data.cart;
@@ -58,7 +66,36 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              region_id: cart.region_id,
              customer_id: cart.customer_id,
          };
-@@ -72,15 +108,22 @@
+@@ -61,26 +105,56 @@
+     }).config({ name: "fetch-variants" });
+     const calculatedPriceSets = (0, steps_1.getVariantPriceSetsStep)({
+         data: cartPricingContext,
++    }).config({ name: "wcwp-get-variant-price-sets-primary" });
++    const eurFallbackPricingContext = (0, workflows_sdk_1.transform)({ cartPricingContext, cart: input.cart }, ({ cartPricingContext: ctxRows, cart, }) => {
++        const rawCurrency = String(cart?.currency_code ?? cart?.region?.currency_code ?? "").toLowerCase();
++        if (rawCurrency === WCWP_FALLBACK_CURRENCY || !ctxRows?.length) {
++            return [];
++        }
++        return ctxRows.map((entry) => ({
++            ...entry,
++            context: {
++                ...entry.context,
++                currency_code: WCWP_FALLBACK_CURRENCY,
++            },
++        }));
+     });
++    const eurCalculatedPriceSets = (0, steps_1.getVariantPriceSetsStep)({
++        data: eurFallbackPricingContext,
++    }).config({ name: "wcwp-get-variant-price-sets-fallback" });
+     const variantsItemsWithPrices = (0, workflows_sdk_1.transform)({
+         cart: input.cart,
+         items: input.items,
+         variantsData,
+         calculatedPriceSets,
+-    }, ({ cart, items: inputItems, variantsData, calculatedPriceSets, }) => {
++        eurCalculatedPriceSets,
++    }, ({ cart, items: inputItems, variantsData, calculatedPriceSets, eurCalculatedPriceSets, }) => {
+         const priceNotFound = [];
          const variantNotFoundOrPublished = [];
          const items = (inputItems ?? cart.items ?? []).map((item) => {
              const item_ = item;
@@ -75,6 +112,12 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
                  calculatedPriceSet = calculatedPriceSets[item_.variant_id];
              }
 -            if (!calculatedPriceSet && item_.variant_id) {
++            if (!calculatedPriceSet) {
++                calculatedPriceSet = eurCalculatedPriceSets[idLike];
++            }
++            if (!calculatedPriceSet) {
++                calculatedPriceSet = eurCalculatedPriceSets[item_.variant_id];
++            }
 +            const isCustomPrice = (item_.is_custom_price ?? (0, utils_1.isDefined)(item?.unit_price)) || wcwpHasTierPrice;
 +            if (!calculatedPriceSet && item_.variant_id && !isCustomPrice) {
                  priceNotFound.push(item_.variant_id);
@@ -83,7 +126,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              if ((item.variant_id && !variant) || // variant specified but doesn't exist
                  (variant && (!variant?.product?.status || variant.product.status !== utils_1.ProductStatus.PUBLISHED)) // variant exists but product is not published
              ) {
-@@ -89,7 +132,6 @@
+@@ -89,7 +163,6 @@
              if (variant) {
                  variant.calculated_price = calculatedPriceSet;
              }
@@ -91,28 +134,26 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              const input = {
                  item: item_,
                  variant: variant,
-@@ -99,10 +141,16 @@
+@@ -99,11 +172,17 @@
                      calculatedPriceSet?.is_calculated_price_tax_inclusive,
                  isCustomPrice: isCustomPrice,
              };
 -            if (variant && !isCustomPrice) {
--                input.unitPrice = calculatedPriceSet.calculated_amount;
--                input.isTaxInclusive =
--                    calculatedPriceSet.is_calculated_price_tax_inclusive;
 +            if (variant && !isCustomPrice && calculatedPriceSet) {
-+                input.unitPrice = calculatedPriceSet.calculated_amount;
-+                input.isTaxInclusive =
-+                    calculatedPriceSet.is_calculated_price_tax_inclusive;
-+            }
+                 input.unitPrice = calculatedPriceSet.calculated_amount;
+                 input.isTaxInclusive =
+                     calculatedPriceSet.is_calculated_price_tax_inclusive;
+             }
 +            if (variant && wcwpHasTierPrice) {
 +                const cur = cart.currency_code ?? cart.region?.currency_code;
 +                input.unitPrice = wcwpMajorToMinor(wcwpTierMajor, cur);
 +                input.isCustomPrice = true;
 +                input.isTaxInclusive = false;
-             }
++            }
              const preparedItem = (0, prepare_line_item_data_1.prepareLineItemData)(input);
              return {
-@@ -120,4 +173,4 @@
+                 selector: { id: item_.id },
+@@ -120,4 +199,4 @@
      });
      return new workflows_sdk_1.WorkflowResponse(variantsItemsWithPrices);
  });
@@ -182,27 +223,3 @@ diff --git a/dist/cart/workflows/refresh-cart-shipping-methods.js b/dist/cart/wo
              return {
                  shippingMethodsToRemove: invalidShippingMethodIds,
                  shippingMethodsToUpdate,
-diff --git a/dist/draft-order/workflows/convert-draft-order.js b/dist/draft-order/workflows/convert-draft-order.js
---- a/dist/draft-order/workflows/convert-draft-order.js
-+++ b/dist/draft-order/workflows/convert-draft-order.js
-@@ -84,12 +84,14 @@
-         const items = [];
-         const variants = [];
-         for (const orderItem of orderItems.items ?? []) {
--            items.push({
--                variant_id: orderItem.variant.id,
--                quantity: orderItem.quantity,
--                id: orderItem.id,
--            });
--            variants.push(orderItem.variant);
-+            if (orderItem.variant) {
-+                items.push({
-+                    variant_id: orderItem.variant.id,
-+                    quantity: orderItem.quantity,
-+                    id: orderItem.id,
-+                });
-+                variants.push(orderItem.variant);
-+            }
-         }
-         return {
-             variants,
