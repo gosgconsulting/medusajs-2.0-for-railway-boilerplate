@@ -91,7 +91,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              const input = {
                  item: item_,
                  variant: variant,
-@@ -99,10 +141,21 @@
+@@ -99,10 +141,16 @@
                      calculatedPriceSet?.is_calculated_price_tax_inclusive,
                  isCustomPrice: isCustomPrice,
              };
@@ -100,14 +100,9 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
 -                input.isTaxInclusive =
 -                    calculatedPriceSet.is_calculated_price_tax_inclusive;
 +            if (variant && !isCustomPrice && calculatedPriceSet) {
-+                if ((0, utils_1.isPresent)(calculatedPriceSet.calculated_amount)) {
-+                    input.unitPrice = calculatedPriceSet.calculated_amount;
-+                    input.isTaxInclusive =
-+                        calculatedPriceSet.is_calculated_price_tax_inclusive;
-+                }
-+                else if (item_.variant_id) {
-+                    priceNotFound.push(item_.variant_id);
-+                }
++                input.unitPrice = calculatedPriceSet.calculated_amount;
++                input.isTaxInclusive =
++                    calculatedPriceSet.is_calculated_price_tax_inclusive;
 +            }
 +            if (variant && wcwpHasTierPrice) {
 +                const cur = cart.currency_code ?? cart.region?.currency_code;

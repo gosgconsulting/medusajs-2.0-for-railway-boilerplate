@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@medusajs/core-flows@2.12.1':
-    hash: qjram4nmozdnhuom3wqa5l455m
+    hash: yx7eqbwmyzomqyhad27lp6c2k4
     path: patches/@medusajs__core-flows@2.12.1.patch
 
 importers:
@@ -9467,7 +9467,7 @@ snapshots:
       - supports-color
       - tedious
 
-  '@medusajs/core-flows@2.12.1(patch_hash=qjram4nmozdnhuom3wqa5l455m)(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))':
+  '@medusajs/core-flows@2.12.1(patch_hash=yx7eqbwmyzomqyhad27lp6c2k4)(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))':
     dependencies:
       '@medusajs/framework': 2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25))
       csv-parse: 5.6.0
@@ -9720,7 +9720,7 @@ snapshots:
       '@medusajs/caching': 2.12.1(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(awilix@8.0.1)
       '@medusajs/caching-redis': 2.12.1(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/cart': 2.12.1(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
-      '@medusajs/core-flows': 2.12.1(patch_hash=qjram4nmozdnhuom3wqa5l455m)(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
+      '@medusajs/core-flows': 2.12.1(patch_hash=yx7eqbwmyzomqyhad27lp6c2k4)(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/currency': 2.12.1(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/customer': 2.12.1(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/draft-order': 2.12.1(@medusajs/admin-sdk@2.12.1)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/icons@2.12.1(react@18.3.1))(@medusajs/test-utils@2.12.1(@medusajs/framework@2.12.1(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/medusa@2.12.1))(@medusajs/ui@4.0.29(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react-router-dom@6.20.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
