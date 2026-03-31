@@ -75,7 +75,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
                  calculatedPriceSet = calculatedPriceSets[item_.variant_id];
              }
 -            if (!calculatedPriceSet && item_.variant_id) {
-+            const isCustomPrice = item_.is_custom_price ?? (0, utils_1.isDefined)(item?.unit_price) || wcwpHasTierPrice;
++            const isCustomPrice = (item_.is_custom_price ?? (0, utils_1.isDefined)(item?.unit_price)) || wcwpHasTierPrice;
 +            if (!calculatedPriceSet && item_.variant_id && !isCustomPrice) {
                  priceNotFound.push(item_.variant_id);
              }
