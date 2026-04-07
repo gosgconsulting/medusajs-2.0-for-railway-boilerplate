@@ -15,6 +15,10 @@ import {
   STORE_CORS,
   STRIPE_API_KEY,
   STRIPE_WEBHOOK_SECRET,
+  HITPAY_API_KEY,
+  HITPAY_SALT,
+  HITPAY_SANDBOX,
+  HITPAY_REDIRECT_URL,
   WORKER_MODE,
   MINIO_ENDPOINT,
   MINIO_ACCESS_KEY,
@@ -25,6 +29,35 @@ import {
 } from 'lib/constants';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
+
+const paymentModuleProviders = [
+  ...(STRIPE_API_KEY
+    ? [
+        {
+          resolve: "@medusajs/payment-stripe",
+          id: "stripe",
+          options: {
+            apiKey: STRIPE_API_KEY,
+            webhookSecret: STRIPE_WEBHOOK_SECRET || "unconfigured",
+          },
+        },
+      ]
+    : []),
+  ...(HITPAY_API_KEY && HITPAY_SALT && HITPAY_REDIRECT_URL
+    ? [
+        {
+          resolve: "./src/modules/hitpay-payment",
+          id: "hitpay",
+          options: {
+            apiKey: HITPAY_API_KEY,
+            salt: HITPAY_SALT,
+            sandbox: HITPAY_SANDBOX,
+            redirectUrl: HITPAY_REDIRECT_URL,
+          },
+        },
+      ]
+    : []),
+];
 
 const medusaConfig = {
   projectConfig: {
@@ -117,22 +150,17 @@ const medusaConfig = {
         ]
       }
     }] : []),
-    ...(STRIPE_API_KEY ? [{
-      key: Modules.PAYMENT,
-      resolve: '@medusajs/payment',
-      options: {
-        providers: [
+    ...(paymentModuleProviders.length
+      ? [
           {
-            resolve: '@medusajs/payment-stripe',
-            id: 'stripe',
+            key: Modules.PAYMENT,
+            resolve: "@medusajs/payment",
             options: {
-              apiKey: STRIPE_API_KEY,
-              webhookSecret: STRIPE_WEBHOOK_SECRET || 'unconfigured',
+              providers: paymentModuleProviders,
             },
           },
-        ],
-      },
-    }] : [])
+        ]
+      : [])
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{
@@ -160,5 +188,4 @@ const medusaConfig = {
   ]
 };
 
-console.log(JSON.stringify(medusaConfig, null, 2));
 export default defineConfig(medusaConfig);

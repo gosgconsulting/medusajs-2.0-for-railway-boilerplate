@@ -117,7 +117,14 @@ export default async function seedDemoData({ container }: ExecArgs) {
           name: "Europe",
           currency_code: "eur",
           countries,
-          payment_providers: ["pp_system_default"],
+          payment_providers: [
+            "pp_system_default",
+            ...(process.env.HITPAY_API_KEY &&
+            process.env.HITPAY_SALT &&
+            process.env.HITPAY_REDIRECT_URL
+              ? ["pp_hitpay_hitpay"]
+              : []),
+          ],
         },
       ],
     },

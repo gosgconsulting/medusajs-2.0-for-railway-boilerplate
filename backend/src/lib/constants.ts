@@ -85,6 +85,14 @@ export const STRIPE_API_KEY = process.env.STRIPE_API_KEY;
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 /**
+ * (optional) HitPay — API key, webhook salt (HMAC), sandbox flag, storefront redirect after checkout
+ */
+export const HITPAY_API_KEY = process.env.HITPAY_API_KEY;
+export const HITPAY_SALT = process.env.HITPAY_SALT;
+export const HITPAY_SANDBOX = process.env.HITPAY_SANDBOX === "true";
+export const HITPAY_REDIRECT_URL = process.env.HITPAY_REDIRECT_URL;
+
+/**
  * (optional) Meilisearch configuration
  */
 export const MEILISEARCH_HOST = process.env.MEILISEARCH_HOST;
