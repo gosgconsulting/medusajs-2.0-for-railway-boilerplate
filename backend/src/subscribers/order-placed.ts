@@ -1,6 +1,7 @@
 import { Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService, IOrderModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
+import { applyDbEmailTemplate } from '../lib/apply-db-email-template'
 import { EmailTemplates } from '../modules/email-notifications/templates'
 
 export default async function orderPlacedHandler({
@@ -14,9 +15,7 @@ export default async function orderPlacedHandler({
   const shippingAddress = await (orderModuleService as any).orderAddressService_.retrieve(order.shipping_address.id)
 
   try {
-    await notificationModuleService.createNotifications({
-      to: order.email,
-      channel: 'email',
+    const payload = await applyDbEmailTemplate(container, EmailTemplates.ORDER_PLACED, {
       template: EmailTemplates.ORDER_PLACED,
       data: {
         emailOptions: {
@@ -27,6 +26,12 @@ export default async function orderPlacedHandler({
         shippingAddress,
         preview: 'Thank you for your order!'
       }
+    })
+
+    await notificationModuleService.createNotifications({
+      to: order.email,
+      channel: 'email',
+      ...payload
     })
   } catch (error) {
     console.error('Error sending order confirmation notification:', error)

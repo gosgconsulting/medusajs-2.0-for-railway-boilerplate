@@ -52,7 +52,54 @@ export class ResendNotificationService extends AbstractNotificationProviderServi
       throw new MedusaError(MedusaError.Types.INVALID_DATA, `SMS notification not supported`)
     }
 
-    // Generate the email content using the template
+    const emailOptions = (notification.data?.emailOptions ?? {}) as NotificationEmailOptions
+
+    // Pre-rendered HTML from admin-managed Handlebars templates
+    if (notification.content?.html) {
+      const message: CreateEmailOptions = {
+        to: notification.to,
+        from: notification.from?.trim() ?? this.config_.from,
+        html: notification.content.html,
+        subject:
+          notification.content.subject ??
+          emailOptions.subject ??
+          'You have a new notification',
+        headers: emailOptions.headers,
+        replyTo: emailOptions.replyTo,
+        cc: emailOptions.cc,
+        bcc: emailOptions.bcc,
+        tags: emailOptions.tags,
+        text: notification.content.text ?? emailOptions.text,
+        attachments: Array.isArray(notification.attachments)
+          ? notification.attachments.map((attachment) => ({
+              content: attachment.content,
+              filename: attachment.filename,
+              content_type: attachment.content_type,
+              disposition: attachment.disposition ?? 'attachment',
+              id: attachment.id ?? undefined
+            }))
+          : undefined,
+        scheduledAt: emailOptions.scheduledAt
+      }
+
+      try {
+        await this.resend.emails.send(message)
+        this.logger_.log(
+          `Successfully sent "${notification.template}" email (HTML content) to ${notification.to} via Resend`
+        )
+        return {}
+      } catch (error: unknown) {
+        const err = error as { code?: string; response?: { body?: { errors?: { message?: string }[] } } }
+        const errorCode = err.code
+        const responseError = err.response?.body?.errors?.[0]
+        throw new MedusaError(
+          MedusaError.Types.UNEXPECTED_STATE,
+          `Failed to send "${notification.template}" email to ${notification.to} via Resend: ${errorCode} - ${responseError?.message ?? 'unknown error'}`
+        )
+      }
+    }
+
+    // Generate the email content using React Email templates
     let emailContent: ReactNode
 
     try {
@@ -66,8 +113,6 @@ export class ResendNotificationService extends AbstractNotificationProviderServi
         `Failed to generate email content for template: ${notification.template}`
       )
     }
-
-    const emailOptions = notification.data.emailOptions as NotificationEmailOptions
 
     // Compose the message body to send via API to Resend
     const message: CreateEmailOptions = {
