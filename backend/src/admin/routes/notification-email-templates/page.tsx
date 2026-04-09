@@ -262,23 +262,6 @@ const NotificationEmailTemplatesPage = () => {
       <div className="flex shrink-0 items-center justify-between px-6 py-4">
         <div>
           <Heading level="h1">Notification emails</Heading>
-          <Text size="small" className="text-ui-fg-subtle mt-1">
-            Write plain-text email bodies with{" "}
-            <a
-              href="https://handlebarsjs.com/guide/"
-              target="_blank"
-              rel="noreferrer"
-              className="text-ui-fg-interactive"
-            >
-              Handlebars
-            </a>{" "}
-            placeholders. The server turns them into HTML for sending. When disabled or empty, the
-            built-in React template is used. Optional{" "}
-            <code className="txt-compact-xsmall">STORE_NAME</code> and{" "}
-            <code className="txt-compact-xsmall">STORE_SUPPORT_EMAIL</code> env vars fill{" "}
-            <code className="txt-compact-xsmall">{"{{store_name}}"}</code> and{" "}
-            <code className="txt-compact-xsmall">{"{{support_email}}"}</code>.
-          </Text>
         </div>
       </div>
 
