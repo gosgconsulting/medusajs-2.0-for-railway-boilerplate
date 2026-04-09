@@ -125,7 +125,7 @@ export async function POST(
   if (!reset && !html_body.trim()) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "html_body is required unless reset_to_defaults is true"
+      "Body text is required unless reset_to_defaults is true"
     )
   }
 

@@ -42,7 +42,29 @@ type DetailResponse = {
   defaults: { subject: string; html_body: string }
 }
 
-const mono = "font-mono text-sm min-h-[320px]"
+const bodyTextareaClass = "font-mono text-sm min-h-[280px]"
+
+const ORDER_TEMPLATE_VARS = [
+  "{{customer_name}}",
+  "{{customer_email}}",
+  "{{order_id}}",
+  "{{total}}",
+  "{{currency}}",
+  "{{items_count}}",
+  "{{tracking_number}}",
+  "{{shipping_address}}",
+  "{{support_email}}",
+  "{{store_name}}",
+  "{{noticeHeadline}}",
+  "{{noticeMessage}}",
+  "{{formatDate order.created_at}}",
+]
+
+const INVITE_TEMPLATE_VARS = [
+  "{{store_name}}",
+  "{{support_email}}",
+  "{{inviteLink}}",
+]
 
 /** Visual accent for sidebar rows (matches common order-lifecycle semantics). */
 const TEMPLATE_DOT_CLASS: Record<string, string> = {
@@ -226,7 +248,7 @@ const NotificationEmailTemplatesPage = () => {
             </span>
             {t.configured && t.is_enabled ? (
               <span className="txt-compact-xsmall text-ui-fg-muted">
-                Custom HTML
+                Custom
               </span>
             ) : null}
           </span>
@@ -241,7 +263,7 @@ const NotificationEmailTemplatesPage = () => {
         <div>
           <Heading level="h1">Notification emails</Heading>
           <Text size="small" className="text-ui-fg-subtle mt-1">
-            Edit HTML email bodies with{" "}
+            Write plain-text email bodies with{" "}
             <a
               href="https://handlebarsjs.com/guide/"
               target="_blank"
@@ -249,8 +271,13 @@ const NotificationEmailTemplatesPage = () => {
               className="text-ui-fg-interactive"
             >
               Handlebars
-            </a>
-            . When disabled or empty, the built-in React template is used.
+            </a>{" "}
+            placeholders. The server turns them into HTML for sending. When disabled or empty, the
+            built-in React template is used. Optional{" "}
+            <code className="txt-compact-xsmall">STORE_NAME</code> and{" "}
+            <code className="txt-compact-xsmall">STORE_SUPPORT_EMAIL</code> env vars fill{" "}
+            <code className="txt-compact-xsmall">{"{{store_name}}"}</code> and{" "}
+            <code className="txt-compact-xsmall">{"{{support_email}}"}</code>.
           </Text>
         </div>
       </div>
@@ -352,7 +379,7 @@ const NotificationEmailTemplatesPage = () => {
                       checked={enabled}
                       onCheckedChange={setEnabled}
                     />
-                    Use custom HTML template
+                    Use custom template
                   </label>
                 </div>
                 <Input
@@ -374,25 +401,44 @@ const NotificationEmailTemplatesPage = () => {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="html">HTML body (Handlebars)</Label>
+                <Label htmlFor="html">Email body (plain text)</Label>
                 <Text size="xsmall" className="text-ui-fg-subtle">
-                  Order emails:{" "}
-                  <code className="txt-compact-xsmall">order</code>,{" "}
-                  <code className="txt-compact-xsmall">shippingAddress</code>,{" "}
-                  <code className="txt-compact-xsmall">preview</code>
-                  . Status emails also include{" "}
-                  <code className="txt-compact-xsmall">noticeHeadline</code> and{" "}
-                  <code className="txt-compact-xsmall">noticeMessage</code>. Invite:{" "}
-                  <code className="txt-compact-xsmall">inviteLink</code>. Helper:{" "}
-                  <code className="txt-compact-xsmall">{"{{formatDate order.created_at}}"}</code>
+                  Blank line = new paragraph; single line break = line break in the email. You can
+                  still use full paths (e.g.{" "}
+                  <code className="txt-compact-xsmall">{"{{order.display_id}}"}</code>
+                  ) or blocks like{" "}
+                  <code className="txt-compact-xsmall">{"{{#each order.items}}"}</code>. Saved
+                  full-HTML templates from before this change are still sent as HTML.
                 </Text>
                 <Textarea
                   id="html"
-                  className={mono}
+                  className={bodyTextareaClass}
                   value={htmlBody}
                   onChange={(e) => setHtmlBody(e.target.value)}
-                  placeholder="Paste HTML or click Reset to defaults"
+                  placeholder={`Hi {{customer_name}},\n\nYour order #{{order_id}}…`}
                 />
+                <div className="flex flex-col gap-2">
+                  <Text
+                    size="xsmall"
+                    weight="plus"
+                    className="text-ui-fg-muted uppercase tracking-wide"
+                  >
+                    Common variables
+                  </Text>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(selectedKey === INVITE_TEMPLATE_KEY
+                      ? INVITE_TEMPLATE_VARS
+                      : ORDER_TEMPLATE_VARS
+                    ).map((v) => (
+                      <code
+                        key={v}
+                        className="bg-ui-bg-subtle txt-compact-xsmall rounded-md border border-ui-border-base px-2 py-1 text-ui-fg-subtle"
+                      >
+                        {v}
+                      </code>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}

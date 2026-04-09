@@ -1,6 +1,11 @@
 import Handlebars from "handlebars"
 import { MedusaError } from "@medusajs/framework/utils"
 import { NOTIFICATION_EMAIL_TEMPLATE_MODULE } from "../modules/notification-email-template/constants"
+import {
+  augmentNotificationTemplateData,
+  isLegacyHtmlBody,
+  plainTextAfterHandlebarsToEmailHtml,
+} from "./notification-email-template-body"
 
 let handlebarsInitialized = false
 
@@ -24,8 +29,10 @@ export type ApplyDbEmailTemplateResult = {
 }
 
 /**
- * When a row exists and is enabled with a non-empty html_body, compiles Handlebars
- * against notification `data` and returns `content.html` for the Resend provider.
+ * When a row exists and is enabled with a non-empty `html_body`, compiles Handlebars
+ * against notification `data` (with simple aliases like `{{customer_name}}`) and returns
+ * `content.html`. Plain-text bodies are wrapped as HTML; stored full-HTML bodies are
+ * detected and left as-is. Subject lines are compiled with the same context.
  * Otherwise returns the original payload (React-email templates).
  */
 export async function applyDbEmailTemplate(
@@ -80,9 +87,14 @@ export async function applyDbEmailTemplate(
     string,
     unknown
   >
+  const augmented = augmentNotificationTemplateData(templateData)
+
   let html: string
   try {
-    html = compiled(templateData)
+    const rendered = compiled(augmented)
+    html = isLegacyHtmlBody(row.html_body)
+      ? rendered
+      : plainTextAfterHandlebarsToEmailHtml(rendered)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     throw new MedusaError(
@@ -92,11 +104,22 @@ export async function applyDbEmailTemplate(
   }
 
   const emailOptions = (templateData.emailOptions ?? {}) as Record<string, unknown>
-  const subjectFromRow = row.subject?.trim()
-  const subject =
-    subjectFromRow ||
+  const fallbackSubject =
     (typeof emailOptions.subject === "string" ? emailOptions.subject : "") ||
     "Notification"
+  const subjectFromRow = row.subject?.trim()
+  const subjectTemplate = subjectFromRow || fallbackSubject
+  let subject: string
+  try {
+    const subCompiled = Handlebars.compile(subjectTemplate, { strict: false })
+    subject = subCompiled(augmented).trim() || fallbackSubject
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `Invalid Handlebars in notification subject for "${templateKey}": ${msg}`
+    )
+  }
 
   const replyTo = row.reply_to?.trim()
   const mergedData = {
