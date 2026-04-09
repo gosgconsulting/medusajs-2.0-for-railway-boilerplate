@@ -5,9 +5,15 @@ import { NOTIFICATION_TEMPLATE_CATALOG } from "../../../../lib/notification-temp
 import {
   DEFAULT_INVITE_USER_HTML,
   DEFAULT_ORDER_PLACED_HTML,
+  DEFAULT_ORDER_STATUS_NOTICE_HTML,
   DEFAULT_SUBJECT_BY_KEY,
 } from "../../../../lib/default-notification-email-templates"
+import { OrderNotificationEmailKeys } from "../../../../lib/order-notification-email-keys"
 import { EmailTemplates } from "../../../../modules/email-notifications/templates"
+
+const ORDER_STATUS_TEMPLATE_KEYS = new Set<string>(
+  Object.values(OrderNotificationEmailKeys)
+)
 
 type TemplateRow = {
   id: string
@@ -40,6 +46,7 @@ function catalogMeta(templateKey: string) {
 function defaultBodyForKey(templateKey: string): string {
   if (templateKey === EmailTemplates.ORDER_PLACED) return DEFAULT_ORDER_PLACED_HTML
   if (templateKey === EmailTemplates.INVITE_USER) return DEFAULT_INVITE_USER_HTML
+  if (ORDER_STATUS_TEMPLATE_KEYS.has(templateKey)) return DEFAULT_ORDER_STATUS_NOTICE_HTML
   throw new MedusaError(
     MedusaError.Types.INVALID_DATA,
     `No default HTML for template key: ${templateKey}`

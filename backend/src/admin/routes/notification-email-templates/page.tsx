@@ -259,12 +259,14 @@ const NotificationEmailTemplatesPage = () => {
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="html">HTML body (Handlebars)</Label>
                   <Text size="xsmall" className="text-ui-fg-subtle">
-                    Order email: variables include{" "}
+                    Order emails:{" "}
                     <code className="txt-compact-xsmall">order</code>,{" "}
                     <code className="txt-compact-xsmall">shippingAddress</code>,{" "}
-                    <code className="txt-compact-xsmall">preview</code>. Invite:{" "}
-                    <code className="txt-compact-xsmall">inviteLink</code>,{" "}
-                    <code className="txt-compact-xsmall">preview</code>. Helper:{" "}
+                    <code className="txt-compact-xsmall">preview</code>
+                    . Status emails also include{" "}
+                    <code className="txt-compact-xsmall">noticeHeadline</code> and{" "}
+                    <code className="txt-compact-xsmall">noticeMessage</code>. Invite:{" "}
+                    <code className="txt-compact-xsmall">inviteLink</code>. Helper:{" "}
                     <code className="txt-compact-xsmall">{"{{formatDate order.created_at}}"}</code>
                   </Text>
                   <Textarea

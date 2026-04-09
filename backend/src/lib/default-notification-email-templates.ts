@@ -38,6 +38,31 @@ export const DEFAULT_ORDER_PLACED_HTML = `<!DOCTYPE html>
 </html>
 `
 
+/**
+ * Shared default for all `order-email-*` status templates (Handlebars).
+ * Payload includes `noticeHeadline`, `noticeMessage`, `order`, `shippingAddress`.
+ */
+export const DEFAULT_ORDER_STATUS_NOTICE_HTML = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8" /></head>
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+  <h1 style="text-align: center;">{{noticeHeadline}}</h1>
+  <p>Dear {{shippingAddress.first_name}} {{shippingAddress.last_name}},</p>
+  <p>{{noticeMessage}}</p>
+  <hr />
+  <h2>Order summary</h2>
+  <p>Order ID: {{order.display_id}}</p>
+  <p>Order date: {{formatDate order.created_at}}</p>
+  <p>Total: {{order.summary.raw_current_order_total.value}} {{order.currency_code}}</p>
+  <hr />
+  <h2>Shipping address</h2>
+  <p>{{shippingAddress.address_1}}</p>
+  <p>{{shippingAddress.city}}, {{shippingAddress.province}} {{shippingAddress.postal_code}}</p>
+  <p>{{shippingAddress.country_code}}</p>
+</body>
+</html>
+`
+
 export const DEFAULT_INVITE_USER_HTML = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8" /></head>
@@ -61,4 +86,11 @@ export const DEFAULT_INVITE_USER_HTML = `<!DOCTYPE html>
 export const DEFAULT_SUBJECT_BY_KEY: Record<string, string> = {
   "order-placed": "Your order has been placed",
   "invite-user": "You've been invited to Medusa!",
+  "order-email-processing": "We are processing your order",
+  "order-email-payment-failed": "Action needed for your order payment",
+  "order-email-in-fulfillment": "Your order is being prepared",
+  "order-email-shipment-in-progress": "Your order has shipped",
+  "order-email-delivered": "Your order was delivered",
+  "order-email-cancelled": "Your order was cancelled",
+  "order-email-refunded": "Your order was refunded",
 }

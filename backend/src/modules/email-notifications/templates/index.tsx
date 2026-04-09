@@ -2,6 +2,10 @@ import { ReactNode } from 'react'
 import { MedusaError } from '@medusajs/framework/utils'
 import { InviteUserEmail, INVITE_USER, isInviteUserData } from './invite-user'
 import { OrderPlacedTemplate, ORDER_PLACED, isOrderPlacedTemplateData } from './order-placed'
+import {
+  OrderSimpleNoticeTemplate,
+  isOrderSimpleNoticeTemplateData,
+} from './order-simple-notice'
 
 export const EmailTemplates = {
   INVITE_USER,
@@ -31,6 +35,13 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
       return <OrderPlacedTemplate {...data} />
 
     default:
+      if (
+        templateKey.startsWith('order-email-') &&
+        isOrderSimpleNoticeTemplateData(data)
+      ) {
+        return <OrderSimpleNoticeTemplate {...data} />
+      }
+
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         `Unknown template key: "${templateKey}"`
