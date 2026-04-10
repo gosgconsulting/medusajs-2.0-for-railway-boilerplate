@@ -14,7 +14,6 @@ import {
   IconButton,
   Input,
   Label,
-  Switch,
   Text,
   Textarea,
   toast,
@@ -111,9 +110,6 @@ const ProductEditPage = () => {
       .join(", ")
   )
   const [material, setMaterial] = useState(initialProduct?.material ?? "")
-  const [discountable, setDiscountable] = useState(
-    initialProduct?.discountable ?? true
-  )
   const [thumbnail, setThumbnail] = useState(initialProduct?.thumbnail ?? "")
   const [weight, setWeight] = useState(
     initialProduct?.weight != null ? String(initialProduct.weight) : ""
@@ -180,7 +176,6 @@ const ProductEditPage = () => {
         .join(", ")
     )
     setMaterial(initialProduct.material ?? "")
-    setDiscountable(initialProduct.discountable ?? true)
     setThumbnail(initialProduct.thumbnail ?? "")
     setWeight(
       initialProduct.weight != null ? String(initialProduct.weight) : ""
@@ -240,7 +235,6 @@ const ProductEditPage = () => {
         status: status as "draft" | "published",
         handle: handle || undefined,
         material: material || undefined,
-        discountable,
         thumbnail: thumbnail || undefined,
         weight: num(weight),
         width: num(width),
@@ -269,7 +263,6 @@ const ProductEditPage = () => {
     handle,
     tagsInput,
     material,
-    discountable,
     thumbnail,
     weight,
     width,
@@ -1155,14 +1148,6 @@ const ProductEditPage = () => {
                   value={material}
                   onChange={(e) => setMaterial(e.target.value)}
                   placeholder="e.g. Cotton, Polyester"
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <Label htmlFor="product-discountable">Discountable</Label>
-                <Switch
-                  id="product-discountable"
-                  checked={discountable}
-                  onCheckedChange={setDiscountable}
                 />
               </div>
               <div className="flex flex-col gap-2">
