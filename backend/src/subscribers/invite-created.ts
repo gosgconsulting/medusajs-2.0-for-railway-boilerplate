@@ -1,6 +1,7 @@
 import { INotificationModuleService, IUserModuleService } from '@medusajs/framework/types'
 import { Modules } from '@medusajs/framework/utils'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/framework'
+import { applyDbEmailTemplate } from '../lib/apply-db-email-template'
 import { BACKEND_URL } from '../lib/constants'
 import { EmailTemplates } from '../modules/email-notifications/templates'
 
@@ -16,9 +17,7 @@ export default async function userInviteHandler({
   const invite = await userModuleService.retrieveInvite(data.id)
 
   try {
-    await notificationModuleService.createNotifications({
-      to: invite.email,
-      channel: 'email',
+    const payload = await applyDbEmailTemplate(container, EmailTemplates.INVITE_USER, {
       template: EmailTemplates.INVITE_USER,
       data: {
         emailOptions: {
@@ -28,6 +27,12 @@ export default async function userInviteHandler({
         inviteLink: `${BACKEND_URL}/app/invite?token=${invite.token}`,
         preview: 'The administration dashboard awaits...'
       }
+    })
+
+    await notificationModuleService.createNotifications({
+      to: invite.email,
+      channel: 'email',
+      ...payload
     })
   } catch (error) {
     console.error(error)
