@@ -26,6 +26,7 @@ export type ApplyDbEmailTemplateResult = {
   template?: string | null
   data?: Record<string, unknown> | null
   content?: { subject?: string; html?: string; text?: string } | null
+  provider_data?: { _preRenderedEmail?: { html: string; subject: string } } | null
 }
 
 /**
@@ -129,6 +130,8 @@ export async function applyDbEmailTemplate(
       subject,
       ...(replyTo ? { replyTo } : {}),
     },
+    /** Fallback for providers if top-level `content` is dropped before send. */
+    _preRenderedEmail: { html, subject },
   }
 
   return {
@@ -137,6 +140,9 @@ export async function applyDbEmailTemplate(
     content: {
       subject,
       html,
+    },
+    provider_data: {
+      _preRenderedEmail: { html, subject },
     },
   }
 }

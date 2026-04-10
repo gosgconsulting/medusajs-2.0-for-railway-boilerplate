@@ -36,33 +36,27 @@ export const OrderSimpleNoticeTemplate: React.FC<OrderSimpleNoticeTemplateProps>
   noticeMessage,
   preview = "Order update",
 }) => {
+  const customerName = [shippingAddress.first_name, shippingAddress.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim()
+  const dateStr = new Date(order.created_at).toLocaleDateString()
+
   return (
     <Base preview={preview}>
-      <Section>
-        <Text
-          style={{
-            fontSize: "22px",
-            fontWeight: "bold",
-            textAlign: "center",
-            margin: "0 0 24px",
-          }}
-        >
-          {noticeHeadline}
+      <Section className="text-[#111] text-[15px] leading-[1.55]">
+        <Text className="m-0 mb-4">
+          Hi{customerName ? ` ${customerName}` : ""},
         </Text>
-        <Text style={{ margin: "0 0 16px" }}>
-          Dear {shippingAddress.first_name} {shippingAddress.last_name},
+        <Text className="m-0 mb-3 font-semibold">{noticeHeadline}</Text>
+        <Text className="m-0 mb-6 whitespace-pre-line">{noticeMessage}</Text>
+        <Hr className="border-[#eaeaea] my-6" />
+        <Text className="m-0 mb-2">
+          Order #{order.display_id} · {dateStr}
         </Text>
-        <Text style={{ margin: "0 0 24px" }}>{noticeMessage}</Text>
-        <Hr style={{ margin: "20px 0" }} />
-        <Text style={{ fontSize: "16px", fontWeight: "bold", margin: "0 0 8px" }}>
-          Order
-        </Text>
-        <Text style={{ margin: "0 0 4px" }}>Order ID: {order.display_id}</Text>
-        <Text style={{ margin: "0 0 4px" }}>
-          Date: {new Date(order.created_at).toLocaleDateString()}
-        </Text>
-        <Text style={{ margin: "0 0 16px" }}>
-          Total: {order.summary.raw_current_order_total.value} {order.currency_code}
+        <Text className="m-0 mb-6">
+          Total: {order.summary.raw_current_order_total.value}{" "}
+          {String(order.currency_code).toUpperCase()}
         </Text>
       </Section>
     </Base>

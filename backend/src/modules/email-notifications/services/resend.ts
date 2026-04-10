@@ -23,6 +23,36 @@ type NotificationEmailOptions = Omit<
   'to' | 'from' | 'react' | 'html' | 'attachments'
 >
 
+type PreRendered = { html: string; subject?: string }
+
+function resolvePreRenderedEmail(
+  notification: NotificationTypes.ProviderSendNotificationDTO
+): PreRendered | null {
+  const fromContent = notification.content?.html?.trim()
+  if (fromContent) {
+    return {
+      html: notification.content!.html!,
+      subject: notification.content?.subject,
+    }
+  }
+
+  const fromProvider = (
+    notification.provider_data as { _preRenderedEmail?: PreRendered } | null | undefined
+  )?._preRenderedEmail
+  if (fromProvider?.html?.trim()) {
+    return fromProvider
+  }
+
+  const fromData = (
+    notification.data as { _preRenderedEmail?: PreRendered } | null | undefined
+  )?._preRenderedEmail
+  if (fromData?.html?.trim()) {
+    return fromData
+  }
+
+  return null
+}
+
 /**
  * Service to handle email notifications using the Resend API.
  */
@@ -54,14 +84,16 @@ export class ResendNotificationService extends AbstractNotificationProviderServi
 
     const emailOptions = (notification.data?.emailOptions ?? {}) as NotificationEmailOptions
 
-    // Pre-rendered HTML from admin-managed Handlebars templates
-    if (notification.content?.html) {
+    const preRendered = resolvePreRenderedEmail(notification)
+
+    // Pre-rendered HTML from admin-managed templates (content may be omitted by the notification pipeline)
+    if (preRendered) {
       const message: CreateEmailOptions = {
         to: notification.to,
         from: notification.from?.trim() ?? this.config_.from,
-        html: notification.content.html,
+        html: preRendered.html,
         subject:
-          notification.content.subject ??
+          preRendered.subject ??
           emailOptions.subject ??
           'You have a new notification',
         headers: emailOptions.headers,
@@ -69,7 +101,7 @@ export class ResendNotificationService extends AbstractNotificationProviderServi
         cc: emailOptions.cc,
         bcc: emailOptions.bcc,
         tags: emailOptions.tags,
-        text: notification.content.text ?? emailOptions.text,
+        text: notification.content?.text ?? emailOptions.text,
         attachments: Array.isArray(notification.attachments)
           ? notification.attachments.map((attachment) => ({
               content: attachment.content,
