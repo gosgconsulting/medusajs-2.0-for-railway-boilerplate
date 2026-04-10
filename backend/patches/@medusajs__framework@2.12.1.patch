@@ -1,0 +1,22 @@
+diff --git a/dist/http/router.js b/dist/http/router.js
+index ba0b469ecb72752f1729926de559063d61ac972e..a4a52f2232c1b252b1c3c4bf381b861ac73f0ae2 100644
+--- a/dist/http/router.js
++++ b/dist/http/router.js
+@@ -122,10 +122,13 @@ _a = ApiLoader, _ApiLoader_app = new WeakMap(), _ApiLoader_sourceDirs = new Weak
+ async function _ApiLoader_loadHttpResources() {
+     const routesLoader = new routes_loader_1.RoutesLoader();
+     const middlewareLoader = new middleware_file_loader_1.MiddlewareFileLoader();
+-    await (0, utils_1.promiseAll)(__classPrivateFieldGet(this, _ApiLoader_sourceDirs, "f").flatMap(dir => [
+-        routesLoader.scanDir(dir),
+-        middlewareLoader.scanDir(dir)
+-    ]));
++    const sourceDirs = __classPrivateFieldGet(this, _ApiLoader_sourceDirs, "f");
++    for (const dir of sourceDirs) {
++        await Promise.all([
++            routesLoader.scanDir(dir),
++            middlewareLoader.scanDir(dir),
++        ]);
++    }
+     return {
+         routes: routesLoader.getRoutes(),
+         routesFinder: new routes_finder_1.RoutesFinder(),

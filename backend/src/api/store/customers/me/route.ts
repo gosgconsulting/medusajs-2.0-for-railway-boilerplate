@@ -109,5 +109,9 @@ export async function POST(
     req.queryConfig?.fields
   )
   const groups = await listCustomerGroupSummaries(req.scope, customerId)
-  res.status(200).json({ customer: { ...customer, groups, role: groups.length ? groups[0].name : null } })
+  const role = groups.length ? groups[0].name : null
+  const metadata = { ...customer.metadata, groups, role }
+  res
+    .status(200)
+    .json({ customer: { ...customer, metadata }, groups, role })
 }

@@ -1,0 +1,33 @@
+diff --git a/dist/loaders/api.js b/dist/loaders/api.js
+index 807e1aafe1c0465870ef25698b6d75619cc15302..dec8bb76fe2ea9b7207d3bde341cab2312aebc25 100644
+--- a/dist/loaders/api.js
++++ b/dist/loaders/api.js
+@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ const http_1 = require("@medusajs/framework/http");
+ const path_1 = require("path");
+ const qs_1 = __importDefault(require("qs"));
++const medusa_utils_1 = require("@medusajs/utils");
+ exports.default = async ({ app, container, plugins }) => {
+     // This is a workaround for the issue described here: https://github.com/expressjs/express/issues/3454
+     // We parse the url and get the qs to be parsed and override the query prop from the request
+@@ -30,10 +31,17 @@ exports.default = async ({ app, container, plugins }) => {
+      * Now, if Medusa routes gets registered first, then the "/products/active"
+      * route will never be resolved, because it will be handled by the
+      * "/products/:id" route.
++     *
++     * Load order: packaged plugins, core, then the project `src/api` plugin last so
++     * project routes override core for the same path (last registration wins) without
++     * putting project before core (which would let core override project).
+      */
+-    sourcePaths.push((0, path_1.join)(__dirname, "../api"), ...plugins.map((pluginDetails) => {
+-        return (0, path_1.join)(pluginDetails.resolve, "api");
+-    }));
++    const projectPlugin = plugins.find((p) => p.name === medusa_utils_1.MEDUSA_PROJECT_NAME);
++    const packagedPlugins = plugins.filter((p) => p.name !== medusa_utils_1.MEDUSA_PROJECT_NAME);
++    sourcePaths.push(...packagedPlugins.map((pluginDetails) => (0, path_1.join)(pluginDetails.resolve, "api")), (0, path_1.join)(__dirname, "../api"));
++    if (projectPlugin) {
++        sourcePaths.push((0, path_1.join)(projectPlugin.resolve, "api"));
++    }
+     const { projectConfig: { http: { restrictedFields }, }, } = container.resolve("configModule");
+     // TODO: Figure out why this is causing issues with test when placed inside ./api.ts
+     // Adding this here temporarily
