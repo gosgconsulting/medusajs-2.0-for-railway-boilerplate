@@ -88,7 +88,8 @@ export async function GET(
     )
   }
   const groups = await listCustomerGroupSummaries(req.scope, id)
-  res.json({ customer: { ...customer, groups } })
+  const metadata = { ...customer.metadata, groups, role: groups.length ? groups[0].name : null }
+  res.json({ customer: { ...customer, metadata }, groups, role: groups.length ? groups[0].name : null })
 }
 
 export async function POST(
@@ -108,5 +109,5 @@ export async function POST(
     req.queryConfig?.fields
   )
   const groups = await listCustomerGroupSummaries(req.scope, customerId)
-  res.status(200).json({ customer: { ...customer, groups } })
+  res.status(200).json({ customer: { ...customer, groups, role: groups.length ? groups[0].name : null } })
 }
