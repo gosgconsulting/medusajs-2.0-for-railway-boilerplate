@@ -7,6 +7,7 @@ import { updateCustomersWorkflow } from "@medusajs/medusa/core-flows"
 import {
   ContainerRegistrationKeys,
   MedusaError,
+  Modules,
   remoteQueryObjectFromString,
 } from "@medusajs/framework/utils"
 
@@ -26,13 +27,35 @@ const DEFAULT_STORE_CUSTOMER_RETRIEVE_FIELDS = [
   "*addresses",
 ] as const
 
-const CUSTOMER_GROUP_FIELDS = ["groups.id", "groups.name"] as const
-
-function buildCustomerRetrieveFields(
-  fields: string[] | undefined
-): string[] {
+function buildCustomerRetrieveFields(fields: string[] | undefined): string[] {
   const base = fields?.length ? fields : [...DEFAULT_STORE_CUSTOMER_RETRIEVE_FIELDS]
-  return [...new Set([...base, ...CUSTOMER_GROUP_FIELDS])]
+  return [...base]
+}
+
+type CustomerGroupSummary = { id: string; name: string }
+
+async function listCustomerGroupSummaries(
+  scope: MedusaRequest["scope"],
+  customerId: string
+): Promise<CustomerGroupSummary[]> {
+  const customerModuleService = scope.resolve(Modules.CUSTOMER)
+  const links = await customerModuleService.listCustomerGroupCustomers(
+    { customer_id: customerId },
+    { take: 100 }
+  )
+  const groupIds = [
+    ...new Set(links.map((l) => l.customer_group_id).filter(Boolean)),
+  ]
+  if (!groupIds.length) {
+    return []
+  }
+  const groups = await customerModuleService.listCustomerGroups(
+    { id: groupIds },
+    { take: 100 }
+  )
+  return groups
+    .filter((g) => g.id && g.name != null)
+    .map((g) => ({ id: g.id, name: g.name }))
 }
 
 async function refetchCustomer(
@@ -64,7 +87,8 @@ export async function GET(
       `Customer with id: ${id} was not found`
     )
   }
-  res.json({ customer })
+  const groups = await listCustomerGroupSummaries(req.scope, id)
+  res.json({ customer: { ...customer, groups } })
 }
 
 export async function POST(
@@ -83,5 +107,6 @@ export async function POST(
     req.scope,
     req.queryConfig?.fields
   )
-  res.status(200).json({ customer })
+  const groups = await listCustomerGroupSummaries(req.scope, customerId)
+  res.status(200).json({ customer: { ...customer, groups } })
 }
