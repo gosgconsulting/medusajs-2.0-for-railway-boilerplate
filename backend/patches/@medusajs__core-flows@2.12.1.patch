@@ -223,3 +223,18 @@ diff --git a/dist/cart/workflows/refresh-cart-shipping-methods.js b/dist/cart/wo
              return {
                  shippingMethodsToRemove: invalidShippingMethodIds,
                  shippingMethodsToUpdate,
+diff --git a/dist/order/workflows/create-shipment.js b/dist/order/workflows/create-shipment.js
+--- a/dist/order/workflows/create-shipment.js
++++ b/dist/order/workflows/create-shipment.js
+@@ -74,8 +74,10 @@
+             //   If we allow to cancel partial fulfillments for an order item, we need to change this.
+             if (iitems?.length) {
+                 const iitem = iitems.find((i) => i.inventory.id === fitem.inventory_item_id);
+-                quantity = utils_1.MathBN.div(quantity, iitem.required_quantity);
++                if (iitem) {
++                    quantity = utils_1.MathBN.div(quantity, iitem.required_quantity);
++                }
+             }
+             return {
+                 id: lineItemId,
+                 quantity,
