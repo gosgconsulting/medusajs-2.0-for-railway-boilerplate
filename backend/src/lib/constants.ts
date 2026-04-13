@@ -110,6 +110,12 @@ export const WORKER_MODE =
 export const SHOULD_DISABLE_ADMIN = process.env.MEDUSA_DISABLE_ADMIN === 'true'
 
 /**
+ * When true, `POST /store/carts/:id/complete-deferred` is enabled (order without payment/shipping).
+ */
+export const STORE_DEFERRED_CHECKOUT =
+  process.env.STORE_DEFERRED_CHECKOUT === "true"
+
+/**
  * WooCommerce REST API (optional). When all three are set, /admin/wc-import and
  * /admin/wc-sync-variant-color-hex use them; the admin UI hides URL / keys for import.
  */

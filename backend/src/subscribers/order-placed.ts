@@ -12,6 +12,16 @@ export default async function orderPlacedHandler({
   const orderModuleService: IOrderModuleService = container.resolve(Modules.ORDER)
   
   const order = await orderModuleService.retrieveOrder(data.id, { relations: ['items', 'summary', 'shipping_address'] })
+
+  const meta = order.metadata as Record<string, unknown> | null | undefined
+  if (meta?.deferred_checkout === true) {
+    return
+  }
+
+  if (!order.shipping_address?.id) {
+    return
+  }
+
   const shippingAddress = await (orderModuleService as any).orderAddressService_.retrieve(order.shipping_address.id)
 
   try {
