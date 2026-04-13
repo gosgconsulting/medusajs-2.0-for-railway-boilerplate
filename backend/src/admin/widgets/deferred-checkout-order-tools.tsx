@@ -71,11 +71,28 @@ function orderQueryKeyTouchesId(query: Query, orderId: string): boolean {
   return Array.isArray(k) && k[0] === "orders" && walk(k)
 }
 
+type InvoiceSendFeedback =
+  | { variant: "success"; message: string }
+  | { variant: "error"; message: string }
+
+function deferredInvoiceErrorMessage(e: unknown): string {
+  if (e instanceof FetchError) {
+    const m = e.message?.trim()
+    if (m) return m
+    if (e.status != null) return `Request failed (HTTP ${e.status}).`
+    return "Failed to send invoice email."
+  }
+  if (e instanceof Error && e.message.trim()) return e.message.trim()
+  return "Failed to send invoice email."
+}
+
 const DeferredCheckoutOrderTools = ({ data }: { data: OrderStub }) => {
   const orderId = data?.id
   const queryClient = useQueryClient()
   const [shippingOptionId, setShippingOptionId] = useState("")
   const [shippingFee, setShippingFee] = useState("")
+  const [invoiceSendFeedback, setInvoiceSendFeedback] =
+    useState<InvoiceSendFeedback | null>(null)
 
   const { data: orderRes, isLoading } = useQuery({
     queryKey: ["admin-order-deferred-tools", orderId],
@@ -87,6 +104,10 @@ const DeferredCheckoutOrderTools = ({ data }: { data: OrderStub }) => {
   })
 
   const order = orderRes
+
+  useEffect(() => {
+    setInvoiceSendFeedback(null)
+  }, [orderId])
 
   const { data: shippingOptionsRes } = useQuery({
     queryKey: ["admin-order-deferred-shipping-options", orderId],
@@ -189,21 +210,25 @@ const DeferredCheckoutOrderTools = ({ data }: { data: OrderStub }) => {
         method: "POST",
       })
     },
-    onSuccess: async () => {
-      toast.success("Invoice email sent to the customer.")
+    onMutate: () => {
+      setInvoiceSendFeedback(null)
+    },
+    onSuccess: async (res) => {
+      const message =
+        res?.success === true
+          ? "Success: payment link email was sent to the customer."
+          : "Success: the server accepted the request. Ask the customer to confirm they received the email."
+      setInvoiceSendFeedback({ variant: "success", message })
+      toast.success(message)
       await queryClient.invalidateQueries({ queryKey: ["admin-order-deferred-tools", orderId] })
       await queryClient.invalidateQueries({
         predicate: (q) => orderQueryKeyTouchesId(q, orderId),
       })
     },
     onError: (e: unknown) => {
-      const msg =
-        e instanceof FetchError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : "Failed to send invoice email."
-      toast.error(msg)
+      const message = deferredInvoiceErrorMessage(e)
+      setInvoiceSendFeedback({ variant: "error", message: `Error: ${message}` })
+      toast.error(message)
     },
   })
 
@@ -315,6 +340,19 @@ const DeferredCheckoutOrderTools = ({ data }: { data: OrderStub }) => {
           >
             Send invoice / pay link
           </Button>
+          {invoiceSendFeedback ? (
+            <Text
+              size="small"
+              role="status"
+              className={
+                invoiceSendFeedback.variant === "success"
+                  ? "mt-2 max-w-md text-ui-fg-success"
+                  : "mt-2 max-w-md text-ui-fg-error"
+              }
+            >
+              {invoiceSendFeedback.message}
+            </Text>
+          ) : null}
         </div>
       </div>
     </Container>
