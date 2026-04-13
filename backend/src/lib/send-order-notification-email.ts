@@ -1,9 +1,23 @@
-import type { INotificationModuleService, IOrderModuleService } from "@medusajs/framework/types"
-import { Modules } from "@medusajs/framework/utils"
+import type {
+  INotificationModuleService,
+  IOrderModuleService,
+  OrderAddressDTO,
+} from "@medusajs/framework/types"
+import { MedusaError, Modules } from "@medusajs/framework/utils"
 import { applyDbEmailTemplate } from "./apply-db-email-template"
 import type { OrderNotificationEmailKey } from "./order-notification-email-keys"
 
 const DEFAULT_REPLY_TO = "info@example.com"
+
+const EMPTY_ADDRESS = {
+  first_name: "",
+  last_name: "",
+  address_1: "",
+  city: "",
+  country_code: "",
+  province: "",
+  postal_code: "",
+} as OrderAddressDTO
 
 export type SendOrderNotificationEmailParams = {
   container: { resolve: (key: string) => unknown }
@@ -14,6 +28,10 @@ export type SendOrderNotificationEmailParams = {
   noticeHeadline: string
   noticeMessage: string
   idempotencyKey?: string
+  /** Merged into template data (e.g. payUrl, pay_url, payButtonLabel). */
+  extraTemplateData?: Record<string, unknown>
+  /** When true, missing order email throws instead of no-op. */
+  throwIfNoEmail?: boolean
 }
 
 export async function sendOrderNotificationEmail(
@@ -28,6 +46,8 @@ export async function sendOrderNotificationEmail(
     noticeHeadline,
     noticeMessage,
     idempotencyKey,
+    extraTemplateData,
+    throwIfNoEmail,
   } = params
 
   const orderModuleService = container.resolve(Modules.ORDER) as IOrderModuleService
@@ -36,17 +56,50 @@ export async function sendOrderNotificationEmail(
   ) as INotificationModuleService
 
   const order = await orderModuleService.retrieveOrder(orderId, {
-    relations: ["items", "summary", "shipping_address"],
+    relations: ["items", "summary", "shipping_address", "billing_address"],
   })
 
   const email = order.email?.trim()
-  if (!email) return
-
-  const shippingAddress = await (
-    orderModuleService as unknown as {
-      orderAddressService_: { retrieve: (id: string) => Promise<unknown> }
+  if (!email) {
+    if (throwIfNoEmail) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Order has no customer email address."
+      )
     }
-  ).orderAddressService_.retrieve(order.shipping_address.id)
+    return
+  }
+
+  const orderAddressService = (
+    orderModuleService as unknown as {
+      orderAddressService_: { retrieve: (id: string) => Promise<OrderAddressDTO> }
+    }
+  ).orderAddressService_
+
+  const sa = order.shipping_address as
+    | (OrderAddressDTO & { id?: string })
+    | null
+    | undefined
+  const ba = order.billing_address as
+    | (OrderAddressDTO & { id?: string })
+    | null
+    | undefined
+
+  const hasInline = (a: OrderAddressDTO | null | undefined) =>
+    !!(a && (a.address_1 || a.first_name || a.city))
+
+  let shippingAddress: OrderAddressDTO
+  if (hasInline(sa)) {
+    shippingAddress = sa as OrderAddressDTO
+  } else if (sa?.id) {
+    shippingAddress = await orderAddressService.retrieve(sa.id)
+  } else if (hasInline(ba)) {
+    shippingAddress = ba as OrderAddressDTO
+  } else if (ba?.id) {
+    shippingAddress = await orderAddressService.retrieve(ba.id)
+  } else {
+    shippingAddress = EMPTY_ADDRESS
+  }
 
   const payload = await applyDbEmailTemplate(container, templateKey, {
     template: templateKey,
@@ -60,6 +113,7 @@ export async function sendOrderNotificationEmail(
       preview,
       noticeHeadline,
       noticeMessage,
+      ...(extraTemplateData ?? {}),
     },
   })
 

@@ -116,6 +116,18 @@ export const STORE_DEFERRED_CHECKOUT =
   process.env.STORE_DEFERRED_CHECKOUT === "true"
 
 /**
+ * Storefront origin for deferred invoice payment links (no trailing slash required).
+ */
+export const STOREFRONT_URL = process.env.STOREFRONT_URL?.trim() || ""
+
+/**
+ * Optional Handlebars URL for pay links in deferred invoice emails.
+ * Variables: storefront_url, order_id, order_display_id, payment_collection_id
+ */
+export const DEFERRED_INVOICE_PAYMENT_URL_TEMPLATE =
+  process.env.DEFERRED_INVOICE_PAYMENT_URL_TEMPLATE?.trim() || ""
+
+/**
  * WooCommerce REST API (optional). When all three are set, /admin/wc-import and
  * /admin/wc-sync-variant-color-hex use them; the admin UI hides URL / keys for import.
  */

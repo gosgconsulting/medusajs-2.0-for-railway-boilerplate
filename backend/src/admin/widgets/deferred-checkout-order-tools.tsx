@@ -180,6 +180,33 @@ const DeferredCheckoutOrderTools = ({ data }: { data: OrderStub }) => {
     },
   })
 
+  const sendInvoiceEmail = useMutation({
+    mutationFn: async () => {
+      return sdk.client.fetch<{
+        success: boolean
+        payment_collection_id?: string | null
+      }>(`/admin/orders/${orderId}/deferred-send-invoice`, {
+        method: "POST",
+      })
+    },
+    onSuccess: async () => {
+      toast.success("Invoice email sent to the customer.")
+      await queryClient.invalidateQueries({ queryKey: ["admin-order-deferred-tools", orderId] })
+      await queryClient.invalidateQueries({
+        predicate: (q) => orderQueryKeyTouchesId(q, orderId),
+      })
+    },
+    onError: (e: unknown) => {
+      const msg =
+        e instanceof FetchError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "Failed to send invoice email."
+      toast.error(msg)
+    },
+  })
+
   if (!orderId || !isDeferredCheckout(data?.metadata)) {
     return null
   }
@@ -269,6 +296,25 @@ const DeferredCheckoutOrderTools = ({ data }: { data: OrderStub }) => {
               </Button>
             </div>
           )}
+        </div>
+
+        <div className="pt-4 border-t border-ui-border-base">
+          <Heading level="h3" className="mb-2 txt-compact-small">
+            Customer payment
+          </Heading>
+          <Text size="small" className="text-ui-fg-muted mb-3 max-w-md">
+            Email the customer a secure pay link. Requires{" "}
+            <code className="text-xs bg-ui-bg-subtle px-1 rounded">STOREFRONT_URL</code> (or a
+            payment URL template) on the server and an outstanding order balance.
+          </Text>
+          <Button
+            variant="primary"
+            size="small"
+            isLoading={sendInvoiceEmail.isPending}
+            onClick={() => sendInvoiceEmail.mutate()}
+          >
+            Send invoice / pay link
+          </Button>
         </div>
       </div>
     </Container>

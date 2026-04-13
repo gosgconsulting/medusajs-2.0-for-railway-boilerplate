@@ -78,6 +78,24 @@ export function augmentNotificationTemplateData(
     out.invite_link = data.inviteLink
   }
 
+  const payUrl =
+    typeof data.pay_url === "string"
+      ? data.pay_url.trim()
+      : typeof data.payUrl === "string"
+        ? data.payUrl.trim()
+        : ""
+  if (payUrl) {
+    out.pay_url = payUrl
+  }
+
+  const pcId =
+    typeof data.payment_collection_id === "string"
+      ? data.payment_collection_id.trim()
+      : ""
+  if (pcId) {
+    out.payment_collection_id = pcId
+  }
+
   if (order) {
     const fn =
       typeof shippingAddress?.first_name === "string"

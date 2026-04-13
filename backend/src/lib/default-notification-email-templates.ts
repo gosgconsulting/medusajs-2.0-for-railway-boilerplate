@@ -51,4 +51,5 @@ export const DEFAULT_SUBJECT_BY_KEY: Record<string, string> = {
   "order-email-delivered": "Your order was delivered",
   "order-email-cancelled": "Your order was cancelled",
   "order-email-refunded": "Your order was refunded",
+  "order-email-deferred-invoice": "Complete payment for your order",
 }

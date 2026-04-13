@@ -54,6 +54,12 @@ export const NOTIFICATION_TEMPLATE_CATALOG: NotificationTemplateCatalogEntry[] =
     description: "Sent when a payment refund is recorded (payment.refunded).",
   },
   {
+    template_key: OrderNotificationEmailKeys.ORDER_DEFERRED_INVOICE,
+    label: "Deferred checkout — pay link",
+    description:
+      "Sent when an admin uses deferred checkout tools to email a payment link. Override in Notification email templates; use {{pay_url}} in the body when needed.",
+  },
+  {
     template_key: EmailTemplates.INVITE_USER,
     label: "Admin invite",
     description: "Sent when a user is invited to the admin (invite.created / invite.resent).",

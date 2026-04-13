@@ -20,6 +20,8 @@ export const OrderNotificationEmailKeys = {
   ORDER_CANCELLED: "order-email-cancelled",
   /** payment.refunded */
   ORDER_REFUNDED: "order-email-refunded",
+  /** Admin-triggered: deferred checkout — pay link after shipping/total is finalized */
+  ORDER_DEFERRED_INVOICE: "order-email-deferred-invoice",
 } as const
 
 export type OrderNotificationEmailKey =

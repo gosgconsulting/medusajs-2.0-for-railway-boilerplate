@@ -1,4 +1,4 @@
-import { Text, Section, Hr } from "@react-email/components"
+import { Text, Section, Hr, Button } from "@react-email/components"
 import * as React from "react"
 import { Base } from "./base"
 import type { OrderDTO, OrderAddressDTO } from "@medusajs/framework/types"
@@ -12,6 +12,9 @@ export interface OrderSimpleNoticeTemplateProps {
   noticeHeadline: string
   noticeMessage: string
   preview?: string
+  /** HTTPS payment link (deferred invoice, etc.) */
+  payUrl?: string
+  payButtonLabel?: string
 }
 
 export const isOrderSimpleNoticeTemplateData = (
@@ -35,6 +38,8 @@ export const OrderSimpleNoticeTemplate: React.FC<OrderSimpleNoticeTemplateProps>
   noticeHeadline,
   noticeMessage,
   preview = "Order update",
+  payUrl,
+  payButtonLabel = "Pay now",
 }) => {
   const customerName = [shippingAddress.first_name, shippingAddress.last_name]
     .filter(Boolean)
@@ -50,6 +55,16 @@ export const OrderSimpleNoticeTemplate: React.FC<OrderSimpleNoticeTemplateProps>
         </Text>
         <Text className="m-0 mb-3 font-semibold">{noticeHeadline}</Text>
         <Text className="m-0 mb-6 whitespace-pre-line">{noticeMessage}</Text>
+        {payUrl ? (
+          <Section className="text-center mb-6">
+            <Button
+              href={payUrl}
+              className="rounded-md bg-[#111] px-5 py-3 text-center text-[14px] font-semibold text-white no-underline"
+            >
+              {payButtonLabel}
+            </Button>
+          </Section>
+        ) : null}
         <Hr className="border-[#eaeaea] my-6" />
         <Text className="m-0 mb-2">
           Order #{order.display_id} · {dateStr}

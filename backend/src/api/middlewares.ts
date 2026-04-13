@@ -47,5 +47,10 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [requireDeferredCheckoutEnabled],
     },
+    {
+      matcher: "/admin/orders/:id/deferred-send-invoice",
+      methods: ["POST"],
+      middlewares: [requireDeferredCheckoutEnabled],
+    },
   ],
 })
