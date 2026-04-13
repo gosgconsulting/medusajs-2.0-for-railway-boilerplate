@@ -8,6 +8,8 @@ import { validateAndTransformQuery } from "@medusajs/framework"
 import { MedusaError } from "@medusajs/framework/utils"
 import { StoreGetOrderParams } from "@medusajs/medusa/api/store/orders/validators"
 import * as OrderQueryConfig from "@medusajs/medusa/api/store/orders/query-config"
+import { StoreGetPaymentCollectionParams } from "@medusajs/medusa/api/store/payment-collections/validators"
+import * as PaymentCollectionQueryConfig from "@medusajs/medusa/api/store/payment-collections/query-config"
 import { STORE_DEFERRED_CHECKOUT } from "lib/constants"
 
 function requireDeferredCheckoutEnabled(
@@ -35,6 +37,17 @@ export default defineMiddlewares({
           OrderQueryConfig.retrieveTransformQueryConfig
         ),
         requireDeferredCheckoutEnabled,
+      ],
+    },
+    {
+      matcher:
+        "/store/payment-collections/:id/payment-sessions/:session_id/authorize",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformQuery(
+          StoreGetPaymentCollectionParams,
+          PaymentCollectionQueryConfig.retrievePaymentCollectionTransformQueryConfig
+        ),
       ],
     },
     {
