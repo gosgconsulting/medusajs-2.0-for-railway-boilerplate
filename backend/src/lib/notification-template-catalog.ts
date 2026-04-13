@@ -57,7 +57,7 @@ export const NOTIFICATION_TEMPLATE_CATALOG: NotificationTemplateCatalogEntry[] =
     template_key: OrderNotificationEmailKeys.ORDER_DEFERRED_INVOICE,
     label: "Deferred checkout — pay link",
     description:
-      "Sent when an admin uses deferred checkout tools to email a payment link. Override in Notification email templates; use {{pay_url}} in the body when needed.",
+      "Sent when an admin sends a pay link from the order (deferred checkout). A module row is created on first send with defaults including {{pay_url}}; edit under Notification email templates.",
   },
   {
     template_key: EmailTemplates.INVITE_USER,

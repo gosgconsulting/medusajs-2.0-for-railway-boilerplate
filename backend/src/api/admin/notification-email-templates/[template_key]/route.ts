@@ -3,17 +3,9 @@ import { MedusaError } from "@medusajs/framework/utils"
 import { NOTIFICATION_EMAIL_TEMPLATE_MODULE } from "../../../../modules/notification-email-template/constants"
 import { NOTIFICATION_TEMPLATE_CATALOG } from "../../../../lib/notification-template-catalog"
 import {
-  DEFAULT_INVITE_USER_HTML,
-  DEFAULT_ORDER_PLACED_HTML,
-  DEFAULT_ORDER_STATUS_NOTICE_HTML,
-  DEFAULT_SUBJECT_BY_KEY,
-} from "../../../../lib/default-notification-email-templates"
-import { OrderNotificationEmailKeys } from "../../../../lib/order-notification-email-keys"
-import { EmailTemplates } from "../../../../modules/email-notifications/templates"
-
-const ORDER_STATUS_TEMPLATE_KEYS = new Set<string>(
-  Object.values(OrderNotificationEmailKeys)
-)
+  getDefaultHtmlBodyForTemplateKey,
+  getDefaultSubjectForTemplateKey,
+} from "../../../../lib/notification-template-defaults"
 
 type TemplateRow = {
   id: string
@@ -43,20 +35,6 @@ function catalogMeta(templateKey: string) {
   return entry
 }
 
-function defaultBodyForKey(templateKey: string): string {
-  if (templateKey === EmailTemplates.ORDER_PLACED) return DEFAULT_ORDER_PLACED_HTML
-  if (templateKey === EmailTemplates.INVITE_USER) return DEFAULT_INVITE_USER_HTML
-  if (ORDER_STATUS_TEMPLATE_KEYS.has(templateKey)) return DEFAULT_ORDER_STATUS_NOTICE_HTML
-  throw new MedusaError(
-    MedusaError.Types.INVALID_DATA,
-    `No default HTML for template key: ${templateKey}`
-  )
-}
-
-function defaultSubjectForKey(templateKey: string): string {
-  return DEFAULT_SUBJECT_BY_KEY[templateKey] ?? "Notification"
-}
-
 export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void> {
   const templateKey = req.params.template_key as string
   catalogMeta(templateKey)
@@ -83,8 +61,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
     is_enabled: row?.is_enabled ?? false,
     html_body: row?.html_body ?? "",
     defaults: {
-      subject: defaultSubjectForKey(templateKey),
-      html_body: defaultBodyForKey(templateKey),
+      subject: getDefaultSubjectForTemplateKey(templateKey),
+      html_body: getDefaultHtmlBodyForTemplateKey(templateKey),
     },
   })
 }
@@ -109,12 +87,12 @@ export async function POST(
   const reset = body.reset_to_defaults === true
 
   const subject = reset
-    ? defaultSubjectForKey(templateKey)
+    ? getDefaultSubjectForTemplateKey(templateKey)
     : typeof body.subject === "string"
       ? body.subject
       : ""
   const html_body = reset
-    ? defaultBodyForKey(templateKey)
+    ? getDefaultHtmlBodyForTemplateKey(templateKey)
     : typeof body.html_body === "string"
       ? body.html_body
       : ""

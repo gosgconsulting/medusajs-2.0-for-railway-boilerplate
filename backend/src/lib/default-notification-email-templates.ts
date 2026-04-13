@@ -30,6 +30,26 @@ If you have any questions, reach us at {{support_email}}.
 
 — {{store_name}}`
 
+/**
+ * Deferred checkout invoice (notification_email_template module).
+ * `{{pay_url}}` is set when an admin sends the pay link; override this body in Admin → Notification email templates.
+ */
+export const DEFAULT_DEFERRED_INVOICE_EMAIL_HTML = `Hi {{customer_name}},
+
+{{noticeHeadline}}
+
+{{noticeMessage}}
+
+Pay securely (copy and paste if needed):
+{{pay_url}}
+
+Order #{{order_id}} · {{formatDate order.created_at}}
+Total: {{total}} {{currency}}
+
+If you have any questions, reach us at {{support_email}}.
+
+— {{store_name}}`
+
 export const DEFAULT_INVITE_USER_HTML = `Hi,
 
 You've been invited to join {{store_name}} as an administrator.

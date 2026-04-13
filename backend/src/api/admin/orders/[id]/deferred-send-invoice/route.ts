@@ -5,7 +5,8 @@ import {
 } from "@medusajs/framework/utils"
 import { createOrUpdateOrderPaymentCollectionWorkflow } from "@medusajs/medusa/core-flows"
 import { buildDeferredInvoicePayUrl } from "lib/deferred-invoice-pay-url"
-import { DEFAULT_SUBJECT_BY_KEY } from "lib/default-notification-email-templates"
+import { ensureNotificationEmailTemplateRow } from "lib/ensure-notification-email-template"
+import { getDefaultSubjectForTemplateKey } from "lib/notification-template-defaults"
 import { OrderNotificationEmailKeys } from "lib/order-notification-email-keys"
 import { sendOrderNotificationEmail } from "lib/send-order-notification-email"
 
@@ -115,15 +116,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
 
   const templateKey = OrderNotificationEmailKeys.ORDER_DEFERRED_INVOICE
 
+  await ensureNotificationEmailTemplateRow(req.scope, templateKey)
+
   await sendOrderNotificationEmail({
     container: req.scope,
     orderId,
     templateKey,
-    defaultSubject: DEFAULT_SUBJECT_BY_KEY[templateKey] ?? "Complete payment for your order",
+    defaultSubject: getDefaultSubjectForTemplateKey(templateKey),
     preview: "Complete your payment",
     noticeHeadline: "Your order is ready for payment",
     noticeMessage:
-      "We have updated your order total (including shipping where applicable). Use the button below to pay securely.",
+      "We have updated your order total (including shipping where applicable). Use the payment link below to complete checkout.",
     throwIfNoEmail: true,
     extraTemplateData: {
       payUrl,
