@@ -73,6 +73,20 @@ export const NOTIFICATION_TEMPLATE_CATALOG: NotificationTemplateCatalogEntry[] =
     audience: "customer",
   },
   {
+    template_key: EmailTemplates.ADMIN_ORDER_PLACED,
+    label: "New order (staff)",
+    description:
+      "Sent to staff on order.placed for normal checkout (not deferred). Set ADMIN_ORDER_NOTIFICATION_EMAIL or STORE_SUPPORT_EMAIL.",
+    audience: "admin",
+  },
+  {
+    template_key: EmailTemplates.ADMIN_DEFERRED_ORDER_PAID,
+    label: "Deferred checkout — customer paid (staff)",
+    description:
+      "Sent to staff when payment is captured or authorized (payment.captured / payment.authorized) on a deferred-checkout order. Same recipient env vars as other staff order emails; idempotency is per event so both can notify if your provider emits both.",
+    audience: "admin",
+  },
+  {
     template_key: EmailTemplates.INVITE_USER,
     label: "Admin invite",
     description: "Sent when a user is invited to the admin (invite.created / invite.resent).",

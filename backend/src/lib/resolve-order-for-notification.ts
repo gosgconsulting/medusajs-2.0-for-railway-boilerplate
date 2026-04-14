@@ -12,6 +12,18 @@ type QueryGraph = {
   }) => Promise<{ data?: unknown[] }>
 }
 
+/** Payment subscriber payloads use `id` (core) or sometimes `payment_id`. */
+export function resolvePaymentIdFromSubscriberData(
+  data: { id?: string; payment_id?: string } | null | undefined
+): string | null {
+  if (!data || typeof data !== "object") return null
+  if (typeof data.id === "string" && data.id.trim()) return data.id.trim()
+  if (typeof data.payment_id === "string" && data.payment_id.trim()) {
+    return data.payment_id.trim()
+  }
+  return null
+}
+
 export async function resolveOrderIdFromPaymentId(
   container: { resolve: (k: string) => unknown },
   paymentId: string

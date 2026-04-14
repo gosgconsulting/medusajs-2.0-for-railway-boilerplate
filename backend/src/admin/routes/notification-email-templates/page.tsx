@@ -68,6 +68,14 @@ const INVITE_TEMPLATE_VARS = [
   "{{inviteLink}}",
 ]
 
+const ADMIN_NEW_ORDER_TEMPLATE_VARS = [
+  ...ORDER_TEMPLATE_VARS,
+  "{{admin_order_url}}",
+]
+
+const ADMIN_ORDER_PLACED_TEMPLATE_KEY = "admin-order-placed"
+const ADMIN_DEFERRED_ORDER_PAID_TEMPLATE_KEY = "admin-deferred-order-paid"
+
 /** Visual accent for sidebar rows (matches common order-lifecycle semantics). */
 const TEMPLATE_DOT_CLASS: Record<string, string> = {
   "order-placed": "bg-ui-fg-muted",
@@ -79,6 +87,8 @@ const TEMPLATE_DOT_CLASS: Record<string, string> = {
   "order-email-cancelled": "bg-red-500",
   "order-email-refunded": "bg-pink-500",
   "invite-user": "bg-violet-500",
+  "admin-order-placed": "bg-amber-500",
+  "admin-deferred-order-paid": "bg-emerald-600",
 }
 
 const INVITE_TEMPLATE_KEY = "invite-user"
@@ -443,7 +453,10 @@ const NotificationEmailTemplatesPage = () => {
                   <div className="flex flex-wrap gap-1.5">
                     {(selectedKey === INVITE_TEMPLATE_KEY
                       ? INVITE_TEMPLATE_VARS
-                      : ORDER_TEMPLATE_VARS
+                      : selectedKey === ADMIN_ORDER_PLACED_TEMPLATE_KEY ||
+                          selectedKey === ADMIN_DEFERRED_ORDER_PAID_TEMPLATE_KEY
+                        ? ADMIN_NEW_ORDER_TEMPLATE_VARS
+                        : ORDER_TEMPLATE_VARS
                     ).map((v) => (
                       <code
                         key={v}

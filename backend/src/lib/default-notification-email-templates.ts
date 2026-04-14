@@ -61,6 +61,38 @@ If you were not expecting this invitation, you can ignore this email.
 
 — {{store_name}}`
 
+/** Staff alert when a shopper places an order (Handlebars). */
+export const DEFAULT_ADMIN_ORDER_PLACED_HTML = `New order on {{store_name}}
+
+Customer: {{customer_name}} <{{customer_email}}>
+Order: #{{order_id}}
+Placed: {{formatDate order.created_at}}
+Total: {{total}} {{currency}} · {{items_count}} line item(s)
+
+Shipping:
+{{shipping_address}}
+
+Open in Medusa Admin:
+{{admin_order_url}}
+
+— {{store_name}}`
+
+/** Staff alert when a deferred-checkout order is paid (Handlebars). */
+export const DEFAULT_ADMIN_DEFERRED_ORDER_PAID_HTML = `Payment received (deferred checkout) — {{store_name}}
+
+Customer: {{customer_name}} <{{customer_email}}>
+Order: #{{order_id}}
+Placed: {{formatDate order.created_at}}
+Total: {{total}} {{currency}} · {{items_count}} line item(s)
+
+Shipping:
+{{shipping_address}}
+
+Open in Medusa Admin:
+{{admin_order_url}}
+
+— {{store_name}}`
+
 export const DEFAULT_SUBJECT_BY_KEY: Record<string, string> = {
   "order-placed": "Your order has been placed",
   "invite-user": "You've been invited to Medusa!",
@@ -72,4 +104,6 @@ export const DEFAULT_SUBJECT_BY_KEY: Record<string, string> = {
   "order-email-cancelled": "Your order was cancelled",
   "order-email-refunded": "Your order was refunded",
   "order-email-deferred-invoice": "Complete payment for your order",
+  "admin-order-placed": "New order #{{order_id}} — {{store_name}}",
+  "admin-deferred-order-paid": "Paid: order #{{order_id}} — {{store_name}}",
 }

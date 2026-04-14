@@ -2,6 +2,8 @@ import { Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService, IOrderModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { applyDbEmailTemplate } from '../lib/apply-db-email-template'
+import { DEFAULT_SUBJECT_BY_KEY } from '../lib/default-notification-email-templates'
+import { sendAdminOrderStaffNotification } from '../lib/send-admin-order-staff-notification'
 import { EmailTemplates } from '../modules/email-notifications/templates'
 
 export default async function orderPlacedHandler({
@@ -45,6 +47,20 @@ export default async function orderPlacedHandler({
     })
   } catch (error) {
     console.error('Error sending order confirmation notification:', error)
+  }
+
+  try {
+    await sendAdminOrderStaffNotification({
+      container,
+      templateKey: EmailTemplates.ADMIN_ORDER_PLACED,
+      idempotencyPrefix: 'admin-order-placed',
+      order,
+      shippingAddress,
+      preview: 'New customer order',
+      fallbackSubject: DEFAULT_SUBJECT_BY_KEY[EmailTemplates.ADMIN_ORDER_PLACED] ?? 'New order',
+    })
+  } catch (error) {
+    console.error('Error sending admin new-order notification:', error)
   }
 }
 

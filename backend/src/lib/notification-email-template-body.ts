@@ -127,6 +127,18 @@ export function augmentNotificationTemplateData(
     } else {
       out.shipping_address = ""
     }
+
+    const baseUrl =
+      process.env.BACKEND_PUBLIC_URL?.trim() ||
+      process.env.RAILWAY_PUBLIC_DOMAIN_VALUE?.trim() ||
+      ""
+    const orderId = typeof order.id === "string" ? order.id : ""
+    if (baseUrl && orderId) {
+      const origin = baseUrl.replace(/\/$/, "")
+      out.admin_order_url = `${origin}/app/orders/${orderId}`
+    } else {
+      out.admin_order_url = ""
+    }
   }
 
   return out

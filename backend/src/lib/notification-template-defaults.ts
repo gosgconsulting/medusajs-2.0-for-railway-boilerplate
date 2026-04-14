@@ -1,6 +1,8 @@
 import { MedusaError } from "@medusajs/framework/utils"
 import { EmailTemplates } from "../modules/email-notifications/templates"
 import {
+  DEFAULT_ADMIN_DEFERRED_ORDER_PAID_HTML,
+  DEFAULT_ADMIN_ORDER_PLACED_HTML,
   DEFAULT_DEFERRED_INVOICE_EMAIL_HTML,
   DEFAULT_INVITE_USER_HTML,
   DEFAULT_ORDER_PLACED_HTML,
@@ -22,6 +24,12 @@ export function getDefaultHtmlBodyForTemplateKey(templateKey: string): string {
   }
   if (templateKey === EmailTemplates.INVITE_USER) {
     return DEFAULT_INVITE_USER_HTML
+  }
+  if (templateKey === EmailTemplates.ADMIN_ORDER_PLACED) {
+    return DEFAULT_ADMIN_ORDER_PLACED_HTML
+  }
+  if (templateKey === EmailTemplates.ADMIN_DEFERRED_ORDER_PAID) {
+    return DEFAULT_ADMIN_DEFERRED_ORDER_PAID_HTML
   }
   if (templateKey === OrderNotificationEmailKeys.ORDER_DEFERRED_INVOICE) {
     return DEFAULT_DEFERRED_INVOICE_EMAIL_HTML

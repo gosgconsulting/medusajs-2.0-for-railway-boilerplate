@@ -19,6 +19,46 @@ const EMPTY_ADDRESS = {
   postal_code: "",
 } as OrderAddressDTO
 
+/**
+ * Resolves shipping (or billing fallback) for notification templates — same rules as customer order emails.
+ */
+export async function resolveShippingAddressForOrderEmail(
+  orderModuleService: IOrderModuleService,
+  order: Awaited<ReturnType<IOrderModuleService["retrieveOrder"]>>
+): Promise<OrderAddressDTO> {
+  const orderAddressService = (
+    orderModuleService as unknown as {
+      orderAddressService_: { retrieve: (id: string) => Promise<OrderAddressDTO> }
+    }
+  ).orderAddressService_
+
+  const sa = order.shipping_address as
+    | (OrderAddressDTO & { id?: string })
+    | null
+    | undefined
+  const ba = order.billing_address as
+    | (OrderAddressDTO & { id?: string })
+    | null
+    | undefined
+
+  const hasInline = (a: OrderAddressDTO | null | undefined) =>
+    !!(a && (a.address_1 || a.first_name || a.city))
+
+  if (hasInline(sa)) {
+    return sa as OrderAddressDTO
+  }
+  if (sa?.id) {
+    return await orderAddressService.retrieve(sa.id)
+  }
+  if (hasInline(ba)) {
+    return ba as OrderAddressDTO
+  }
+  if (ba?.id) {
+    return await orderAddressService.retrieve(ba.id)
+  }
+  return EMPTY_ADDRESS
+}
+
 export type SendOrderNotificationEmailParams = {
   container: { resolve: (key: string) => unknown }
   orderId: string
@@ -70,36 +110,7 @@ export async function sendOrderNotificationEmail(
     return
   }
 
-  const orderAddressService = (
-    orderModuleService as unknown as {
-      orderAddressService_: { retrieve: (id: string) => Promise<OrderAddressDTO> }
-    }
-  ).orderAddressService_
-
-  const sa = order.shipping_address as
-    | (OrderAddressDTO & { id?: string })
-    | null
-    | undefined
-  const ba = order.billing_address as
-    | (OrderAddressDTO & { id?: string })
-    | null
-    | undefined
-
-  const hasInline = (a: OrderAddressDTO | null | undefined) =>
-    !!(a && (a.address_1 || a.first_name || a.city))
-
-  let shippingAddress: OrderAddressDTO
-  if (hasInline(sa)) {
-    shippingAddress = sa as OrderAddressDTO
-  } else if (sa?.id) {
-    shippingAddress = await orderAddressService.retrieve(sa.id)
-  } else if (hasInline(ba)) {
-    shippingAddress = ba as OrderAddressDTO
-  } else if (ba?.id) {
-    shippingAddress = await orderAddressService.retrieve(ba.id)
-  } else {
-    shippingAddress = EMPTY_ADDRESS
-  }
+  const shippingAddress = await resolveShippingAddressForOrderEmail(orderModuleService, order)
 
   const payload = await applyDbEmailTemplate(container, templateKey, {
     template: templateKey,

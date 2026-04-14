@@ -1,5 +1,11 @@
 import { ReactNode } from 'react'
 import { MedusaError } from '@medusajs/framework/utils'
+import {
+  AdminOrderPlacedTemplate,
+  ADMIN_DEFERRED_ORDER_PAID,
+  ADMIN_ORDER_PLACED,
+  isAdminOrderPlacedTemplateData,
+} from './admin-order-placed'
 import { InviteUserEmail, INVITE_USER, isInviteUserData } from './invite-user'
 import { OrderPlacedTemplate, ORDER_PLACED, isOrderPlacedTemplateData } from './order-placed'
 import {
@@ -9,7 +15,9 @@ import {
 
 export const EmailTemplates = {
   INVITE_USER,
-  ORDER_PLACED
+  ORDER_PLACED,
+  ADMIN_ORDER_PLACED,
+  ADMIN_DEFERRED_ORDER_PAID,
 } as const
 
 export type EmailTemplateType = keyof typeof EmailTemplates
@@ -34,6 +42,30 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
       }
       return <OrderPlacedTemplate {...data} />
 
+    case EmailTemplates.ADMIN_ORDER_PLACED:
+      if (!isAdminOrderPlacedTemplateData(data)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Invalid data for template "${EmailTemplates.ADMIN_ORDER_PLACED}"`
+        )
+      }
+      return <AdminOrderPlacedTemplate {...data} />
+
+    case EmailTemplates.ADMIN_DEFERRED_ORDER_PAID:
+      if (!isAdminOrderPlacedTemplateData(data)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Invalid data for template "${EmailTemplates.ADMIN_DEFERRED_ORDER_PAID}"`
+        )
+      }
+      return (
+        <AdminOrderPlacedTemplate
+          {...data}
+          headline="Payment received (deferred checkout)"
+          preview={data.preview ?? "Deferred checkout — payment received"}
+        />
+      )
+
     default:
       if (
         templateKey.startsWith('order-email-') &&
@@ -49,4 +81,4 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
   }
 }
 
-export { InviteUserEmail, OrderPlacedTemplate }
+export { AdminOrderPlacedTemplate, InviteUserEmail, OrderPlacedTemplate }
