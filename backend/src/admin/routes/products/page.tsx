@@ -12,6 +12,7 @@ import {
   Text,
 } from "@medusajs/ui"
 import { ChevronDown, ChevronRight, PencilSquare } from "@medusajs/icons"
+import { hydrateProductVariantsInventoryQuantity } from "../../lib/hydrate-product-variant-inventory"
 import { sdk } from "../../lib/sdk"
 import {
   loadColumnPrefs,
@@ -216,14 +217,17 @@ const ProductsIndexPage = () => {
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-products-index", offset, debouncedSearch],
-    queryFn: () =>
-      sdk.admin.product.list({
+    queryFn: async () => {
+      const res = await sdk.admin.product.list({
         limit: PAGE_SIZE,
         offset,
         ...(debouncedSearch ? { q: debouncedSearch } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
-      } as Parameters<typeof sdk.admin.product.list>[0]),
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.metadata",
+      } as Parameters<typeof sdk.admin.product.list>[0])
+      await hydrateProductVariantsInventoryQuantity(res.products ?? [])
+      return res
+    },
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
   })

@@ -14,6 +14,7 @@ import {
   toast,
 } from "@medusajs/ui"
 import { ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
+import { hydrateProductVariantsInventoryQuantity } from "../../../lib/hydrate-product-variant-inventory"
 import { sdk } from "../../../lib/sdk"
 import {
   loadColumnPrefs,
@@ -67,6 +68,9 @@ type VariantRow = {
   thumbnail: string | null
   manage_inventory: boolean
   inventory_quantity: number | null
+  /** First linked inventory item (Medusa v2 stock is on levels, not variant fields). */
+  inventory_item_id: string | null
+  inventory_required_quantity: number
   metadata: Record<string, unknown>
 }
 
@@ -102,6 +106,10 @@ type ApiVariant = {
   images?: { id?: string; url?: string }[] | null
   manage_inventory?: boolean | null
   inventory_quantity?: number | null
+  inventory_items?: {
+    inventory_item_id?: string | null
+    required_quantity?: number | null
+  }[] | null
   metadata?: Record<string, unknown> | null
 }
 
@@ -136,6 +144,20 @@ function toVariantRow(v: ApiVariant): VariantRow {
     (typeof v.thumbnail === "string" && v.thumbnail.trim() ? v.thumbnail : null) ??
     (v.images?.[0]?.url ?? null) ??
     (typeof meta?.thumbnail === "string" ? meta.thumbnail : null)
+  const invLink = v.inventory_items?.[0] as
+    | {
+        inventory_item_id?: string | null
+        required_quantity?: number | null
+        inventory?: { id?: string | null }
+      }
+    | undefined
+  const reqQty = invLink?.required_quantity
+  const inventoryItemId =
+    typeof invLink?.inventory_item_id === "string"
+      ? invLink.inventory_item_id
+      : typeof invLink?.inventory?.id === "string"
+        ? invLink.inventory.id
+        : null
   return {
     id: v.id,
     title: v.title ?? "Default",
@@ -153,6 +175,9 @@ function toVariantRow(v: ApiVariant): VariantRow {
     thumbnail,
     manage_inventory: v.manage_inventory ?? false,
     inventory_quantity: v.inventory_quantity ?? null,
+    inventory_item_id: inventoryItemId,
+    inventory_required_quantity:
+      typeof reqQty === "number" && reqQty > 0 ? reqQty : 1,
     metadata: meta,
   }
 }
@@ -398,8 +423,8 @@ const BulkEditPage = () => {
       createdAt,
       updatedAt,
     ],
-    queryFn: () =>
-      sdk.admin.product.list({
+    queryFn: async () => {
+      const res = await sdk.admin.product.list({
         limit: PAGE_SIZE,
         offset,
         ...(debouncedSearch ? { q: debouncedSearch } : {}),
@@ -410,8 +435,11 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
-      } as Parameters<typeof sdk.admin.product.list>[0]),
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,*variants.inventory_items,+variants.metadata",
+      } as Parameters<typeof sdk.admin.product.list>[0])
+      await hydrateProductVariantsInventoryQuantity(res.products ?? [])
+      return res
+    },
     refetchOnWindowFocus: false,
   })
 
@@ -442,6 +470,23 @@ const BulkEditPage = () => {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
+
+  const { data: stockLocationsData } = useQuery({
+    queryKey: ["admin-stock-locations-bulk"],
+    queryFn: () => sdk.admin.stockLocation.list({ limit: 100 }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const primaryStockLocationId = useMemo(() => {
+    const locs = (stockLocationsData as { stock_locations?: { id?: string; name?: string | null }[] })
+      ?.stock_locations
+    if (!locs?.length) return null
+    const sorted = [...locs].sort((a, b) =>
+      (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" })
+    )
+    return sorted[0]?.id ?? null
+  }, [stockLocationsData])
 
   const hierarchicalCategories = useMemo(() => {
     const raw = (categoriesData as any)?.product_categories ?? []
@@ -1113,13 +1158,6 @@ const BulkEditPage = () => {
             if (v.manage_inventory !== origV.manage_inventory) {
               vPatch.manage_inventory = v.manage_inventory
             }
-            if (
-              v.manage_inventory &&
-              v.inventory_quantity !== origV.inventory_quantity
-            ) {
-              vPatch.inventory_quantity =
-                v.inventory_quantity != null ? v.inventory_quantity : null
-            }
 
             // Build merged metadata for b2b_price, color_hex, wcwp_client-*, etc.
             const metaUpdates: Record<string, unknown> = {
@@ -1188,9 +1226,77 @@ const BulkEditPage = () => {
       })
       )
 
+      let inventorySaveNeedsLocation = false
+      for (const id of dirtyIds) {
+        const row = working.find((r) => r.id === id)
+        const orig = source.find((s) => s.id === id)
+        if (!row || !orig) continue
+        const dirtyVs = dirtyVariantMap.get(id)
+        if (!dirtyVs) continue
+        for (const variantId of dirtyVs) {
+          const v = row.variants.find((x) => x.id === variantId)
+          const origV = orig.variants.find((x) => x.id === variantId)
+          if (!v || !origV) continue
+          if (!v.manage_inventory) continue
+          if (v.inventory_quantity === origV.inventory_quantity) continue
+          if (!origV.inventory_item_id) continue
+          inventorySaveNeedsLocation = true
+          break
+        }
+        if (inventorySaveNeedsLocation) break
+      }
+      if (inventorySaveNeedsLocation && !primaryStockLocationId) {
+        throw new Error(
+          "Stock quantity was changed but no stock location exists. Create a stock location in Settings (Inventory → Locations), then save again."
+        )
+      }
+
       const batchRes = await sdk.admin.product.batch(
         { update } as Parameters<typeof sdk.admin.product.batch>[0]
       )
+
+      const inventoryLevelUpdates: {
+        inventory_item_id: string
+        location_id: string
+        stocked_quantity: number
+      }[] = []
+
+      if (primaryStockLocationId) {
+        for (const id of dirtyIds) {
+          const row = working.find((r) => r.id === id)
+          const orig = source.find((s) => s.id === id)
+          if (!row || !orig) continue
+          const dirtyVs = dirtyVariantMap.get(id)
+          if (!dirtyVs) continue
+          for (const variantId of dirtyVs) {
+            const v = row.variants.find((x) => x.id === variantId)
+            const origV = orig.variants.find((x) => x.id === variantId)
+            if (!v || !origV) continue
+            if (!v.manage_inventory) continue
+            if (v.inventory_quantity === origV.inventory_quantity) continue
+            const itemId = origV.inventory_item_id
+            if (!itemId) continue
+            const req = Math.max(1, origV.inventory_required_quantity)
+            const qty =
+              v.inventory_quantity != null
+                ? Math.max(0, Math.round(v.inventory_quantity))
+                : 0
+            inventoryLevelUpdates.push({
+              inventory_item_id: itemId,
+              location_id: primaryStockLocationId,
+              stocked_quantity: qty * req,
+            })
+          }
+        }
+      }
+
+      if (inventoryLevelUpdates.length) {
+        await sdk.admin.inventoryItem.batchInventoryItemsLocationLevels({
+          update: inventoryLevelUpdates,
+        } as Parameters<
+          typeof sdk.admin.inventoryItem.batchInventoryItemsLocationLevels
+        >[0])
+      }
 
       // Product categories are managed through category endpoints, not product batch update.
       // Apply diffs per category.
@@ -1225,8 +1331,12 @@ const BulkEditPage = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products-bulk"] })
       queryClient.invalidateQueries({ queryKey: ["products"] })
     },
-    onError: () => {
-      toast.error("Failed to save products. Please try again.")
+    onError: (e: Error) => {
+      toast.error(
+        e?.message && e.message.length < 200
+          ? e.message
+          : "Failed to save products. Please try again."
+      )
     },
   })
 
