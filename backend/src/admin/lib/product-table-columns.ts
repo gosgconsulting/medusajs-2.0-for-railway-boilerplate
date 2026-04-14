@@ -20,7 +20,6 @@ export const TOGGLEABLE_COLUMNS = [
   { id: "weight", label: "Weight (g)" },
   { id: "width", label: "Width" },
   { id: "height", label: "Height" },
-  { id: "discountable", label: "Discountable" },
   { id: "color", label: "Color" },
   { id: "changed", label: "Changed" },
 ] as const

@@ -79,7 +79,6 @@ type ProductRow = {
   weight: string    // as string for input control
   width: string     // as string for input control
   height: string    // as string for input control
-  discountable: boolean
   thumbnail: string | null
   variants: VariantRow[]
 }
@@ -114,7 +113,6 @@ type ApiProduct = {
   weight?: number | null
   width?: number | null
   height?: number | null
-  discountable?: boolean | null
   thumbnail?: string | null
   tags?: { id?: string; value?: string }[] | null
   variants?: ApiVariant[] | null
@@ -171,7 +169,6 @@ function toRow(p: ApiProduct): ProductRow {
     weight: p.weight != null ? String(p.weight) : "",
     width: p.width != null ? String(p.width) : "",
     height: p.height != null ? String(p.height) : "",
-    discountable: p.discountable ?? true,
     thumbnail: p.thumbnail ?? null,
     variants: (p.variants ?? []).map(toVariantRow),
   }
@@ -393,7 +390,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+discountable,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     refetchOnWindowFocus: false,
   })
@@ -537,7 +534,6 @@ const BulkEditPage = () => {
         row.weight !== orig.weight ||
         row.width !== orig.width ||
         row.height !== orig.height ||
-        row.discountable !== orig.discountable ||
         row.thumbnail !== orig.thumbnail
       ) {
         set.add(row.id)
@@ -985,8 +981,6 @@ const BulkEditPage = () => {
           }
         }
         if (row.material !== orig.material) patch.material = row.material || null
-        if (row.discountable !== orig.discountable)
-          patch.discountable = row.discountable
         if (row.tags !== orig.tags) {
           const arr = row.tags
             .split(",")
@@ -1914,14 +1908,6 @@ const BulkEditPage = () => {
                     Height
                   </th>
                   )}
-                  {isColumnVisible("discountable") && (
-                  <th
-                    className="px-3 py-3 text-center txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 110 }}
-                  >
-                    Discountable
-                  </th>
-                  )}
                   {isColumnVisible("color") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
@@ -2349,20 +2335,6 @@ const BulkEditPage = () => {
                             }
                             placeholder="0"
                             className={cellInput}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("discountable") && (
-                        <td className="px-3 py-2 text-center">
-                          <Checkbox
-                            checked={row.discountable}
-                            onCheckedChange={(checked) =>
-                              updateRow(
-                                row.id,
-                                "discountable",
-                                checked === true
-                              )
-                            }
                           />
                         </td>
                         )}
@@ -2809,16 +2781,6 @@ const BulkEditPage = () => {
                                 <input
                                   type="text"
                                   value={row.height}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("discountable") && (
-                              <td className="px-3 py-2 text-center">
-                                <input
-                                  type="text"
-                                  value={row.discountable ? "Yes" : "No"}
                                   disabled
                                   className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                                 />

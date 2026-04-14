@@ -64,7 +64,6 @@ type ProductRow = {
   weight: string
   width: string
   height: string
-  discountable: boolean
   thumbnail: string | null
   categories?: { name?: string | null }[] | null
   variants: VariantRow[]
@@ -100,7 +99,6 @@ type ApiProduct = {
   weight?: number | null
   width?: number | null
   height?: number | null
-  discountable?: boolean | null
   thumbnail?: string | null
   tags?: { id?: string; value?: string }[] | null
   variants?: ApiVariant[] | null
@@ -145,7 +143,6 @@ function toRow(p: ApiProduct): ProductRow {
     weight: p.weight != null ? String(p.weight) : "",
     width: p.width != null ? String(p.width) : "",
     height: p.height != null ? String(p.height) : "",
-    discountable: p.discountable ?? true,
     thumbnail: p.thumbnail ?? null,
     categories: p.categories,
     variants: (p.variants ?? []).map(toVariantRow),
@@ -225,7 +222,7 @@ const ProductsIndexPage = () => {
         offset,
         ...(debouncedSearch ? { q: debouncedSearch } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+discountable,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.inventory_quantity,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0]),
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
@@ -575,14 +572,6 @@ const ProductsIndexPage = () => {
                         Height
                       </th>
                     )}
-                    {isColumnVisible("discountable") && (
-                      <th
-                        className="txt-compact-small-plus px-3 py-3 text-center text-ui-fg-muted"
-                        style={{ minWidth: 110 }}
-                      >
-                        Discountable
-                      </th>
-                    )}
                     {isColumnVisible("color") && (
                       <th
                         className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
@@ -765,11 +754,6 @@ const ProductsIndexPage = () => {
                               {row.height || "—"}
                             </td>
                           )}
-                          {isColumnVisible("discountable") && (
-                            <td className={`${tdText} text-center`}>
-                              {row.discountable ? "Yes" : "No"}
-                            </td>
-                          )}
                           {isColumnVisible("color") && (
                             <td className={tdText}>
                               {colorDisplay(row.variants) || "—"}
@@ -913,11 +897,6 @@ const ProductsIndexPage = () => {
                               )}
                               {isColumnVisible("height") && (
                                 <td className={tdText}>{row.height || "—"}</td>
-                              )}
-                              {isColumnVisible("discountable") && (
-                                <td className={`${tdText} text-center`}>
-                                  {row.discountable ? "Yes" : "No"}
-                                </td>
                               )}
                               {isColumnVisible("color") && (
                                 <td className={tdText}>
