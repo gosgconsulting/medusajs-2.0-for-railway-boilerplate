@@ -6,8 +6,11 @@ settings:
 
 patchedDependencies:
   '@medusajs/core-flows@2.12.1':
-    hash: c7qn4k5vmbfncgrfgtxrxlavay
+    hash: c6v5s6q44krgw2wmdurgxh3yay
     path: patches/@medusajs__core-flows@2.12.1.patch
+  '@medusajs/dashboard@2.12.1':
+    hash: aoyl3baexfmvwh5en56fdspwry
+    path: patches/@medusajs__dashboard@2.12.1.patch
   '@medusajs/framework@2.12.1':
     hash: ff3n52dtwgprtaphgw7joq3b7a
     path: patches/@medusajs__framework@2.12.1.patch
@@ -30,7 +33,7 @@ importers:
         version: 2.12.1(@types/node@20.19.25)
       '@medusajs/dashboard':
         specifier: 2.12.1
-        version: 2.12.1(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
+        version: 2.12.1(patch_hash=aoyl3baexfmvwh5en56fdspwry)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
       '@medusajs/draft-order':
         specifier: 2.12.1
         version: 2.12.1(@medusajs/admin-sdk@2.12.1)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/icons@2.12.1(react@18.3.1))(@medusajs/test-utils@2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/medusa@2.12.1))(@medusajs/ui@4.0.29(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react-router-dom@6.20.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
@@ -9332,7 +9335,7 @@ snapshots:
     dependencies:
       '@medusajs/admin-shared': 2.12.1
       '@medusajs/admin-vite-plugin': 2.12.1(picomatch@4.0.3)(vite@5.4.21(@types/node@20.19.25))
-      '@medusajs/dashboard': 2.12.1(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
+      '@medusajs/dashboard': 2.12.1(patch_hash=aoyl3baexfmvwh5en56fdspwry)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
       '@vitejs/plugin-react': 4.7.0(vite@5.4.21(@types/node@20.19.25))
       autoprefixer: 10.4.22(postcss@8.5.6)
       compression: 1.8.1
@@ -9492,7 +9495,7 @@ snapshots:
       - supports-color
       - tedious
 
-  '@medusajs/core-flows@2.12.1(patch_hash=c7qn4k5vmbfncgrfgtxrxlavay)(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))':
+  '@medusajs/core-flows@2.12.1(patch_hash=c6v5s6q44krgw2wmdurgxh3yay)(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))':
     dependencies:
       '@medusajs/framework': 2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25))
       csv-parse: 5.6.0
@@ -9507,7 +9510,7 @@ snapshots:
     dependencies:
       '@medusajs/framework': 2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25))
 
-  '@medusajs/dashboard@2.12.1(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)':
+  '@medusajs/dashboard@2.12.1(patch_hash=aoyl3baexfmvwh5en56fdspwry)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)':
     dependencies:
       '@ariakit/react': 0.4.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@babel/runtime': 7.28.4
@@ -9745,7 +9748,7 @@ snapshots:
       '@medusajs/caching': 2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(awilix@8.0.1)
       '@medusajs/caching-redis': 2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/cart': 2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
-      '@medusajs/core-flows': 2.12.1(patch_hash=c7qn4k5vmbfncgrfgtxrxlavay)(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
+      '@medusajs/core-flows': 2.12.1(patch_hash=c6v5s6q44krgw2wmdurgxh3yay)(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/currency': 2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/customer': 2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))
       '@medusajs/draft-order': 2.12.1(@medusajs/admin-sdk@2.12.1)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/icons@2.12.1(react@18.3.1))(@medusajs/test-utils@2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/medusa@2.12.1))(@medusajs/ui@4.0.29(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react-router-dom@6.20.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)

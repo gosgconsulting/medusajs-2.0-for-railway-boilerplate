@@ -1,0 +1,120 @@
+diff --git a/dist/product-detail-ATPFDPI2.mjs b/dist/product-detail-ATPFDPI2.mjs
+--- a/dist/product-detail-ATPFDPI2.mjs
++++ b/dist/product-detail-ATPFDPI2.mjs
+@@ -101,6 +101,20 @@
+ } from "./chunk-NFEK63OE.mjs";
+ import "./chunk-QZ7TP4HQ.mjs";
+ 
++function wcwpStripHtmlTags(raw) {
++  if (raw == null || raw === "") return "";
++  if (typeof window === "undefined") {
++    return String(raw).replace(/<[^>]*>/g, "").trim();
++  }
++  try {
++    const doc = new DOMParser().parseFromString(String(raw), "text/html");
++    const text = doc.body.textContent ?? "";
++    return text.replace(/\u00a0/g, " ").trim();
++  } catch {
++    return String(raw).replace(/<[^>]*>/g, "").trim();
++  }
++}
++
+ // src/routes/products/product-detail/breadcrumb.tsx
+ import { jsx } from "react/jsx-runtime";
+ var ProductDetailBreadcrumb = (props) => {
+@@ -118,7 +132,7 @@
+   if (!product) {
+     return null;
+   }
+-  return /* @__PURE__ */ jsx("span", { children: product.title });
++  return /* @__PURE__ */ jsx("span", { children: wcwpStripHtmlTags(product.title) });
+ };
+ 
+ // src/routes/products/product-detail/loader.ts
+@@ -221,7 +235,7 @@
+     const res = await prompt({
+       title: t("general.areYouSure"),
+       description: t("products.deleteWarning", {
+-        title: product.title
++        title: wcwpStripHtmlTags(product.title)
+       }),
+       confirmText: t("actions.delete"),
+       cancelText: t("actions.cancel")
+@@ -242,7 +256,7 @@
+   };
+   return /* @__PURE__ */ jsxs2(Container2, { className: "divide-y p-0", children: [
+     /* @__PURE__ */ jsxs2("div", { className: "flex items-center justify-between px-6 py-4", children: [
+-      /* @__PURE__ */ jsx3(Heading2, { children: product.title }),
++      /* @__PURE__ */ jsx3(Heading2, { children: wcwpStripHtmlTags(product.title) }),
+       /* @__PURE__ */ jsxs2("div", { className: "flex items-center gap-x-4", children: [
+         /* @__PURE__ */ jsx3(StatusBadge, { color: productStatusColor(product.status), children: t(`products.productStatus.${product.status}`) }),
+         /* @__PURE__ */ jsx3(
+@@ -272,8 +286,8 @@
+         )
+       ] })
+     ] }),
+-    /* @__PURE__ */ jsx3(SectionRow, { title: t("fields.description"), value: product.description }),
+-    /* @__PURE__ */ jsx3(SectionRow, { title: t("fields.subtitle"), value: product.subtitle }),
++    /* @__PURE__ */ jsx3(SectionRow, { title: t("fields.description"), value: wcwpStripHtmlTags(product.description) }),
++    /* @__PURE__ */ jsx3(SectionRow, { title: t("fields.subtitle"), value: wcwpStripHtmlTags(product.subtitle) }),
+     /* @__PURE__ */ jsx3(SectionRow, { title: t("fields.handle"), value: `/${product.handle}` }),
+     /* @__PURE__ */ jsx3(SectionRow, { title: t("fields.material"), value: product.material }),
+     /* @__PURE__ */ jsx3(
+diff --git a/dist/product-edit-XPUNYMD7.mjs b/dist/product-edit-XPUNYMD7.mjs
+--- a/dist/product-edit-XPUNYMD7.mjs
++++ b/dist/product-edit-XPUNYMD7.mjs
+@@ -89,6 +89,21 @@
+ import { useTranslation } from "react-i18next";
+ import * as zod from "zod";
+ import { jsx, jsxs } from "react/jsx-runtime";
++
++function wcwpStripHtmlTags(raw) {
++  if (raw == null || raw === "") return "";
++  if (typeof window === "undefined") {
++    return String(raw).replace(/<[^>]*>/g, "").trim();
++  }
++  try {
++    const doc = new DOMParser().parseFromString(String(raw), "text/html");
++    const text = doc.body.textContent ?? "";
++    return text.replace(/\u00a0/g, " ").trim();
++  } catch {
++    return String(raw).replace(/<[^>]*>/g, "").trim();
++  }
++}
++
+ var EditProductSchema = zod.object({
+   status: zod.enum(["draft", "published", "proposed", "rejected"]),
+   title: zod.string().min(1),
+@@ -108,11 +123,11 @@
+   const form = useExtendableForm({
+     defaultValues: {
+       status: product.status,
+-      title: product.title,
++      title: wcwpStripHtmlTags(product.title),
+       material: product.material || "",
+-      subtitle: product.subtitle || "",
++      subtitle: wcwpStripHtmlTags(product.subtitle || ""),
+       handle: product.handle || "",
+-      description: product.description || "",
++      description: wcwpStripHtmlTags(product.description || ""),
+       discountable: product.discountable
+     },
+     schema: EditProductSchema,
+@@ -122,10 +137,15 @@
+   const { mutateAsync, isPending } = useUpdateProduct(product.id);
+   const handleSubmit = form.handleSubmit(async (data) => {
+     const { title, discountable, handle, status, ...optional } = data;
+-    const nullableData = transformNullableFormData(optional);
++    const strippedOptional = {
++      ...optional,
++      subtitle: optional.subtitle != null ? wcwpStripHtmlTags(String(optional.subtitle)) : optional.subtitle,
++      description: optional.description != null ? wcwpStripHtmlTags(String(optional.description)) : optional.description
++    };
++    const nullableData = transformNullableFormData(strippedOptional);
+     await mutateAsync(
+       {
+-        title,
++        title: wcwpStripHtmlTags(title),
+         discountable,
+         handle,
+         status,
