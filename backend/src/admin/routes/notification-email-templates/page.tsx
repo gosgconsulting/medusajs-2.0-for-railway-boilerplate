@@ -9,6 +9,7 @@ import {
   Input,
   Label,
   Switch,
+  Tabs,
   Text,
   Textarea,
   toast,
@@ -19,6 +20,7 @@ type CatalogEntry = {
   template_key: string
   label: string
   description: string
+  audience?: "customer" | "admin"
   configured: boolean
   id: string | null
   subject: string
@@ -83,6 +85,7 @@ const INVITE_TEMPLATE_KEY = "invite-user"
 
 const NotificationEmailTemplatesPage = () => {
   const queryClient = useQueryClient()
+  const [audienceTab, setAudienceTab] = useState<"customer" | "admin">("customer")
   const [selectedKey, setSelectedKey] = useState<string>("")
   const [subject, setSubject] = useState("")
   const [replyTo, setReplyTo] = useState("")
@@ -102,11 +105,34 @@ const NotificationEmailTemplatesPage = () => {
 
   const templates = listData?.templates ?? []
 
+  const customerTemplates = useMemo(
+    () => templates.filter((t) => (t.audience ?? "customer") === "customer"),
+    [templates]
+  )
+
+  const adminTemplates = useMemo(
+    () => templates.filter((t) => t.audience === "admin"),
+    [templates]
+  )
+
+  const templatesForActiveTab =
+    audienceTab === "customer" ? customerTemplates : adminTemplates
+
   useEffect(() => {
-    if (!selectedKey && templates.length > 0) {
-      setSelectedKey(templates[0].template_key)
+    if (!listLoading && audienceTab === "admin" && adminTemplates.length === 0) {
+      setAudienceTab("customer")
     }
-  }, [templates, selectedKey])
+  }, [listLoading, audienceTab, adminTemplates.length])
+
+  useEffect(() => {
+    if (templatesForActiveTab.length === 0) return
+    const stillInTab = templatesForActiveTab.some(
+      (t) => t.template_key === selectedKey
+    )
+    if (!stillInTab) {
+      setSelectedKey(templatesForActiveTab[0].template_key)
+    }
+  }, [templatesForActiveTab, selectedKey])
 
   const { data: detail, isLoading: detailLoading } = useQuery({
     queryKey: ["notification-email-template", selectedKey],
@@ -132,19 +158,6 @@ const NotificationEmailTemplatesPage = () => {
     () => templates.find((t) => t.template_key === selectedKey),
     [templates, selectedKey]
   )
-
-  const { orderTemplates, otherTemplates } = useMemo(() => {
-    const order: CatalogEntry[] = []
-    const other: CatalogEntry[] = []
-    for (const t of templates) {
-      if (t.template_key === INVITE_TEMPLATE_KEY) {
-        other.push(t)
-      } else {
-        order.push(t)
-      }
-    }
-    return { orderTemplates: order, otherTemplates: other }
-  }, [templates])
 
   const save = useCallback(async () => {
     if (!selectedKey) return
@@ -266,7 +279,7 @@ const NotificationEmailTemplatesPage = () => {
       </div>
 
       <div className="flex min-h-[min(70vh,640px)] flex-1 flex-col lg:flex-row">
-        <aside className="border-ui-border-base bg-ui-bg-subtle shrink-0 border-b lg:w-64 lg:border-b-0 lg:border-r">
+        <aside className="border-ui-border-base bg-ui-bg-subtle flex min-h-0 shrink-0 flex-col border-b lg:w-64 lg:border-b-0 lg:border-r">
           {listLoading ? (
             <div className="p-4">
               <Text size="small" className="text-ui-fg-muted">
@@ -274,37 +287,50 @@ const NotificationEmailTemplatesPage = () => {
               </Text>
             </div>
           ) : (
-            <nav
-              className="max-h-56 overflow-y-auto lg:max-h-none lg:h-full"
-              aria-label="Notification templates"
+            <Tabs
+              value={audienceTab}
+              onValueChange={(v) => setAudienceTab(v as "customer" | "admin")}
+              className="flex min-h-0 max-h-56 flex-1 flex-col overflow-hidden lg:max-h-none"
             >
-              <div className="p-4 pb-2">
-                <Text
-                  size="xsmall"
-                  weight="plus"
-                  className="text-ui-fg-muted uppercase tracking-wide"
-                >
-                  Order notifications
-                </Text>
-                <ul className="mt-2 flex flex-col gap-0.5">
-                  {orderTemplates.map(renderTemplateNavItem)}
-                </ul>
+              <div className="border-ui-border-base shrink-0 border-b px-3 py-3">
+                <Tabs.List>
+                  <Tabs.Trigger value="customer">Customer</Tabs.Trigger>
+                  <Tabs.Trigger value="admin">Admin</Tabs.Trigger>
+                </Tabs.List>
               </div>
-              {otherTemplates.length > 0 ? (
-                <div className="border-ui-border-base border-t p-4 pt-3">
-                  <Text
-                    size="xsmall"
-                    weight="plus"
-                    className="text-ui-fg-muted uppercase tracking-wide"
-                  >
-                    Admin
+              <Tabs.Content
+                value="customer"
+                className="min-h-0 flex-1 overflow-y-auto outline-none"
+              >
+                <nav className="p-4 pt-3" aria-label="Customer notification templates">
+                  <Text size="xsmall" className="text-ui-fg-muted mb-2">
+                    Emails sent to shoppers (order lifecycle and pay links).
                   </Text>
-                  <ul className="mt-2 flex flex-col gap-0.5">
-                    {otherTemplates.map(renderTemplateNavItem)}
+                  <ul className="flex flex-col gap-0.5">
+                    {customerTemplates.map(renderTemplateNavItem)}
                   </ul>
-                </div>
-              ) : null}
-            </nav>
+                </nav>
+              </Tabs.Content>
+              <Tabs.Content
+                value="admin"
+                className="min-h-0 flex-1 overflow-y-auto outline-none"
+              >
+                <nav className="p-4 pt-3" aria-label="Admin notification templates">
+                  <Text size="xsmall" className="text-ui-fg-muted mb-2">
+                    Emails sent to staff (for example admin invitations).
+                  </Text>
+                  {adminTemplates.length === 0 ? (
+                    <Text size="small" className="text-ui-fg-muted">
+                      No admin templates in catalog.
+                    </Text>
+                  ) : (
+                    <ul className="flex flex-col gap-0.5">
+                      {adminTemplates.map(renderTemplateNavItem)}
+                    </ul>
+                  )}
+                </nav>
+              </Tabs.Content>
+            </Tabs>
           )}
         </aside>
 
@@ -325,6 +351,12 @@ const NotificationEmailTemplatesPage = () => {
                       {selectedMeta.description}
                     </Text>
                   ) : null}
+                  <Text size="xsmall" className="text-ui-fg-muted mt-1.5">
+                    Recipients:{" "}
+                    {(selectedMeta.audience ?? "customer") === "admin"
+                      ? "admin users"
+                      : "customers"}
+                  </Text>
                 </div>
               </div>
               {detail && !detailLoading ? (
