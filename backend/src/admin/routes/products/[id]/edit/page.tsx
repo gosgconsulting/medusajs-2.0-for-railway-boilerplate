@@ -22,6 +22,7 @@ import {
 import { ChevronLeft, ThumbnailBadge, Trash } from "@medusajs/icons"
 import { SimpleMarkdownEditor } from "../../../../components/SimpleMarkdownEditor"
 import { sdk } from "../../../../lib/sdk"
+import { stripHtmlTags } from "../../../../lib/strip-html"
 
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 
@@ -66,7 +67,14 @@ async function loader({ params }: LoaderFunctionArgs): Promise<{ product: any }>
   }
   try {
     const { product } = await sdk.admin.product.retrieve(id)
-    return { product }
+    return {
+      product: {
+        ...product,
+        title: stripHtmlTags(product.title ?? ""),
+        subtitle: stripHtmlTags(product.subtitle ?? ""),
+        description: stripHtmlTags(product.description ?? ""),
+      },
+    }
   } catch {
     throw new Response("Product not found", { status: 404 })
   }
@@ -96,10 +104,14 @@ const ProductEditPage = () => {
     useState(false)
   const [updatingMedia, setUpdatingMedia] = useState(false)
 
-  const [title, setTitle] = useState(initialProduct?.title ?? "")
-  const [subtitle, setSubtitle] = useState(initialProduct?.subtitle ?? "")
-  const [description, setDescription] = useState(
-    initialProduct?.description ?? ""
+  const [title, setTitle] = useState(() =>
+    stripHtmlTags(initialProduct?.title ?? "")
+  )
+  const [subtitle, setSubtitle] = useState(() =>
+    stripHtmlTags(initialProduct?.subtitle ?? "")
+  )
+  const [description, setDescription] = useState(() =>
+    stripHtmlTags(initialProduct?.description ?? "")
   )
   const [status, setStatus] = useState(initialProduct?.status ?? "draft")
   const [handle, setHandle] = useState(initialProduct?.handle ?? "")
@@ -164,9 +176,9 @@ const ProductEditPage = () => {
 
   useEffect(() => {
     if (!initialProduct) return
-    setTitle(initialProduct.title ?? "")
-    setSubtitle(initialProduct.subtitle ?? "")
-    setDescription(initialProduct.description ?? "")
+    setTitle(stripHtmlTags(initialProduct.title ?? ""))
+    setSubtitle(stripHtmlTags(initialProduct.subtitle ?? ""))
+    setDescription(stripHtmlTags(initialProduct.description ?? ""))
     setStatus(initialProduct.status ?? "draft")
     setHandle(initialProduct.handle ?? "")
     setTagsInput(
@@ -227,10 +239,13 @@ const ProductEditPage = () => {
         .map((s) => s.trim())
         .filter(Boolean)
       const num = (v: string) => (v === "" ? undefined : Number(v))
+      const cleanTitle = stripHtmlTags(title)
+      const cleanSubtitle = stripHtmlTags(subtitle)
+      const cleanDescription = stripHtmlTags(description)
       await sdk.admin.product.update(id, {
-        title: title || undefined,
-        subtitle: subtitle || undefined,
-        description: description || undefined,
+        title: cleanTitle || undefined,
+        subtitle: cleanSubtitle || undefined,
+        description: cleanDescription || undefined,
         metadata: parsedMetadata,
         status: status as "draft" | "published",
         handle: handle || undefined,
@@ -246,6 +261,9 @@ const ProductEditPage = () => {
         external_id: externalId || undefined,
         ...(tags.length > 0 && { tags: tags.map((value) => ({ value })) }),
       } as unknown as Parameters<typeof sdk.admin.product.update>[1])
+      setTitle(cleanTitle)
+      setSubtitle(cleanSubtitle)
+      setDescription(cleanDescription)
       setSaveMessage("success")
       toast.success("Product saved")
     } catch {
