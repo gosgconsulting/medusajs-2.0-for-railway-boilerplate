@@ -3,6 +3,9 @@
  */
 
 export const TOGGLEABLE_COLUMNS = [
+  { id: "subtitle", label: "Subtitle" },
+  { id: "description", label: "Description" },
+  { id: "handle", label: "Handle" },
   { id: "category", label: "Category" },
   { id: "sku", label: "SKU" },
   { id: "basePrice", label: "Base price" },
@@ -13,9 +16,6 @@ export const TOGGLEABLE_COLUMNS = [
   { id: "clientD", label: "Client D" },
   { id: "manageStock", label: "Manage Stock" },
   { id: "stockQty", label: "Stock qty" },
-  { id: "subtitle", label: "Subtitle" },
-  { id: "description", label: "Description" },
-  { id: "handle", label: "Handle" },
   { id: "tags", label: "Tags" },
   { id: "material", label: "Material" },
   { id: "weight", label: "Weight (g)" },

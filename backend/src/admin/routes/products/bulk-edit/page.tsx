@@ -7,6 +7,7 @@ import {
   Checkbox,
   Container,
   DropdownMenu,
+  FocusModal,
   Heading,
   Input,
   Text,
@@ -18,6 +19,7 @@ import {
   loadColumnPrefs,
   saveColumnPrefs,
 } from "../../../lib/product-column-prefs"
+import { stripHtmlTags } from "../../../lib/strip-html"
 import {
   TOGGLEABLE_COLUMNS,
   amountToDisplay,
@@ -25,6 +27,7 @@ import {
   getVariantPriceRange,
   tagsToString,
 } from "../../../lib/product-table-columns"
+import { SimpleMarkdownEditor } from "../../../components/SimpleMarkdownEditor"
 
 const PAGE_SIZE = 20
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
@@ -157,9 +160,9 @@ function toVariantRow(v: ApiVariant): VariantRow {
 function toRow(p: ApiProduct): ProductRow {
   return {
     id: p.id,
-    title: p.title ?? "",
-    subtitle: p.subtitle ?? "",
-    description: p.description ?? "",
+    title: stripHtmlTags(p.title ?? ""),
+    subtitle: stripHtmlTags(p.subtitle ?? ""),
+    description: stripHtmlTags(p.description ?? ""),
     handle: p.handle ?? "",
     status: (p.status as ProductStatus) ?? "draft",
     category_ids: (p.categories ?? [])
@@ -232,6 +235,21 @@ function buildHierarchicalCategoryRows(
 }
 
 type RowErrors = Record<string, string>
+
+type RichTextEditState =
+  | null
+  | {
+      productId: string
+      draftTitle: string
+      draftSubtitle: string
+      draftDescription: string
+    }
+
+function stripForPreview(raw: string, maxLen: number): string {
+  const s = raw.replace(/\s+/g, " ").trim()
+  if (!s) return ""
+  return s.length > maxLen ? `${s.slice(0, maxLen)}…` : s
+}
 
 const cellInput =
   "flex h-8 w-full rounded-md border border-ui-border-base bg-ui-bg-field px-3 py-1.5 txt-small focus:border-ui-border-interactive focus:outline-none"
@@ -336,6 +354,7 @@ const BulkEditPage = () => {
   const [working, setWorking] = useState<ProductRow[]>([])
   const [errors, setErrors] = useState<RowErrors>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [richTextEdit, setRichTextEdit] = useState<RichTextEditState>(null)
   const [columnMode, setColumnMode] = useState<"default" | "custom">(
     () => loadColumnPrefs().mode
   )
@@ -589,11 +608,22 @@ const BulkEditPage = () => {
       field: keyof Omit<ProductRow, "id" | "variants">,
       value: string | boolean | string[] | null
     ) => {
+      let nextValue: string | boolean | string[] | null = value
+      if (
+        (field === "title" ||
+          field === "subtitle" ||
+          field === "description") &&
+        typeof value === "string"
+      ) {
+        nextValue = stripHtmlTags(value)
+      }
       setWorking((prev) =>
-        prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+        prev.map((row) =>
+          row.id === id ? { ...row, [field]: nextValue } : row
+        )
       )
       if (field === "title") {
-        if (!(value as string).trim()) {
+        if (!(nextValue as string).trim()) {
           setErrors((prev) => ({ ...prev, [id]: "Title is required" }))
         } else {
           setErrors((prev) => {
@@ -606,6 +636,58 @@ const BulkEditPage = () => {
     },
     []
   )
+
+  const closeRichTextEdit = useCallback(() => {
+    setRichTextEdit(null)
+  }, [])
+
+  const openRichTextEdit = useCallback(
+    (
+      productId: string,
+      fields: Pick<ProductRow, "title" | "subtitle" | "description">
+    ) => {
+      setRichTextEdit({
+        productId,
+        draftTitle: stripHtmlTags(fields.title),
+        draftSubtitle: stripHtmlTags(fields.subtitle),
+        draftDescription: stripHtmlTags(fields.description),
+      })
+    },
+    []
+  )
+
+  const setRichTextDraftField = useCallback(
+    (
+      key: "draftTitle" | "draftSubtitle" | "draftDescription",
+      value: string
+    ) => {
+      setRichTextEdit((prev) => (prev ? { ...prev, [key]: value } : null))
+    },
+    []
+  )
+
+  const saveRichTextEdit = useCallback(() => {
+    if (!richTextEdit) return
+    const title = stripHtmlTags(richTextEdit.draftTitle)
+    const subtitle = stripHtmlTags(richTextEdit.draftSubtitle)
+    const description = stripHtmlTags(richTextEdit.draftDescription)
+    if (!title.trim()) {
+      toast.error("Title is required")
+      return
+    }
+    const id = richTextEdit.productId
+    setWorking((prev) =>
+      prev.map((row) =>
+        row.id === id ? { ...row, title, subtitle, description } : row
+      )
+    )
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    setRichTextEdit(null)
+  }, [richTextEdit])
 
   const updateVariantSku = useCallback(
     (productId: string, variantId: string, sku: string) => {
@@ -1765,6 +1847,30 @@ const BulkEditPage = () => {
                     Title
                   </th>
                   )}
+                  {isColumnVisible("subtitle") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 150 }}
+                  >
+                    Subtitle
+                  </th>
+                  )}
+                  {isColumnVisible("description") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 260 }}
+                  >
+                    Description
+                  </th>
+                  )}
+                  {isColumnVisible("handle") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 150 }}
+                  >
+                    Handle
+                  </th>
+                  )}
                   {isColumnVisible("status") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
@@ -1851,30 +1957,6 @@ const BulkEditPage = () => {
                     style={{ minWidth: 90 }}
                   >
                     Stock qty
-                  </th>
-                  )}
-                  {isColumnVisible("subtitle") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 150 }}
-                  >
-                    Subtitle
-                  </th>
-                  )}
-                  {isColumnVisible("description") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 260 }}
-                  >
-                    Description
-                  </th>
-                  )}
-                  {isColumnVisible("handle") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 150 }}
-                  >
-                    Handle
                   </th>
                   )}
                   {isColumnVisible("tags") && (
@@ -2044,18 +2126,80 @@ const BulkEditPage = () => {
                         )}
                         {isColumnVisible("title") && (
                         <td className="px-3 py-2">
-                          <Input
-                            value={row.title}
-                            onChange={(e) =>
-                              updateRow(row.id, "title", e.target.value)
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openRichTextEdit(row.id, {
+                                title: row.title,
+                                subtitle: row.subtitle,
+                                description: row.description,
+                              })
                             }
-                            placeholder="Product title"
-                          />
+                            className={`${cellInput} flex min-w-[140px] cursor-pointer items-center justify-between gap-2 text-left hover:bg-ui-bg-base-hover`}
+                          >
+                            <span className="min-w-0 truncate">
+                              {stripForPreview(row.title, 120) || "Edit title…"}
+                            </span>
+                            <PencilSquare className="size-4 shrink-0 text-ui-fg-muted" />
+                          </button>
                           {rowError && (
                             <p className="mt-1 txt-small text-ui-fg-error">
                               {rowError}
                             </p>
                           )}
+                        </td>
+                        )}
+                        {isColumnVisible("subtitle") && (
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openRichTextEdit(row.id, {
+                                title: row.title,
+                                subtitle: row.subtitle,
+                                description: row.description,
+                              })
+                            }
+                            className={`${cellInput} flex min-h-8 min-w-[140px] cursor-pointer items-center justify-between gap-2 py-2 text-left hover:bg-ui-bg-base-hover`}
+                          >
+                            <span className="line-clamp-2 min-w-0 flex-1 text-left">
+                              {stripForPreview(row.subtitle, 160) ||
+                                "Edit subtitle…"}
+                            </span>
+                            <PencilSquare className="size-4 shrink-0 self-start text-ui-fg-muted" />
+                          </button>
+                        </td>
+                        )}
+                        {isColumnVisible("description") && (
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openRichTextEdit(row.id, {
+                                title: row.title,
+                                subtitle: row.subtitle,
+                                description: row.description,
+                              })
+                            }
+                            className={`${cellInput} flex min-h-8 min-w-[160px] cursor-pointer items-center justify-between gap-2 py-2 text-left hover:bg-ui-bg-base-hover`}
+                          >
+                            <span className="line-clamp-2 min-w-0 flex-1 text-left">
+                              {stripForPreview(row.description, 180) ||
+                                "Edit description…"}
+                            </span>
+                            <PencilSquare className="size-4 shrink-0 self-start text-ui-fg-muted" />
+                          </button>
+                        </td>
+                        )}
+                        {isColumnVisible("handle") && (
+                        <td className="px-3 py-2">
+                          <Input
+                            value={row.handle}
+                            onChange={(e) =>
+                              updateRow(row.id, "handle", e.target.value)
+                            }
+                            placeholder="product-handle"
+                          />
                         </td>
                         )}
                         {isColumnVisible("status") && (
@@ -2255,41 +2399,6 @@ const BulkEditPage = () => {
                             )}
                             disabled
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("subtitle") && (
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.subtitle}
-                            onChange={(e) =>
-                              updateRow(row.id, "subtitle", e.target.value)
-                            }
-                            placeholder="Short subtitle"
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("description") && (
-                        <td className="px-3 py-2">
-                          <textarea
-                            value={row.description}
-                            onChange={(e) =>
-                              updateRow(row.id, "description", e.target.value)
-                            }
-                            placeholder="Product description"
-                            rows={2}
-                            className={`${cellInput} h-auto py-2 resize-y`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("handle") && (
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.handle}
-                            onChange={(e) =>
-                              updateRow(row.id, "handle", e.target.value)
-                            }
-                            placeholder="product-handle"
                           />
                         </td>
                         )}
@@ -2523,6 +2632,58 @@ const BulkEditPage = () => {
                                 </div>
                               </td>
                               )}
+                              {isColumnVisible("subtitle") && (
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openRichTextEdit(row.id, {
+                                      title: row.title,
+                                      subtitle: row.subtitle,
+                                      description: row.description,
+                                    })
+                                  }
+                                  className={`${cellInput} flex min-w-[120px] cursor-pointer items-center justify-between gap-2 text-left hover:bg-ui-bg-base-hover`}
+                                >
+                                  <span className="min-w-0 truncate">
+                                    {stripForPreview(row.subtitle, 80) ||
+                                      "Edit subtitle…"}
+                                  </span>
+                                  <PencilSquare className="size-4 shrink-0 text-ui-fg-muted" />
+                                </button>
+                              </td>
+                              )}
+                              {isColumnVisible("description") && (
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openRichTextEdit(row.id, {
+                                      title: row.title,
+                                      subtitle: row.subtitle,
+                                      description: row.description,
+                                    })
+                                  }
+                                  className={`${cellInput} flex min-w-[120px] cursor-pointer items-center justify-between gap-2 text-left hover:bg-ui-bg-base-hover`}
+                                >
+                                  <span className="min-w-0 truncate">
+                                    {stripForPreview(row.description, 80) ||
+                                      "Edit description…"}
+                                  </span>
+                                  <PencilSquare className="size-4 shrink-0 text-ui-fg-muted" />
+                                </button>
+                              </td>
+                              )}
+                              {isColumnVisible("handle") && (
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.handle}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              )}
                               {isColumnVisible("status") && (
                               <td className="px-3 py-2">
                                 <input
@@ -2742,36 +2903,6 @@ const BulkEditPage = () => {
                                 )}
                               </td>
                               )}
-                              {isColumnVisible("subtitle") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.subtitle}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("description") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.description}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("handle") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.handle}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
                               {isColumnVisible("tags") && (
                               <td className="px-3 py-2">
                                 <input
@@ -2911,6 +3042,82 @@ const BulkEditPage = () => {
           )}
         </div>
       )}
+
+      <FocusModal
+        open={!!richTextEdit}
+        onOpenChange={(open) => {
+          if (!open) closeRichTextEdit()
+        }}
+      >
+        <FocusModal.Content
+          className="z-50 flex w-[calc(100vw-2rem)] max-w-4xl flex-col overflow-hidden !inset-auto !left-1/2 !top-1/2 max-h-[min(92vh,960px)] -translate-x-1/2 -translate-y-1/2"
+        >
+          {richTextEdit ? (
+            <>
+              <FocusModal.Header>
+                <FocusModal.Title className="txt-compact-large font-sans font-medium">
+                  Edit title, subtitle & description
+                </FocusModal.Title>
+              </FocusModal.Header>
+              <FocusModal.Body className="min-h-0 flex-1 overflow-y-auto p-4">
+                <div className="flex flex-col gap-6">
+                  <div>
+                    <Text size="small" weight="plus" className="mb-2 block">
+                      Title
+                    </Text>
+                    <Input
+                      value={richTextEdit.draftTitle}
+                      onChange={(e) =>
+                        setRichTextDraftField("draftTitle", e.target.value)
+                      }
+                      placeholder="Product title…"
+                    />
+                  </div>
+                  <div>
+                    <Text size="small" weight="plus" className="mb-2 block">
+                      Subtitle
+                    </Text>
+                    <Input
+                      value={richTextEdit.draftSubtitle}
+                      onChange={(e) =>
+                        setRichTextDraftField("draftSubtitle", e.target.value)
+                      }
+                      placeholder="Product subtitle…"
+                    />
+                  </div>
+                  <div>
+                    <Text size="small" weight="plus" className="mb-2 block">
+                      Description
+                    </Text>
+                    <SimpleMarkdownEditor
+                      key={`${richTextEdit.productId}-description`}
+                      id={`rte-${richTextEdit.productId}-description`}
+                      value={richTextEdit.draftDescription}
+                      onChange={(v) =>
+                        setRichTextDraftField("draftDescription", v)
+                      }
+                      placeholder="Product description…"
+                      minHeight={280}
+                    />
+                  </div>
+                </div>
+              </FocusModal.Body>
+              <FocusModal.Footer>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={closeRichTextEdit}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" onClick={saveRichTextEdit}>
+                  Save
+                </Button>
+              </FocusModal.Footer>
+            </>
+          ) : null}
+        </FocusModal.Content>
+      </FocusModal>
     </div>
   )
 }

@@ -428,6 +428,30 @@ const ProductsIndexPage = () => {
                         Title
                       </th>
                     )}
+                    {isColumnVisible("subtitle") && (
+                      <th
+                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
+                        style={{ minWidth: 150 }}
+                      >
+                        Subtitle
+                      </th>
+                    )}
+                    {isColumnVisible("description") && (
+                      <th
+                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
+                        style={{ minWidth: 260 }}
+                      >
+                        Description
+                      </th>
+                    )}
+                    {isColumnVisible("handle") && (
+                      <th
+                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
+                        style={{ minWidth: 150 }}
+                      >
+                        Handle
+                      </th>
+                    )}
                     {isColumnVisible("status") && (
                       <th
                         className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
@@ -514,30 +538,6 @@ const ProductsIndexPage = () => {
                         style={{ minWidth: 90 }}
                       >
                         Stock qty
-                      </th>
-                    )}
-                    {isColumnVisible("subtitle") && (
-                      <th
-                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
-                        style={{ minWidth: 150 }}
-                      >
-                        Subtitle
-                      </th>
-                    )}
-                    {isColumnVisible("description") && (
-                      <th
-                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
-                        style={{ minWidth: 260 }}
-                      >
-                        Description
-                      </th>
-                    )}
-                    {isColumnVisible("handle") && (
-                      <th
-                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
-                        style={{ minWidth: 150 }}
-                      >
-                        Handle
                       </th>
                     )}
                     {isColumnVisible("tags") && (
@@ -650,6 +650,27 @@ const ProductsIndexPage = () => {
                               </Link>
                             </td>
                           )}
+                          {isColumnVisible("subtitle") && (
+                            <td className={`${tdText} text-ui-fg-subtle`}>
+                              {row.subtitle.trim() || "—"}
+                            </td>
+                          )}
+                          {isColumnVisible("description") && (
+                            <td
+                              className={`${tdText} text-ui-fg-subtle max-w-[260px]`}
+                              title={row.description}
+                            >
+                              {trunc(
+                                row.description.replace(/<[^>]+>/g, ""),
+                                120
+                              ) || "—"}
+                            </td>
+                          )}
+                          {isColumnVisible("handle") && (
+                            <td className={`${tdText} font-mono`}>
+                              {row.handle || "—"}
+                            </td>
+                          )}
                           {isColumnVisible("status") && (
                             <td className="px-3 py-2 align-middle">
                               <Badge
@@ -724,27 +745,6 @@ const ProductsIndexPage = () => {
                               {stockQtySummary(row.variants) || "—"}
                             </td>
                           )}
-                          {isColumnVisible("subtitle") && (
-                            <td className={`${tdText} text-ui-fg-subtle`}>
-                              {row.subtitle.trim() || "—"}
-                            </td>
-                          )}
-                          {isColumnVisible("description") && (
-                            <td
-                              className={`${tdText} text-ui-fg-subtle max-w-[260px]`}
-                              title={row.description}
-                            >
-                              {trunc(
-                                row.description.replace(/<[^>]+>/g, ""),
-                                120
-                              ) || "—"}
-                            </td>
-                          )}
-                          {isColumnVisible("handle") && (
-                            <td className={`${tdText} font-mono`}>
-                              {row.handle || "—"}
-                            </td>
-                          )}
                           {isColumnVisible("tags") && (
                             <td className={`${tdText} text-ui-fg-subtle`}>
                               {row.tags || "—"}
@@ -802,6 +802,27 @@ const ProductsIndexPage = () => {
                               {isColumnVisible("title") && (
                                 <td className={`${tdText} font-medium`}>
                                   {variant.title}
+                                </td>
+                              )}
+                              {isColumnVisible("subtitle") && (
+                                <td className={`${tdText} text-ui-fg-subtle`}>
+                                  {row.subtitle.trim() || "—"}
+                                </td>
+                              )}
+                              {isColumnVisible("description") && (
+                                <td
+                                  className={`${tdText} text-ui-fg-subtle max-w-[260px]`}
+                                  title={row.description}
+                                >
+                                  {trunc(
+                                    row.description.replace(/<[^>]+>/g, ""),
+                                    80
+                                  ) || "—"}
+                                </td>
+                              )}
+                              {isColumnVisible("handle") && (
+                                <td className={`${tdText} font-mono`}>
+                                  {row.handle || "—"}
                                 </td>
                               )}
                               {isColumnVisible("status") && (
@@ -880,27 +901,6 @@ const ProductsIndexPage = () => {
                                         variant.inventory_quantity ?? "—"
                                       )
                                     : "—"}
-                                </td>
-                              )}
-                              {isColumnVisible("subtitle") && (
-                                <td className={`${tdText} text-ui-fg-subtle`}>
-                                  {row.subtitle.trim() || "—"}
-                                </td>
-                              )}
-                              {isColumnVisible("description") && (
-                                <td
-                                  className={`${tdText} text-ui-fg-subtle max-w-[260px]`}
-                                  title={row.description}
-                                >
-                                  {trunc(
-                                    row.description.replace(/<[^>]+>/g, ""),
-                                    80
-                                  ) || "—"}
-                                </td>
-                              )}
-                              {isColumnVisible("handle") && (
-                                <td className={`${tdText} font-mono`}>
-                                  {row.handle || "—"}
                                 </td>
                               )}
                               {isColumnVisible("tags") && (
