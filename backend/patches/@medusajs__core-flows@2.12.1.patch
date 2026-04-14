@@ -1,7 +1,7 @@
 diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/cart/workflows/get-variants-and-items-with-prices.js
 --- a/dist/cart/workflows/get-variants-and-items-with-prices.js
 +++ b/dist/cart/workflows/get-variants-and-items-with-prices.js
-@@ -7,6 +7,49 @@
+@@ -7,6 +7,52 @@
  const steps_1 = require("../steps");
  const fields_1 = require("../utils/fields");
  const prepare_line_item_data_1 = require("../utils/prepare-line-item-data");
@@ -22,6 +22,9 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
 +        }
 +        if (n === "client_c" || n === "clientc" || n.endsWith("_client_c")) {
 +            return "wcwp_client-c";
++        }
++        if (n === "client_d" || n === "clientd" || n.endsWith("_client_d")) {
++            return "wcwp_client-d";
 +        }
 +    }
 +    return null;
@@ -51,7 +54,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
  exports.getVariantsAndItemsWithPricesId = "get-variant-items-with-prices-workflow";
  exports.getVariantsAndItemsWithPrices = (0, workflows_sdk_1.createWorkflow)(exports.getVariantsAndItemsWithPricesId, (input) => {
      const variantIds = (0, workflows_sdk_1.transform)({ cart: input.cart, items: input.items, variantIds: input.variants?.id }, (data) => {
-@@ -21,12 +64,13 @@
+@@ -21,12 +67,13 @@
          setPricingContextResult: input.setPricingContextResult,
      }, (data) => {
          const cart = data.cart;
@@ -66,7 +69,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              region_id: cart.region_id,
              customer_id: cart.customer_id,
          };
-@@ -61,26 +105,56 @@
+@@ -61,26 +108,56 @@
      }).config({ name: "fetch-variants" });
      const calculatedPriceSets = (0, steps_1.getVariantPriceSetsStep)({
          data: cartPricingContext,
@@ -126,7 +129,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              if ((item.variant_id && !variant) || // variant specified but doesn't exist
                  (variant && (!variant?.product?.status || variant.product.status !== utils_1.ProductStatus.PUBLISHED)) // variant exists but product is not published
              ) {
-@@ -89,7 +163,6 @@
+@@ -89,7 +166,6 @@
              if (variant) {
                  variant.calculated_price = calculatedPriceSet;
              }
@@ -134,7 +137,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              const input = {
                  item: item_,
                  variant: variant,
-@@ -99,11 +172,17 @@
+@@ -99,11 +175,17 @@
                      calculatedPriceSet?.is_calculated_price_tax_inclusive,
                  isCustomPrice: isCustomPrice,
              };
@@ -153,7 +156,7 @@ diff --git a/dist/cart/workflows/get-variants-and-items-with-prices.js b/dist/ca
              const preparedItem = (0, prepare_line_item_data_1.prepareLineItemData)(input);
              return {
                  selector: { id: item_.id },
-@@ -120,4 +199,4 @@
+@@ -120,4 +202,4 @@
      });
      return new workflows_sdk_1.WorkflowResponse(variantsItemsWithPrices);
  });

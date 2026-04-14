@@ -492,6 +492,14 @@ const ProductsIndexPage = () => {
                         Client C
                       </th>
                     )}
+                    {isColumnVisible("clientD") && (
+                      <th
+                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
+                        style={{ minWidth: 90 }}
+                      >
+                        Client D
+                      </th>
+                    )}
                     {isColumnVisible("manageStock") && (
                       <th
                         className="txt-compact-small-plus px-3 py-3 text-center text-ui-fg-muted"
@@ -698,6 +706,14 @@ const ProductsIndexPage = () => {
                               ) || "—"}
                             </td>
                           )}
+                          {isColumnVisible("clientD") && (
+                            <td className={tdText}>
+                              {getVariantPriceRange(
+                                metaVariantsForProduct(row),
+                                "wcwp_client-d"
+                              ) || "—"}
+                            </td>
+                          )}
                           {isColumnVisible("manageStock") && (
                             <td className={`${tdText} text-center`}>
                               {manageStockSummary(row.variants)}
@@ -841,6 +857,14 @@ const ProductsIndexPage = () => {
                                   {getMeta(
                                     variant.metadata,
                                     "wcwp_client-c"
+                                  ) || "—"}
+                                </td>
+                              )}
+                              {isColumnVisible("clientD") && (
+                                <td className={tdText}>
+                                  {getMeta(
+                                    variant.metadata,
+                                    "wcwp_client-d"
                                   ) || "—"}
                                 </td>
                               )}

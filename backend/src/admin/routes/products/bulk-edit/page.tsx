@@ -36,6 +36,7 @@ const VARIANT_METADATA_KEYS = [
   "wcwp_client-a",
   "wcwp_client-b",
   "wcwp_client-c",
+  "wcwp_client-d",
 ] as const
 
 type ProductStatus = "draft" | "proposed" | "published" | "rejected"
@@ -1828,6 +1829,14 @@ const BulkEditPage = () => {
                     Client C
                   </th>
                   )}
+                  {isColumnVisible("clientD") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 90 }}
+                  >
+                    Client D
+                  </th>
+                  )}
                   {isColumnVisible("manageStock") && (
                   <th
                     className="px-3 py-3 text-center txt-compact-small-plus text-ui-fg-muted"
@@ -2204,6 +2213,16 @@ const BulkEditPage = () => {
                           <input
                             type="text"
                             value={getVariantPriceRange(row.variants, "wcwp_client-c")}
+                            disabled
+                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+                        )}
+                        {isColumnVisible("clientD") && (
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={getVariantPriceRange(row.variants, "wcwp_client-d")}
                             disabled
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
@@ -2649,6 +2668,23 @@ const BulkEditPage = () => {
                                       row.id,
                                       variant.id,
                                       "wcwp_client-c",
+                                      e.target.value || null
+                                    )
+                                  }
+                                  placeholder="—"
+                                />
+                              </td>
+                              )}
+                              {isColumnVisible("clientD") && (
+                              <td className="px-3 py-2">
+                                <Input
+                                  size="small"
+                                  value={getMeta(variant.metadata, "wcwp_client-d")}
+                                  onChange={(e) =>
+                                    updateVariantMetadata(
+                                      row.id,
+                                      variant.id,
+                                      "wcwp_client-d",
                                       e.target.value || null
                                     )
                                   }
