@@ -6,6 +6,12 @@ import {
   isLegacyHtmlBody,
   plainTextAfterHandlebarsToEmailHtml,
 } from "./notification-email-template-body"
+import {
+  buildNotificationLocaleFallbackChain,
+  getConfiguredNotificationLocales,
+  normalizeNotificationLocale,
+  resolveDefaultNotificationLocale,
+} from "./notification-email-locales"
 
 let handlebarsInitialized = false
 
@@ -22,6 +28,48 @@ function ensureHandlebarsHelpers() {
   )
 }
 
+type DbTemplateRow = {
+  id: string
+  template_key: string
+  locale?: string | null
+  subject: string
+  reply_to: string | null
+  is_enabled: boolean
+  html_body: string
+}
+
+type TemplateModuleList = {
+  listNotificationEmailTemplates: (
+    filters?: { template_key?: string; locale?: string },
+    config?: { take?: number }
+  ) => Promise<DbTemplateRow[]>
+}
+
+async function findEnabledTemplateRow(
+  mod: TemplateModuleList,
+  templateKey: string,
+  preferredLocale: string,
+  configuredLocales: string[]
+): Promise<DbTemplateRow | null> {
+  const chain = buildNotificationLocaleFallbackChain(
+    preferredLocale,
+    configuredLocales
+  )
+  for (const loc of chain) {
+    const rows = await mod.listNotificationEmailTemplates(
+      { template_key: templateKey, locale: loc },
+      { take: 1 }
+    )
+    const row = rows[0]
+    if (row?.is_enabled && row.html_body?.trim()) {
+      return row
+    }
+  }
+  const all = await mod.listNotificationEmailTemplates({ template_key: templateKey })
+  const hit = all.find((r) => r.is_enabled && r.html_body?.trim())
+  return hit ?? null
+}
+
 export type ApplyDbEmailTemplateResult = {
   template?: string | null
   data?: Record<string, unknown> | null
@@ -29,8 +77,13 @@ export type ApplyDbEmailTemplateResult = {
   provider_data?: { _preRenderedEmail?: { html: string; subject: string } } | null
 }
 
+export type ApplyDbEmailTemplateOptions = {
+  /** Resolved against DB rows with fallback across configured store/env locales. */
+  locale?: string
+}
+
 /**
- * When a row exists and is enabled with a non-empty `html_body`, compiles Handlebars
+ * When a matching row exists and is enabled with a non-empty `html_body`, compiles Handlebars
  * against notification `data` (with simple aliases like `{{customer_name}}`) and returns
  * `content.html`. Plain-text bodies are wrapped as HTML; stored full-HTML bodies are
  * detected and left as-is. Subject lines are compiled with the same context.
@@ -39,37 +92,31 @@ export type ApplyDbEmailTemplateResult = {
 export async function applyDbEmailTemplate(
   container: { resolve: (key: string) => unknown },
   templateKey: string,
-  payload: ApplyDbEmailTemplateResult
+  payload: ApplyDbEmailTemplateResult,
+  options?: ApplyDbEmailTemplateOptions
 ): Promise<ApplyDbEmailTemplateResult> {
   ensureHandlebarsHelpers()
 
-  let mod: {
-    listNotificationEmailTemplates: (
-      filters?: { template_key?: string },
-      config?: { take?: number }
-    ) => Promise<
-      {
-        id: string
-        template_key: string
-        subject: string
-        reply_to: string | null
-        is_enabled: boolean
-        html_body: string
-      }[]
-    >
-  }
+  let mod: TemplateModuleList
   try {
-    mod = container.resolve(NOTIFICATION_EMAIL_TEMPLATE_MODULE) as typeof mod
+    mod = container.resolve(NOTIFICATION_EMAIL_TEMPLATE_MODULE) as TemplateModuleList
   } catch {
     return payload
   }
 
-  const rows = await mod.listNotificationEmailTemplates(
-    { template_key: templateKey },
-    { take: 1 }
+  const configuredLocales = await getConfiguredNotificationLocales(container)
+  const preferred =
+    options?.locale != null && options.locale !== ""
+      ? normalizeNotificationLocale(options.locale)
+      : await resolveDefaultNotificationLocale(container)
+
+  const row = await findEnabledTemplateRow(
+    mod,
+    templateKey,
+    preferred,
+    configuredLocales
   )
-  const row = rows[0]
-  if (!row?.is_enabled || !row.html_body?.trim()) {
+  if (!row) {
     return payload
   }
 

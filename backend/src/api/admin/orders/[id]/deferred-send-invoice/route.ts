@@ -6,6 +6,7 @@ import {
 import { createOrUpdateOrderPaymentCollectionWorkflow } from "@medusajs/medusa/core-flows"
 import { buildDeferredInvoicePayUrl } from "lib/deferred-invoice-pay-url"
 import { ensureNotificationEmailTemplateRow } from "lib/ensure-notification-email-template"
+import { resolveCustomerOrderNotificationLocale } from "lib/notification-email-locales"
 import { getDefaultSubjectForTemplateKey } from "lib/notification-template-defaults"
 import { OrderNotificationEmailKeys } from "lib/order-notification-email-keys"
 import { sendOrderNotificationEmail } from "lib/send-order-notification-email"
@@ -116,7 +117,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
 
   const templateKey = OrderNotificationEmailKeys.ORDER_DEFERRED_INVOICE
 
-  await ensureNotificationEmailTemplateRow(req.scope, templateKey)
+  const locale = await resolveCustomerOrderNotificationLocale(req.scope, {
+    metadata: row.metadata,
+  })
+  await ensureNotificationEmailTemplateRow(req.scope, templateKey, locale)
 
   await sendOrderNotificationEmail({
     container: req.scope,

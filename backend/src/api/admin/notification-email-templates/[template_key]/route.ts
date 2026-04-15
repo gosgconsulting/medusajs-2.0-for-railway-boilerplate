@@ -3,6 +3,11 @@ import { MedusaError } from "@medusajs/framework/utils"
 import { NOTIFICATION_EMAIL_TEMPLATE_MODULE } from "../../../../modules/notification-email-template/constants"
 import { NOTIFICATION_TEMPLATE_CATALOG } from "../../../../lib/notification-template-catalog"
 import {
+  getConfiguredNotificationLocales,
+  normalizeNotificationLocale,
+  resolveDefaultNotificationLocale,
+} from "../../../../lib/notification-email-locales"
+import {
   getDefaultHtmlBodyForTemplateKey,
   getDefaultSubjectForTemplateKey,
 } from "../../../../lib/notification-template-defaults"
@@ -10,6 +15,7 @@ import {
 type TemplateRow = {
   id: string
   template_key: string
+  locale?: string | null
   subject: string
   reply_to: string | null
   is_enabled: boolean
@@ -22,6 +28,7 @@ type UpsertBody = {
   is_enabled?: boolean
   html_body?: string
   reset_to_defaults?: boolean
+  locale?: string
 }
 
 function catalogMeta(templateKey: string) {
@@ -35,25 +42,56 @@ function catalogMeta(templateKey: string) {
   return entry
 }
 
+async function resolveLocaleParam(
+  scope: { resolve: (key: string) => unknown },
+  raw: string | undefined | null
+): Promise<string> {
+  const configured = await getConfiguredNotificationLocales(scope)
+  const fallback = await resolveDefaultNotificationLocale(scope)
+  if (raw == null || raw === "") {
+    return fallback
+  }
+  const n = normalizeNotificationLocale(raw)
+  if (!configured.includes(n)) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `Locale "${raw}" is not in the configured list (${configured.join(", ")}).`
+    )
+  }
+  return n
+}
+
+function firstStringParam(value: unknown): string | undefined {
+  if (typeof value === "string") return value
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0]
+  return undefined
+}
+
 export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void> {
   const templateKey = req.params.template_key as string
   catalogMeta(templateKey)
 
+  const locale = await resolveLocaleParam(
+    req.scope,
+    firstStringParam((req.query as Record<string, unknown>)?.locale)
+  )
+
   const mod = req.scope.resolve(NOTIFICATION_EMAIL_TEMPLATE_MODULE) as {
     listNotificationEmailTemplates: (
-      filters?: { template_key?: string },
+      filters?: { template_key?: string; locale?: string },
       config?: { take?: number }
     ) => Promise<TemplateRow[]>
   }
 
   const rows = await mod.listNotificationEmailTemplates(
-    { template_key: templateKey },
+    { template_key: templateKey, locale },
     { take: 1 }
   )
   const row = rows[0]
 
   res.status(200).json({
     template_key: templateKey,
+    locale,
     configured: !!row,
     id: row?.id ?? null,
     subject: row?.subject ?? "",
@@ -74,16 +112,18 @@ export async function POST(
   const templateKey = req.params.template_key as string
   catalogMeta(templateKey)
 
+  const body = req.body ?? {}
+  const locale = await resolveLocaleParam(req.scope, firstStringParam(body.locale))
+
   const mod = req.scope.resolve(NOTIFICATION_EMAIL_TEMPLATE_MODULE) as {
     listNotificationEmailTemplates: (
-      filters?: { template_key?: string },
+      filters?: { template_key?: string; locale?: string },
       config?: { take?: number }
     ) => Promise<TemplateRow[]>
     createNotificationEmailTemplates: (data: Record<string, unknown>) => Promise<TemplateRow>
     updateNotificationEmailTemplates: (data: { id: string } & Record<string, unknown>) => Promise<TemplateRow>
   }
 
-  const body = req.body ?? {}
   const reset = body.reset_to_defaults === true
 
   const subject = reset
@@ -108,7 +148,7 @@ export async function POST(
   }
 
   const existing = await mod.listNotificationEmailTemplates(
-    { template_key: templateKey },
+    { template_key: templateKey, locale },
     { take: 1 }
   )
   const row = existing[0]
@@ -125,6 +165,7 @@ export async function POST(
   } else {
     saved = await mod.createNotificationEmailTemplates({
       template_key: templateKey,
+      locale,
       subject,
       html_body,
       reply_to: reply_to?.trim() ? reply_to.trim() : null,
@@ -134,6 +175,7 @@ export async function POST(
 
   res.status(200).json({
     template_key: saved.template_key,
+    locale: normalizeNotificationLocale(saved.locale ?? locale),
     id: saved.id,
     subject: saved.subject,
     reply_to: saved.reply_to,

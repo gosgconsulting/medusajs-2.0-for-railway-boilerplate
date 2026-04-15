@@ -30,11 +30,14 @@ type CatalogEntry = {
 }
 
 type ListResponse = {
+  available_locales: string[]
+  default_locale: string
   templates: CatalogEntry[]
 }
 
 type DetailResponse = {
   template_key: string
+  locale: string
   configured: boolean
   id: string | null
   subject: string
@@ -102,6 +105,7 @@ const NotificationEmailTemplatesPage = () => {
   const [enabled, setEnabled] = useState(true)
   const [htmlBody, setHtmlBody] = useState("")
   const [saving, setSaving] = useState(false)
+  const [selectedLocale, setSelectedLocale] = useState("")
 
   const { data: listData, isLoading: listLoading } = useQuery({
     queryKey: ["notification-email-templates"],
@@ -114,6 +118,16 @@ const NotificationEmailTemplatesPage = () => {
   })
 
   const templates = listData?.templates ?? []
+  const availableLocales = listData?.available_locales ?? ["en"]
+
+  useEffect(() => {
+    if (!listData) return
+    const { available_locales: locs, default_locale } = listData
+    setSelectedLocale((prev) => {
+      if (prev && locs.includes(prev)) return prev
+      return default_locale
+    })
+  }, [listData])
 
   const customerTemplates = useMemo(
     () => templates.filter((t) => (t.audience ?? "customer") === "customer"),
@@ -145,15 +159,16 @@ const NotificationEmailTemplatesPage = () => {
   }, [templatesForActiveTab, selectedKey])
 
   const { data: detail, isLoading: detailLoading } = useQuery({
-    queryKey: ["notification-email-template", selectedKey],
+    queryKey: ["notification-email-template", selectedKey, selectedLocale],
     queryFn: async () => {
-      if (!selectedKey) return null
+      if (!selectedKey || !selectedLocale) return null
+      const qs = new URLSearchParams({ locale: selectedLocale })
       const res = await sdk.client.fetch<DetailResponse>(
-        `/admin/notification-email-templates/${encodeURIComponent(selectedKey)}`
+        `/admin/notification-email-templates/${encodeURIComponent(selectedKey)}?${qs.toString()}`
       )
       return res
     },
-    enabled: !!selectedKey,
+    enabled: !!selectedKey && !!selectedLocale,
   })
 
   useEffect(() => {
@@ -178,6 +193,7 @@ const NotificationEmailTemplatesPage = () => {
         {
           method: "POST",
           body: {
+            locale: selectedLocale,
             subject,
             reply_to: replyTo.trim() || null,
             is_enabled: enabled,
@@ -190,7 +206,7 @@ const NotificationEmailTemplatesPage = () => {
         queryKey: ["notification-email-templates"],
       })
       await queryClient.invalidateQueries({
-        queryKey: ["notification-email-template", selectedKey],
+        queryKey: ["notification-email-template", selectedKey, selectedLocale],
       })
     } catch (e: unknown) {
       const msg =
@@ -206,6 +222,7 @@ const NotificationEmailTemplatesPage = () => {
     }
   }, [
     selectedKey,
+    selectedLocale,
     subject,
     replyTo,
     enabled,
@@ -221,7 +238,7 @@ const NotificationEmailTemplatesPage = () => {
         `/admin/notification-email-templates/${encodeURIComponent(selectedKey)}`,
         {
           method: "POST",
-          body: { reset_to_defaults: true },
+          body: { locale: selectedLocale, reset_to_defaults: true },
         }
       )
       toast.success("Template reset to defaults.")
@@ -229,7 +246,7 @@ const NotificationEmailTemplatesPage = () => {
         queryKey: ["notification-email-templates"],
       })
       await queryClient.invalidateQueries({
-        queryKey: ["notification-email-template", selectedKey],
+        queryKey: ["notification-email-template", selectedKey, selectedLocale],
       })
     } catch (e: unknown) {
       const msg =
@@ -243,7 +260,7 @@ const NotificationEmailTemplatesPage = () => {
     } finally {
       setSaving(false)
     }
-  }, [selectedKey, queryClient])
+  }, [selectedKey, selectedLocale, queryClient])
 
   const renderTemplateNavItem = (t: CatalogEntry) => {
     const active = t.template_key === selectedKey
@@ -396,6 +413,27 @@ const NotificationEmailTemplatesPage = () => {
             </Text>
           ) : (
             <div className="flex max-w-4xl flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label id="email-locale-label">Template language</Label>
+                <div
+                  role="group"
+                  aria-labelledby="email-locale-label"
+                  className="flex flex-wrap gap-2"
+                >
+                  {availableLocales.map((loc) => (
+                    <Button
+                      key={loc}
+                      type="button"
+                      size="small"
+                      variant={selectedLocale === loc ? "primary" : "secondary"}
+                      onClick={() => setSelectedLocale(loc)}
+                    >
+                      {loc}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <Label htmlFor="subj">Subject</Label>

@@ -5,6 +5,7 @@ import type {
 } from "@medusajs/framework/types"
 import { MedusaError, Modules } from "@medusajs/framework/utils"
 import { applyDbEmailTemplate } from "./apply-db-email-template"
+import { resolveCustomerOrderNotificationLocale } from "./notification-email-locales"
 import type { OrderNotificationEmailKey } from "./order-notification-email-keys"
 
 const DEFAULT_REPLY_TO = "info@example.com"
@@ -112,21 +113,28 @@ export async function sendOrderNotificationEmail(
 
   const shippingAddress = await resolveShippingAddressForOrderEmail(orderModuleService, order)
 
-  const payload = await applyDbEmailTemplate(container, templateKey, {
-    template: templateKey,
-    data: {
-      emailOptions: {
-        replyTo: DEFAULT_REPLY_TO,
-        subject: defaultSubject,
+  const locale = await resolveCustomerOrderNotificationLocale(container, order)
+
+  const payload = await applyDbEmailTemplate(
+    container,
+    templateKey,
+    {
+      template: templateKey,
+      data: {
+        emailOptions: {
+          replyTo: DEFAULT_REPLY_TO,
+          subject: defaultSubject,
+        },
+        order,
+        shippingAddress,
+        preview,
+        noticeHeadline,
+        noticeMessage,
+        ...(extraTemplateData ?? {}),
       },
-      order,
-      shippingAddress,
-      preview,
-      noticeHeadline,
-      noticeMessage,
-      ...(extraTemplateData ?? {}),
     },
-  })
+    { locale }
+  )
 
   await notificationModuleService.createNotifications({
     to: email,

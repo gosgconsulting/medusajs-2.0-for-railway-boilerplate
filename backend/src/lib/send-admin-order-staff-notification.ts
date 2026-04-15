@@ -3,6 +3,7 @@ import { Modules } from "@medusajs/framework/utils"
 import { applyDbEmailTemplate } from "./apply-db-email-template"
 import { ensureNotificationEmailTemplateRow } from "./ensure-notification-email-template"
 import { NOTIFICATION_EMAIL_TEMPLATE_MODULE } from "../modules/notification-email-template/constants"
+import { resolveDefaultNotificationLocale } from "./notification-email-locales"
 
 export type SendAdminOrderStaffNotificationParams = {
   container: { resolve: (key: string) => unknown }
@@ -48,18 +49,20 @@ export async function sendAdminOrderStaffNotification(
     Modules.NOTIFICATION
   ) as INotificationModuleService
 
-  await ensureNotificationEmailTemplateRow(container, templateKey)
+  const staffLocale = await resolveDefaultNotificationLocale(container)
+
+  await ensureNotificationEmailTemplateRow(container, templateKey, staffLocale)
 
   let skipSend = false
   try {
     const templateMod = container.resolve(NOTIFICATION_EMAIL_TEMPLATE_MODULE) as {
       listNotificationEmailTemplates: (
-        filters?: { template_key?: string },
+        filters?: { template_key?: string; locale?: string },
         config?: { take?: number }
       ) => Promise<{ is_enabled: boolean }[]>
     }
     const rows = await templateMod.listNotificationEmailTemplates(
-      { template_key: templateKey },
+      { template_key: templateKey, locale: staffLocale },
       { take: 1 }
     )
     if (rows[0] && rows[0].is_enabled === false) {
@@ -76,18 +79,23 @@ export async function sendAdminOrderStaffNotification(
   const oid = (order as { id?: unknown }).id
   const orderId = typeof oid === "string" ? oid : ""
 
-  const adminPayload = await applyDbEmailTemplate(container, templateKey, {
-    template: templateKey,
-    data: {
-      emailOptions: {
-        replyTo: "info@example.com",
-        subject: fallbackSubject,
+  const adminPayload = await applyDbEmailTemplate(
+    container,
+    templateKey,
+    {
+      template: templateKey,
+      data: {
+        emailOptions: {
+          replyTo: "info@example.com",
+          subject: fallbackSubject,
+        },
+        order,
+        shippingAddress,
+        preview,
       },
-      order,
-      shippingAddress,
-      preview,
     },
-  })
+    { locale: staffLocale }
+  )
 
   const toList = staffRecipients
     .split(",")

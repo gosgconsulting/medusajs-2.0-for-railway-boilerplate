@@ -2,6 +2,7 @@ import { Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService, IOrderModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { applyDbEmailTemplate } from '../lib/apply-db-email-template'
+import { resolveCustomerOrderNotificationLocale } from '../lib/notification-email-locales'
 import { DEFAULT_SUBJECT_BY_KEY } from '../lib/default-notification-email-templates'
 import { sendAdminOrderStaffNotification } from '../lib/send-admin-order-staff-notification'
 import { EmailTemplates } from '../modules/email-notifications/templates'
@@ -27,18 +28,24 @@ export default async function orderPlacedHandler({
   const shippingAddress = await (orderModuleService as any).orderAddressService_.retrieve(order.shipping_address.id)
 
   try {
-    const payload = await applyDbEmailTemplate(container, EmailTemplates.ORDER_PLACED, {
-      template: EmailTemplates.ORDER_PLACED,
-      data: {
-        emailOptions: {
-          replyTo: 'info@example.com',
-          subject: 'Your order has been placed'
-        },
-        order,
-        shippingAddress,
-        preview: 'Thank you for your order!'
-      }
-    })
+    const locale = await resolveCustomerOrderNotificationLocale(container, order)
+    const payload = await applyDbEmailTemplate(
+      container,
+      EmailTemplates.ORDER_PLACED,
+      {
+        template: EmailTemplates.ORDER_PLACED,
+        data: {
+          emailOptions: {
+            replyTo: 'info@example.com',
+            subject: 'Your order has been placed'
+          },
+          order,
+          shippingAddress,
+          preview: 'Thank you for your order!'
+        }
+      },
+      { locale }
+    )
 
     await notificationModuleService.createNotifications({
       to: order.email,
