@@ -16,11 +16,6 @@ export default async function orderPlacedHandler({
   
   const order = await orderModuleService.retrieveOrder(data.id, { relations: ['items', 'summary', 'shipping_address'] })
 
-  const meta = order.metadata as Record<string, unknown> | null | undefined
-  if (meta?.deferred_checkout === true) {
-    return
-  }
-
   if (!order.shipping_address?.id) {
     return
   }
