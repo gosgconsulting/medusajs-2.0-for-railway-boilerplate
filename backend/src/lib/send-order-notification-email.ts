@@ -6,6 +6,7 @@ import type {
 import { MedusaError, Modules } from "@medusajs/framework/utils"
 import { applyDbEmailTemplate } from "./apply-db-email-template"
 import { resolveCustomerOrderNotificationLocale } from "./notification-email-locales"
+import { translateOrderNotificationNotice } from "./order-notification-notice-i18n"
 import type { OrderNotificationEmailKey } from "./order-notification-email-keys"
 
 const DEFAULT_REPLY_TO = "info@example.com"
@@ -115,6 +116,11 @@ export async function sendOrderNotificationEmail(
 
   const locale = await resolveCustomerOrderNotificationLocale(container, order)
 
+  const notice = translateOrderNotificationNotice(templateKey, locale, {
+    headline: noticeHeadline,
+    message: noticeMessage,
+  })
+
   const payload = await applyDbEmailTemplate(
     container,
     templateKey,
@@ -128,8 +134,8 @@ export async function sendOrderNotificationEmail(
         order,
         shippingAddress,
         preview,
-        noticeHeadline,
-        noticeMessage,
+        noticeHeadline: notice.headline,
+        noticeMessage: notice.message,
         ...(extraTemplateData ?? {}),
       },
     },
