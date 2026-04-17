@@ -5,11 +5,14 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  '@medusajs/admin-shared@2.12.1':
+    hash: h33id65g2cx7dzrbpinqws36gi
+    path: patches/@medusajs__admin-shared@2.12.1.patch
   '@medusajs/core-flows@2.12.1':
     hash: c6v5s6q44krgw2wmdurgxh3yay
     path: patches/@medusajs__core-flows@2.12.1.patch
   '@medusajs/dashboard@2.12.1':
-    hash: aoyl3baexfmvwh5en56fdspwry
+    hash: 3nw2rh4gxsw4emgeecshhdokkq
     path: patches/@medusajs__dashboard@2.12.1.patch
   '@medusajs/framework@2.12.1':
     hash: ff3n52dtwgprtaphgw7joq3b7a
@@ -27,13 +30,13 @@ importers:
         version: 2.12.1
       '@medusajs/admin-shared':
         specifier: 2.12.1
-        version: 2.12.1
+        version: 2.12.1(patch_hash=h33id65g2cx7dzrbpinqws36gi)
       '@medusajs/cli':
         specifier: 2.12.1
         version: 2.12.1(@types/node@20.19.25)
       '@medusajs/dashboard':
         specifier: 2.12.1
-        version: 2.12.1(patch_hash=aoyl3baexfmvwh5en56fdspwry)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
+        version: 2.12.1(patch_hash=3nw2rh4gxsw4emgeecshhdokkq)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
       '@medusajs/draft-order':
         specifier: 2.12.1
         version: 2.12.1(@medusajs/admin-sdk@2.12.1)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/icons@2.12.1(react@18.3.1))(@medusajs/test-utils@2.12.1(@medusajs/framework@2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25)))(@medusajs/medusa@2.12.1))(@medusajs/ui@4.0.29(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react-router-dom@6.20.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
@@ -9333,9 +9336,9 @@ snapshots:
 
   '@medusajs/admin-bundler@2.12.1(@types/node@20.19.25)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(picomatch@4.0.3)(typescript@5.9.3)(yaml@2.8.0)':
     dependencies:
-      '@medusajs/admin-shared': 2.12.1
+      '@medusajs/admin-shared': 2.12.1(patch_hash=h33id65g2cx7dzrbpinqws36gi)
       '@medusajs/admin-vite-plugin': 2.12.1(picomatch@4.0.3)(vite@5.4.21(@types/node@20.19.25))
-      '@medusajs/dashboard': 2.12.1(patch_hash=aoyl3baexfmvwh5en56fdspwry)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
+      '@medusajs/dashboard': 2.12.1(patch_hash=3nw2rh4gxsw4emgeecshhdokkq)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)
       '@vitejs/plugin-react': 4.7.0(vite@5.4.21(@types/node@20.19.25))
       autoprefixer: 10.4.22(postcss@8.5.6)
       compression: 1.8.1
@@ -9368,17 +9371,17 @@ snapshots:
 
   '@medusajs/admin-sdk@2.12.1':
     dependencies:
-      '@medusajs/admin-shared': 2.12.1
+      '@medusajs/admin-shared': 2.12.1(patch_hash=h33id65g2cx7dzrbpinqws36gi)
       zod: 3.25.76
 
-  '@medusajs/admin-shared@2.12.1': {}
+  '@medusajs/admin-shared@2.12.1(patch_hash=h33id65g2cx7dzrbpinqws36gi)': {}
 
   '@medusajs/admin-vite-plugin@2.12.1(picomatch@4.0.3)(vite@5.4.21(@types/node@20.19.25))':
     dependencies:
       '@babel/parser': 7.25.6
       '@babel/traverse': 7.25.6
       '@babel/types': 7.25.6
-      '@medusajs/admin-shared': 2.12.1
+      '@medusajs/admin-shared': 2.12.1(patch_hash=h33id65g2cx7dzrbpinqws36gi)
       chokidar: 3.6.0
       fdir: 6.1.1(picomatch@4.0.3)
       magic-string: 0.30.5
@@ -9510,7 +9513,7 @@ snapshots:
     dependencies:
       '@medusajs/framework': 2.12.1(patch_hash=ff3n52dtwgprtaphgw7joq3b7a)(@medusajs/cli@2.12.1(@types/node@20.19.25))(@types/node@20.19.25)(ioredis@5.8.2)(vite@5.4.21(@types/node@20.19.25))
 
-  '@medusajs/dashboard@2.12.1(patch_hash=aoyl3baexfmvwh5en56fdspwry)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)':
+  '@medusajs/dashboard@2.12.1(patch_hash=3nw2rh4gxsw4emgeecshhdokkq)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(typescript@5.9.3)':
     dependencies:
       '@ariakit/react': 0.4.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@babel/runtime': 7.28.4
@@ -9519,7 +9522,7 @@ snapshots:
       '@dnd-kit/utilities': 3.2.2(react@18.3.1)
       '@hookform/error-message': 2.0.1(react-dom@18.3.1(react@18.3.1))(react-hook-form@7.49.1(react@18.3.1))(react@18.3.1)
       '@hookform/resolvers': 3.4.2(react-hook-form@7.49.1(react@18.3.1))
-      '@medusajs/admin-shared': 2.12.1
+      '@medusajs/admin-shared': 2.12.1(patch_hash=h33id65g2cx7dzrbpinqws36gi)
       '@medusajs/icons': 2.12.1(react@18.3.1)
       '@medusajs/js-sdk': 2.12.1
       '@medusajs/ui': 4.0.29(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
