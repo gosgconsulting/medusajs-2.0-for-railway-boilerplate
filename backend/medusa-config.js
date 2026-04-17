@@ -164,6 +164,10 @@ const medusaConfig = {
     {
       key: "notification_email_template",
       resolve: './src/modules/notification-email-template',
+    },
+    {
+      key: "admin_product_table_pref",
+      resolve: './src/modules/admin-product-table-pref',
     }
   ],
   plugins: [

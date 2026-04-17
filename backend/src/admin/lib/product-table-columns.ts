@@ -40,6 +40,26 @@ export function getMeta(
   return String(val)
 }
 
+/** Summary for a variant metadata key on the collapsed product row (range if numeric, else unique join). */
+export function variantMetadataColumnSummary(
+  variants: { metadata?: Record<string, unknown> | null }[],
+  key: string
+): string {
+  const vals = variants
+    .map((v) => getMeta(v.metadata ?? undefined, key))
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const unique = [...new Set(vals)]
+  if (unique.length === 0) return ""
+  const nums = unique.map((s) => Number(s)).filter((n) => Number.isFinite(n))
+  if (nums.length === unique.length) {
+    const min = Math.min(...nums)
+    const max = Math.max(...nums)
+    return min === max ? String(min) : `${min} - ${max}`
+  }
+  return unique.join(", ")
+}
+
 /** Price range from variant metadata numeric field (e.g. wcwp_client-a, b2b_price). */
 export function getVariantPriceRange(
   variants: { metadata?: Record<string, unknown> }[],

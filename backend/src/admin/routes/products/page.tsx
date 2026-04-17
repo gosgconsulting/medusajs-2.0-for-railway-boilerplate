@@ -15,10 +15,14 @@ import { ChevronDown, ChevronRight, PencilSquare } from "@medusajs/icons"
 import { hydrateProductVariantsInventoryQuantity } from "../../lib/hydrate-product-variant-inventory"
 import { sdk } from "../../lib/sdk"
 import {
+  applyProductColumnPrefsPayload,
+  fetchRemoteProductColumnPrefs,
   loadColumnPrefs,
   saveColumnPrefs,
+  saveRemoteProductColumnPrefs,
 } from "../../lib/product-column-prefs"
 import {
+  DEFAULT_VISIBLE_COLUMNS,
   TOGGLEABLE_COLUMNS,
   amountToDisplay,
   categoriesDisplay,
@@ -170,6 +174,7 @@ const tdText =
 
 const ProductsIndexPage = () => {
   const location = useLocation()
+  const mergedServerColumnPrefsRef = React.useRef(false)
   const [offset, setOffset] = useState(0)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -192,6 +197,51 @@ const ProductsIndexPage = () => {
   useEffect(() => {
     saveColumnPrefs(columnMode, visibleColumns)
   }, [columnMode, visibleColumns])
+
+  const {
+    data: remoteColumnPrefs,
+    status: remoteColumnPrefsStatus,
+  } = useQuery({
+    queryKey: ["admin-product-column-prefs-remote"],
+    queryFn: () => fetchRemoteProductColumnPrefs(sdk),
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const remoteColumnPrefsFetchDone = remoteColumnPrefsStatus !== "pending"
+
+  useEffect(() => {
+    if (!remoteColumnPrefsFetchDone) return
+    if (!remoteColumnPrefs) return
+    if (mergedServerColumnPrefsRef.current) return
+    mergedServerColumnPrefsRef.current = true
+    const visibleArr =
+      remoteColumnPrefs.visible?.length
+        ? remoteColumnPrefs.visible
+        : [...DEFAULT_VISIBLE_COLUMNS]
+    setColumnMode(remoteColumnPrefs.mode)
+    setVisibleColumns(new Set(visibleArr))
+    applyProductColumnPrefsPayload({
+      mode: remoteColumnPrefs.mode,
+      visible: visibleArr,
+      customColumns: remoteColumnPrefs.customColumns ?? [],
+    })
+  }, [remoteColumnPrefsFetchDone, remoteColumnPrefs])
+
+  useEffect(() => {
+    if (!remoteColumnPrefsFetchDone) return
+    const t = window.setTimeout(() => {
+      const p = loadColumnPrefs()
+      void saveRemoteProductColumnPrefs(sdk, {
+        mode: columnMode,
+        visible: [...visibleColumns],
+        customColumns: p.customColumns,
+      }).catch(() => {
+        /* offline */
+      })
+    }, 900)
+    return () => window.clearTimeout(t)
+  }, [remoteColumnPrefsFetchDone, columnMode, visibleColumns])
 
   useEffect(() => {
     const p = loadColumnPrefs()

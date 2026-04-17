@@ -17,16 +17,23 @@ import { ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from 
 import { hydrateProductVariantsInventoryQuantity } from "../../../lib/hydrate-product-variant-inventory"
 import { sdk } from "../../../lib/sdk"
 import {
+  applyProductColumnPrefsPayload,
+  fetchRemoteProductColumnPrefs,
   loadColumnPrefs,
+  newCustomColumnId,
   saveColumnPrefs,
+  saveRemoteProductColumnPrefs,
+  type CustomColumnDef,
 } from "../../../lib/product-column-prefs"
 import { stripHtmlTags } from "../../../lib/strip-html"
 import {
+  DEFAULT_VISIBLE_COLUMNS,
   TOGGLEABLE_COLUMNS,
   amountToDisplay,
   getMeta,
   getVariantPriceRange,
   tagsToString,
+  variantMetadataColumnSummary,
 } from "../../../lib/product-table-columns"
 import { SimpleMarkdownEditor } from "../../../components/SimpleMarkdownEditor"
 
@@ -88,6 +95,7 @@ type ProductRow = {
   width: string     // as string for input control
   height: string    // as string for input control
   thumbnail: string | null
+  metadata: Record<string, unknown>
   variants: VariantRow[]
 }
 
@@ -127,6 +135,7 @@ type ApiProduct = {
   height?: number | null
   thumbnail?: string | null
   tags?: { id?: string; value?: string }[] | null
+  metadata?: Record<string, unknown> | null
   variants?: ApiVariant[] | null
 }
 
@@ -199,6 +208,7 @@ function toRow(p: ApiProduct): ProductRow {
     width: p.width != null ? String(p.width) : "",
     height: p.height != null ? String(p.height) : "",
     thumbnail: p.thumbnail ?? null,
+    metadata: { ...(p.metadata ?? {}) } as Record<string, unknown>,
     variants: (p.variants ?? []).map(toVariantRow),
   }
 }
@@ -344,6 +354,7 @@ CategoryMenuCheckboxRow.displayName = "CategoryMenuCheckboxRow"
 
 const BulkEditPage = () => {
   const queryClient = useQueryClient()
+  const mergedServerColumnPrefsRef = React.useRef(false)
   const productThumbnailInputRef = React.useRef<HTMLInputElement>(null)
   const variantThumbnailInputRef = React.useRef<HTMLInputElement>(null)
   const [uploadingThumbnailFor, setUploadingThumbnailFor] = useState<string | null>(null)
@@ -386,10 +397,76 @@ const BulkEditPage = () => {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
     () => loadColumnPrefs().visible
   )
+  const [customColumns, setCustomColumns] = useState<CustomColumnDef[]>(
+    () => loadColumnPrefs().customColumns
+  )
+  const [newCustomLabel, setNewCustomLabel] = useState("")
+  const [newCustomSourceKind, setNewCustomSourceKind] = useState<
+    "variant_metadata" | "product_metadata"
+  >("variant_metadata")
+  const [newCustomKey, setNewCustomKey] = useState("")
+
+  const extraVariantMetadataKeys = useMemo(() => {
+    const s = new Set<string>()
+    for (const c of customColumns) {
+      if (c.source.kind === "variant_metadata") s.add(c.source.key)
+    }
+    return s
+  }, [customColumns])
 
   useEffect(() => {
-    saveColumnPrefs(columnMode, visibleColumns)
-  }, [columnMode, visibleColumns])
+    saveColumnPrefs(columnMode, visibleColumns, customColumns)
+  }, [columnMode, visibleColumns, customColumns])
+
+  const {
+    data: remoteColumnPrefs,
+    status: remoteColumnPrefsStatus,
+  } = useQuery({
+    queryKey: ["admin-product-column-prefs-remote"],
+    queryFn: () => fetchRemoteProductColumnPrefs(sdk),
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const remoteColumnPrefsFetchDone = remoteColumnPrefsStatus !== "pending"
+
+  useEffect(() => {
+    if (!remoteColumnPrefsFetchDone) return
+    if (!remoteColumnPrefs) return
+    if (mergedServerColumnPrefsRef.current) return
+    mergedServerColumnPrefsRef.current = true
+    const visibleArr =
+      remoteColumnPrefs.visible?.length
+        ? remoteColumnPrefs.visible
+        : [...DEFAULT_VISIBLE_COLUMNS]
+    setColumnMode(remoteColumnPrefs.mode)
+    setVisibleColumns(new Set(visibleArr))
+    setCustomColumns(remoteColumnPrefs.customColumns ?? [])
+    applyProductColumnPrefsPayload({
+      mode: remoteColumnPrefs.mode,
+      visible: visibleArr,
+      customColumns: remoteColumnPrefs.customColumns ?? [],
+    })
+  }, [remoteColumnPrefsFetchDone, remoteColumnPrefs])
+
+  useEffect(() => {
+    if (!remoteColumnPrefsFetchDone) return
+    const t = window.setTimeout(() => {
+      void saveRemoteProductColumnPrefs(sdk, {
+        mode: columnMode,
+        visible: [...visibleColumns],
+        customColumns,
+      }).catch(() => {
+        /* offline */
+      })
+    }, 900)
+    return () => window.clearTimeout(t)
+  }, [
+    remoteColumnPrefsFetchDone,
+    columnMode,
+    visibleColumns,
+    customColumns,
+  ])
 
   const isColumnVisible = useCallback(
     (id: string) => {
@@ -435,7 +512,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,*variants.inventory_items,+variants.metadata",
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+metadata,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,*variants.inventory_items,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0])
       await hydrateProductVariantsInventoryQuantity(res.products ?? [])
       return res
@@ -599,7 +676,9 @@ const BulkEditPage = () => {
         row.weight !== orig.weight ||
         row.width !== orig.width ||
         row.height !== orig.height ||
-        row.thumbnail !== orig.thumbnail
+        row.thumbnail !== orig.thumbnail ||
+        JSON.stringify(row.metadata ?? {}) !==
+          JSON.stringify(orig.metadata ?? {})
       ) {
         set.add(row.id)
       }
@@ -616,9 +695,13 @@ const BulkEditPage = () => {
       for (const variant of row.variants) {
         const origV = orig.variants.find((v) => v.id === variant.id)
         if (!origV) continue
-        const metadataDirty = VARIANT_METADATA_KEYS.some(
-          (k) => getMeta(variant.metadata, k) !== getMeta(origV.metadata, k)
-        )
+        const metadataDirty =
+          VARIANT_METADATA_KEYS.some(
+            (k) => getMeta(variant.metadata, k) !== getMeta(origV.metadata, k)
+          ) ||
+          [...extraVariantMetadataKeys].some(
+            (k) => getMeta(variant.metadata, k) !== getMeta(origV.metadata, k)
+          )
         if (
           variant.sku !== origV.sku ||
           JSON.stringify(variant.prices) !== JSON.stringify(origV.prices) ||
@@ -634,7 +717,7 @@ const BulkEditPage = () => {
       }
     }
     return map
-  }, [working, source])
+  }, [working, source, extraVariantMetadataKeys])
 
   const dirtyIds = useMemo(() => {
     const set = new Set<string>()
@@ -852,6 +935,56 @@ const BulkEditPage = () => {
     },
     []
   )
+
+  const updateProductMetadata = useCallback(
+    (productId: string, key: string, value: string | null) => {
+      setWorking((prev) =>
+        prev.map((row) => {
+          if (row.id !== productId) return row
+          const nextMeta = { ...(row.metadata ?? {}) }
+          if (value !== null && value.trim() !== "") {
+            nextMeta[key] = value.trim()
+          } else {
+            delete nextMeta[key]
+          }
+          return { ...row, metadata: nextMeta }
+        })
+      )
+    },
+    []
+  )
+
+  const addCustomColumn = useCallback(() => {
+    const label = newCustomLabel.trim()
+    const key = newCustomKey.trim()
+    if (!label || !key) {
+      toast.error("Enter a column label and metadata key.")
+      return
+    }
+    const id = newCustomColumnId()
+    const def: CustomColumnDef =
+      newCustomSourceKind === "variant_metadata"
+        ? { id, label, source: { kind: "variant_metadata", key } }
+        : { id, label, source: { kind: "product_metadata", key } }
+    setCustomColumns((prev) => [...prev, def])
+    setVisibleColumns((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+    setNewCustomLabel("")
+    setNewCustomKey("")
+    toast.success("Custom column added")
+  }, [newCustomLabel, newCustomKey, newCustomSourceKind])
+
+  const removeCustomColumn = useCallback((columnId: string) => {
+    setCustomColumns((prev) => prev.filter((c) => c.id !== columnId))
+    setVisibleColumns((prev) => {
+      const next = new Set(prev)
+      next.delete(columnId)
+      return next
+    })
+  }, [])
 
   const updateVariantManageInventory = useCallback(
     (productId: string, variantId: string, manage_inventory: boolean) => {
@@ -1076,6 +1209,11 @@ const BulkEditPage = () => {
         return ids
       }
 
+      const variantMetaKeysForSave = new Set<string>([
+        ...VARIANT_METADATA_KEYS,
+        ...extraVariantMetadataKeys,
+      ])
+
       const update = await Promise.all(
         Array.from(dirtyIds).map(async (id) => {
         const row = working.find((r) => r.id === id)!
@@ -1128,6 +1266,15 @@ const BulkEditPage = () => {
         }
         if (row.thumbnail !== orig.thumbnail) {
           patch.thumbnail = row.thumbnail || null
+        }
+        if (
+          JSON.stringify(row.metadata ?? {}) !==
+          JSON.stringify(orig.metadata ?? {})
+        ) {
+          patch.metadata = {
+            ...(orig.metadata ?? {}),
+            ...(row.metadata ?? {}),
+          }
         }
 
         // Include dirty variant updates
@@ -1199,8 +1346,8 @@ const BulkEditPage = () => {
               metaChanged = true
             }
 
-            // Other metadata fields (b2b_price when no price list, color_hex, wcwp_client-*)
-            for (const key of VARIANT_METADATA_KEYS) {
+            // Other metadata fields (b2b_price when no price list, color_hex, wcwp_client-*, custom keys)
+            for (const key of variantMetaKeysForSave) {
               if (key === "b2b_price" && SALE_PRICE_LIST_ID) continue // already handled above
               const prev = getMeta(origV.metadata, key)
               const next = getMeta(v.metadata, key)
@@ -1434,7 +1581,7 @@ const BulkEditPage = () => {
                   Manage columns <ChevronDown className="ml-1" />
                 </Button>
               </DropdownMenu.Trigger>
-              <DropdownMenu.Content className="w-[300px]">
+              <DropdownMenu.Content className="w-[min(100vw-2rem,360px)]">
                 <div className="flex flex-col gap-3 p-3">
                   <Text size="xsmall" className="text-ui-fg-muted">
                     Expand, image, title, and status always stay visible. Same
@@ -1495,6 +1642,105 @@ const BulkEditPage = () => {
                       </div>
                     </div>
                   )}
+                  <div className="border-t border-ui-border-base pt-2">
+                    <Text size="xsmall" className="mb-2 block text-ui-fg-muted">
+                      Custom columns (read from metadata keys)
+                    </Text>
+                    <div className="flex flex-col gap-2">
+                      <Input
+                        size="small"
+                        placeholder="Column label"
+                        value={newCustomLabel}
+                        onChange={(e) => setNewCustomLabel(e.target.value)}
+                        disabled={isSaving}
+                      />
+                      <select
+                        className="txt-compact-small rounded-md border border-ui-border-base bg-ui-bg-field px-2 py-1.5"
+                        value={newCustomSourceKind}
+                        onChange={(e) =>
+                          setNewCustomSourceKind(
+                            e.target.value === "product_metadata"
+                              ? "product_metadata"
+                              : "variant_metadata"
+                          )
+                        }
+                        disabled={isSaving}
+                      >
+                        <option value="variant_metadata">
+                          Variant metadata
+                        </option>
+                        <option value="product_metadata">
+                          Product metadata
+                        </option>
+                      </select>
+                      <Input
+                        size="small"
+                        placeholder="Metadata key (e.g. my_field)"
+                        value={newCustomKey}
+                        onChange={(e) => setNewCustomKey(e.target.value)}
+                        disabled={isSaving}
+                      />
+                      <Button
+                        size="small"
+                        variant="secondary"
+                        type="button"
+                        onClick={addCustomColumn}
+                        disabled={isSaving}
+                      >
+                        Add column
+                      </Button>
+                    </div>
+                    {customColumns.length > 0 && (
+                      <div className="mt-2 max-h-[min(200px,40vh)] flex flex-col gap-1 overflow-y-auto">
+                        {customColumns.map((cc) => (
+                          <div
+                            key={cc.id}
+                            className="flex items-center gap-2 rounded-md py-1 pl-1 pr-1 hover:bg-ui-bg-base-hover"
+                          >
+                            {columnMode === "custom" ? (
+                              <Checkbox
+                                checked={visibleColumns.has(cc.id)}
+                                onCheckedChange={(checked) => {
+                                  setVisibleColumns((prev) => {
+                                    const next = new Set(prev)
+                                    if (checked === true) next.add(cc.id)
+                                    else next.delete(cc.id)
+                                    return next
+                                  })
+                                }}
+                              />
+                            ) : (
+                              <span className="w-5 shrink-0" aria-hidden />
+                            )}
+                            <div className="flex min-w-0 flex-1 flex-col">
+                              <Text size="small" className="truncate">
+                                {cc.label}
+                              </Text>
+                              <Text
+                                size="xsmall"
+                                className="truncate text-ui-fg-muted"
+                              >
+                                {cc.source.kind === "variant_metadata"
+                                  ? "Variant"
+                                  : "Product"}{" "}
+                                · {cc.source.key}
+                              </Text>
+                            </div>
+                            <Button
+                              size="small"
+                              variant="transparent"
+                              type="button"
+                              className="shrink-0 text-ui-fg-error"
+                              disabled={isSaving}
+                              onClick={() => removeCustomColumn(cc.id)}
+                            >
+                              <XMarkMini />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </DropdownMenu.Content>
             </DropdownMenu>
@@ -2117,6 +2363,17 @@ const BulkEditPage = () => {
                     Color
                   </th>
                   )}
+                  {customColumns.map((cc) =>
+                    isColumnVisible(cc.id) ? (
+                      <th
+                        key={cc.id}
+                        className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                        style={{ minWidth: 120 }}
+                      >
+                        {cc.label}
+                      </th>
+                    ) : null
+                  )}
                   {isColumnVisible("changed") && (
                   <th
                     className="px-3 py-3"
@@ -2585,6 +2842,38 @@ const BulkEditPage = () => {
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
                           />
                         </td>
+                        )}
+                        {customColumns.map((cc) =>
+                          isColumnVisible(cc.id) ? (
+                            <td key={cc.id} className="px-3 py-2">
+                              {cc.source.kind === "variant_metadata" ? (
+                                <input
+                                  type="text"
+                                  value={variantMetadataColumnSummary(
+                                    row.variants,
+                                    cc.source.key
+                                  )}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              ) : (
+                                <Input
+                                  value={getMeta(
+                                    row.metadata,
+                                    cc.source.key
+                                  )}
+                                  onChange={(e) =>
+                                    updateProductMetadata(
+                                      row.id,
+                                      cc.source.key,
+                                      e.target.value || null
+                                    )
+                                  }
+                                  placeholder="—"
+                                />
+                              )}
+                            </td>
+                          ) : null
                         )}
                         {isColumnVisible("changed") && (
                         <td className="px-3 py-2 text-right">
@@ -3099,6 +3388,40 @@ const BulkEditPage = () => {
                                   />
                                 </div>
                               </td>
+                              )}
+                              {customColumns.map((cc) =>
+                                isColumnVisible(cc.id) ? (
+                                  <td key={cc.id} className="px-3 py-2">
+                                    {cc.source.kind === "variant_metadata" ? (
+                                      <Input
+                                        size="small"
+                                        value={getMeta(
+                                          variant.metadata,
+                                          cc.source.key
+                                        )}
+                                        onChange={(e) =>
+                                          updateVariantMetadata(
+                                            row.id,
+                                            variant.id,
+                                            cc.source.key,
+                                            e.target.value || null
+                                          )
+                                        }
+                                        placeholder="—"
+                                      />
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        value={getMeta(
+                                          row.metadata,
+                                          cc.source.key
+                                        )}
+                                        disabled
+                                        className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                      />
+                                    )}
+                                  </td>
+                                ) : null
                               )}
                               {isColumnVisible("changed") && (
                               <td className="px-3 py-2 text-right">
