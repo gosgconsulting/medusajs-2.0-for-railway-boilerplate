@@ -31,6 +31,19 @@ export const DEFAULT_VISIBLE_COLUMNS = new Set<string>(
   TOGGLEABLE_COLUMNS.map((c) => c.id)
 )
 
+/**
+ * Preset product `metadata` keys for bulk-edit: checklist in Manage columns (all **unchecked**
+ * until you enable one — each checked row adds a product-metadata custom column).
+ * Edit this list for your store.
+ */
+export const SUGGESTED_PRODUCT_METADATA_KEYS: ReadonlyArray<{
+  key: string
+  label: string
+}> = [
+  { key: "moq", label: "MOQ" },
+  { key: "osq", label: "OSQ" },
+]
+
 export function getMeta(
   metadata: Record<string, unknown> | undefined,
   key: string

@@ -28,6 +28,7 @@ import {
 import { stripHtmlTags } from "../../../lib/strip-html"
 import {
   DEFAULT_VISIBLE_COLUMNS,
+  SUGGESTED_PRODUCT_METADATA_KEYS,
   TOGGLEABLE_COLUMNS,
   amountToDisplay,
   getMeta,
@@ -986,6 +987,61 @@ const BulkEditPage = () => {
     })
   }, [])
 
+  const toggleSuggestedProductMetadataColumn = useCallback(
+    (metaKey: string, metaLabel: string, enabled: boolean) => {
+      if (enabled) {
+        setCustomColumns((prev) => {
+          if (
+            prev.some(
+              (c) =>
+                c.source.kind === "product_metadata" &&
+                c.source.key === metaKey
+            )
+          ) {
+            return prev
+          }
+          const id = newCustomColumnId()
+          setVisibleColumns((v) => {
+            const next = new Set(v)
+            next.add(id)
+            return next
+          })
+          return [
+            ...prev,
+            {
+              id,
+              label: metaLabel,
+              source: { kind: "product_metadata" as const, key: metaKey },
+            },
+          ]
+        })
+        return
+      }
+      setCustomColumns((prev) => {
+        const ids = prev
+          .filter(
+            (c) =>
+              c.source.kind === "product_metadata" && c.source.key === metaKey
+          )
+          .map((c) => c.id)
+        if (ids.length) {
+          setVisibleColumns((v) => {
+            const next = new Set(v)
+            for (const id of ids) next.delete(id)
+            return next
+          })
+        }
+        return prev.filter(
+          (c) =>
+            !(
+              c.source.kind === "product_metadata" && c.source.key === metaKey
+            )
+        )
+      })
+    },
+    []
+  )
+
   const updateVariantManageInventory = useCallback(
     (productId: string, variantId: string, manage_inventory: boolean) => {
       setWorking((prev) =>
@@ -1646,6 +1702,55 @@ const BulkEditPage = () => {
                     <Text size="xsmall" className="mb-2 block text-ui-fg-muted">
                       Custom columns (read from metadata keys)
                     </Text>
+                    {SUGGESTED_PRODUCT_METADATA_KEYS.length > 0 && (
+                      <div className="mb-3">
+                        <Text
+                          size="xsmall"
+                          className="mb-1.5 block text-ui-fg-subtle"
+                        >
+                          Product metadata presets — off by default; check to
+                          add a column (same as Product + key below).
+                        </Text>
+                        <div className="max-h-[min(220px,40vh)] flex flex-col gap-0.5 overflow-y-auto rounded-md border border-ui-border-base p-1.5">
+                          {SUGGESTED_PRODUCT_METADATA_KEYS.map(({ key, label }) => {
+                            const checked = customColumns.some(
+                              (c) =>
+                                c.source.kind === "product_metadata" &&
+                                c.source.key === key
+                            )
+                            return (
+                              <label
+                                key={key}
+                                className="flex cursor-pointer items-center gap-2 rounded-md py-1.5 pl-1 pr-1 hover:bg-ui-bg-base-hover"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  disabled={isSaving}
+                                  onCheckedChange={(v) =>
+                                    toggleSuggestedProductMetadataColumn(
+                                      key,
+                                      label,
+                                      v === true
+                                    )
+                                  }
+                                />
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                  <Text size="small" className="truncate">
+                                    {label}
+                                  </Text>
+                                  <Text
+                                    size="xsmall"
+                                    className="truncate font-mono text-ui-fg-muted"
+                                  >
+                                    {key}
+                                  </Text>
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-col gap-2">
                       <Input
                         size="small"
