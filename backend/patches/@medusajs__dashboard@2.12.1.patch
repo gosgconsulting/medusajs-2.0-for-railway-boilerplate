@@ -141,6 +141,70 @@ index c9d1c577adfd628c0cb6b3e6b621b53e5f5d705b..927ad961de391e51c8e6cd1efa1e2567
      ] }) }),
      /* @__PURE__ */ jsx(RouteDrawer.Footer, { children: /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-end gap-x-2", children: [
        /* @__PURE__ */ jsx(RouteDrawer.Close, { asChild: true, children: /* @__PURE__ */ jsx(Button, { variant: "secondary", size: "small", children: t("actions.cancel") }) }),
+diff --git a/dist/customer-list-ZXCGIXJC.mjs b/dist/customer-list-ZXCGIXJC.mjs
+index 2a730b3d436da16f635b4a04abc44b1ed1f125cc..4c76148747256f421d284031eb01b5bcda809548 100644
+--- a/dist/customer-list-ZXCGIXJC.mjs
++++ b/dist/customer-list-ZXCGIXJC.mjs
+@@ -43,7 +43,7 @@
+ 
+ // src/routes/customers/customer-list/components/customer-list-table/customer-list-table.tsx
+ import { PencilSquare } from "@medusajs/icons";
+-import { Button, Container, Heading } from "@medusajs/ui";
++import { Button, Container, Heading, Text } from "@medusajs/ui";
+ import { keepPreviousData } from "@tanstack/react-query";
+ import { createColumnHelper } from "@tanstack/react-table";
+ import { useMemo } from "react";
+@@ -56,7 +56,8 @@
+   const { searchParams, raw } = useCustomerTableQuery({ pageSize: PAGE_SIZE });
+   const { customers, count, isLoading, isError, error } = useCustomers(
+     {
+-      ...searchParams
++      ...searchParams,
++      fields: "+*groups"
+     },
+     {
+       placeholderData: keepPreviousData
+@@ -130,16 +131,31 @@
+ };
+ var columnHelper = createColumnHelper();
+ var useColumns = () => {
+-  const columns = useCustomerTableColumns();
++  const { t } = useTranslation();
++  const base = useCustomerTableColumns();
+   return useMemo(
+-    () => [
+-      ...columns,
+-      columnHelper.display({
+-        id: "actions",
+-        cell: ({ row }) => /* @__PURE__ */ jsx(CustomerActions, { customer: row.original })
+-      })
+-    ],
+-    [columns]
++    () => {
++      const [emailCol, nameCol, ...afterName] = base;
++      return [
++        emailCol,
++        nameCol,
++        columnHelper.display({
++          id: "customer_groups",
++          header: () => t("customers.fields.groups"),
++          cell: ({ row }) => {
++            const names = row.original.groups?.map((g) => g.name ?? g.id).filter(Boolean) ?? [];
++            const label = names.length ? names.join(", ") : "—";
++            return /* @__PURE__ */ jsx(Text, { size: "small", className: "text-ui-fg-subtle", children: label });
++          }
++        }),
++        ...afterName,
++        columnHelper.display({
++          id: "actions",
++          cell: ({ row }) => /* @__PURE__ */ jsx(CustomerActions, { customer: row.original })
++        })
++      ];
++    },
++    [t, base]
+   );
+ };
+ 
 diff --git a/dist/product-detail-ATPFDPI2.mjs b/dist/product-detail-ATPFDPI2.mjs
 index a2be9ca8caa13af689f54f40bcb05a257aa998d8..89558963a406df5dd97a9c02dee0613eac128e0e 100644
 --- a/dist/product-detail-ATPFDPI2.mjs
