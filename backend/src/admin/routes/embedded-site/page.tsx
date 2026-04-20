@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { ArrowsPointingOut, CaretMinimizeDiagonal, Window } from "@medusajs/icons"
@@ -8,23 +9,16 @@ const LEGACY_URL_ENV_KEY = "VITE_ADMIN_EMBEDDED_SITE_URL" as const
 
 type EmbeddedSiteEntry = { label: string; url: string }
 
-type AdminImportMeta = ImportMeta & {
-  env?: {
-    VITE_ADMIN_EMBEDDED_SITES?: string
-    VITE_ADMIN_EMBEDDED_SITE_URL?: string
-  }
-}
-
-function getEnvString(key: keyof NonNullable<AdminImportMeta["env"]>): string {
-  if (typeof import.meta === "undefined") {
-    return ""
-  }
-  const raw = (import.meta as AdminImportMeta).env?.[key]
-  return typeof raw === "string" ? raw.trim() : ""
-}
-
+/**
+ * Read Vite-exposed env with **literal** `import.meta.env.VITE_*` keys only.
+ * Dynamic access like `import.meta.env[key]` is not rewritten by Vite, so values
+ * stay undefined in the admin bundle and the sidebar config sees no entries.
+ */
 function parseEmbeddedSites(): { entries: EmbeddedSiteEntry[]; error: string | null } {
-  const jsonRaw = getEnvString(SITES_ENV_KEY)
+  const jsonRaw =
+    typeof import.meta.env.VITE_ADMIN_EMBEDDED_SITES === "string"
+      ? import.meta.env.VITE_ADMIN_EMBEDDED_SITES.trim()
+      : ""
   if (jsonRaw) {
     try {
       const parsed: unknown = JSON.parse(jsonRaw)
@@ -55,7 +49,10 @@ function parseEmbeddedSites(): { entries: EmbeddedSiteEntry[]; error: string | n
     }
   }
 
-  const legacyUrl = getEnvString(LEGACY_URL_ENV_KEY)
+  const legacyUrl =
+    typeof import.meta.env.VITE_ADMIN_EMBEDDED_SITE_URL === "string"
+      ? import.meta.env.VITE_ADMIN_EMBEDDED_SITE_URL.trim()
+      : ""
   if (legacyUrl) {
     return {
       entries: [{ label: "Embedded", url: legacyUrl }],
@@ -154,7 +151,7 @@ const EmbeddedSitePage = () => {
       <div className="flex shrink-0 flex-col gap-3 px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <Heading level="h1">Embedded site</Heading>
+            <Heading level="h1">Sparti Pages</Heading>
             <Text size="small" className="text-ui-fg-muted">
               External pages load in a frame below. Some hosts refuse embedding (for
               example strict{" "}
@@ -252,6 +249,7 @@ const EmbeddedSitePage = () => {
 
 export default EmbeddedSitePage
 
+/** Sidebar: admin Vite plugin only reads `defineRouteConfig({ ... })` with a plain object literal (no top-level `? :`). */
 export const config = defineRouteConfig({
   label: "Sparti Pages",
   icon: Window,
