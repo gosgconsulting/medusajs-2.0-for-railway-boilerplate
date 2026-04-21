@@ -10,6 +10,8 @@ import { StoreGetOrderParams } from "@medusajs/medusa/api/store/orders/validator
 import * as OrderQueryConfig from "@medusajs/medusa/api/store/orders/query-config"
 import { StoreGetPaymentCollectionParams } from "@medusajs/medusa/api/store/payment-collections/validators"
 import * as PaymentCollectionQueryConfig from "@medusajs/medusa/api/store/payment-collections/query-config"
+import { StoreGetCartsCart } from "@medusajs/medusa/api/store/carts/validators"
+import * as StoreCartQueryConfig from "@medusajs/medusa/api/store/carts/query-config"
 import { STORE_DEFERRED_CHECKOUT } from "lib/constants"
 
 function requireDeferredCheckoutEnabled(
@@ -37,6 +39,16 @@ export default defineMiddlewares({
           OrderQueryConfig.retrieveTransformQueryConfig
         ),
         requireDeferredCheckoutEnabled,
+      ],
+    },
+    {
+      matcher: "/store/carts/:id/b2b-sync-line-prices",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformQuery(
+          StoreGetCartsCart,
+          StoreCartQueryConfig.retrieveTransformQueryConfig
+        ),
       ],
     },
     {
