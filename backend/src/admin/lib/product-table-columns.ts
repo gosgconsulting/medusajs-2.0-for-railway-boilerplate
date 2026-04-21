@@ -10,6 +10,7 @@ export const TOGGLEABLE_COLUMNS = [
   { id: "sku", label: "SKU" },
   { id: "basePrice", label: "Base price" },
   { id: "salePrice", label: "Sale price" },
+  { id: "b2bDiscount", label: "B2B discount" },
   { id: "clientA", label: "Client A" },
   { id: "clientB", label: "Client B" },
   { id: "clientC", label: "Client C" },

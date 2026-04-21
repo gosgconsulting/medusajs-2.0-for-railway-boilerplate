@@ -70,6 +70,7 @@ type ProductRow = {
   width: string
   height: string
   thumbnail: string | null
+  metadata: Record<string, unknown>
   categories?: { name?: string | null }[] | null
   variants: VariantRow[]
 }
@@ -106,6 +107,7 @@ type ApiProduct = {
   height?: number | null
   thumbnail?: string | null
   tags?: { id?: string; value?: string }[] | null
+  metadata?: Record<string, unknown> | null
   variants?: ApiVariant[] | null
 }
 
@@ -149,6 +151,7 @@ function toRow(p: ApiProduct): ProductRow {
     width: p.width != null ? String(p.width) : "",
     height: p.height != null ? String(p.height) : "",
     thumbnail: p.thumbnail ?? null,
+    metadata: { ...(p.metadata ?? {}) } as Record<string, unknown>,
     categories: p.categories,
     variants: (p.variants ?? []).map(toVariantRow),
   }
@@ -273,7 +276,7 @@ const ProductsIndexPage = () => {
         offset,
         ...(debouncedSearch ? { q: debouncedSearch } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.metadata",
+          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+metadata,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0])
       await hydrateProductVariantsInventoryQuantity(res.products ?? [])
       return res
@@ -546,6 +549,14 @@ const ProductsIndexPage = () => {
                         Sale price
                       </th>
                     )}
+                    {isColumnVisible("b2bDiscount") && (
+                      <th
+                        className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
+                        style={{ minWidth: 100 }}
+                      >
+                        B2B discount
+                      </th>
+                    )}
                     {isColumnVisible("clientA") && (
                       <th
                         className="txt-compact-small-plus px-3 py-3 text-left text-ui-fg-muted"
@@ -757,6 +768,12 @@ const ProductsIndexPage = () => {
                               {row.variants[0]?.sale_price_amount || "—"}
                             </td>
                           )}
+                          {isColumnVisible("b2bDiscount") && (
+                            <td className={tdText}>
+                              {getMeta(row.metadata, "b2b_discount").trim() ||
+                                "—"}
+                            </td>
+                          )}
                           {isColumnVisible("clientA") && (
                             <td className={tdText}>
                               {getVariantPriceRange(
@@ -909,6 +926,12 @@ const ProductsIndexPage = () => {
                               {isColumnVisible("salePrice") && (
                                 <td className={tdText}>
                                   {variant.sale_price_amount || "—"}
+                                </td>
+                              )}
+                              {isColumnVisible("b2bDiscount") && (
+                                <td className={tdText}>
+                                  {getMeta(row.metadata, "b2b_discount").trim() ||
+                                    "—"}
                                 </td>
                               )}
                               {isColumnVisible("clientA") && (

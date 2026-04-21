@@ -42,8 +42,11 @@ const PAGE_SIZE = 20
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 
 /** Variant metadata keys editable in bulk */
+/** Product `metadata` key for B2B discount (product-level, not variant). */
+const B2B_DISCOUNT_META_KEY = "b2b_discount"
+
 const VARIANT_METADATA_KEYS = [
-  "b2b_price",
+  "sale_price",
   "color_hex",
   "wcwp_client-a",
   "wcwp_client-b",
@@ -179,8 +182,8 @@ function toVariantRow(v: ApiVariant): VariantRow {
     })),
     sale_price_id: undefined,
     sale_price_amount:
-      typeof meta?.b2b_price === "number"
-        ? amountToDisplay(meta.b2b_price as number)
+      typeof meta?.sale_price === "number"
+        ? amountToDisplay(meta.sale_price as number)
         : "",
     thumbnail,
     manage_inventory: v.manage_inventory ?? false,
@@ -877,7 +880,7 @@ const BulkEditPage = () => {
                     sale_price_amount: amount,
                     metadata: {
                       ...(v.metadata ?? {}),
-                      b2b_price:
+                      sale_price:
                         amount.trim() === "" ? null : displayToAmount(amount),
                     },
                   }
@@ -1362,13 +1365,13 @@ const BulkEditPage = () => {
               vPatch.manage_inventory = v.manage_inventory
             }
 
-            // Build merged metadata for b2b_price, color_hex, wcwp_client-*, etc.
+            // Build merged metadata for sale_price, color_hex, wcwp_client-*, etc.
             const metaUpdates: Record<string, unknown> = {
               ...(origV.metadata ?? {}),
             }
             let metaChanged = false
 
-            // Sale price (b2b_price) via price list when configured
+            // Sale price metadata via price list when configured
             if (
               SALE_PRICE_LIST_ID &&
               v.sale_price_amount !== origV.sale_price_amount
@@ -1397,20 +1400,20 @@ const BulkEditPage = () => {
                   amount: displayToAmount(next),
                 })
               }
-              metaUpdates.b2b_price =
+              metaUpdates.sale_price =
                 next === "" ? null : displayToAmount(next)
               metaChanged = true
             }
 
-            // Other metadata fields (b2b_price when no price list, color_hex, wcwp_client-*, custom keys)
+            // Other metadata fields (sale_price when no price list, color_hex, wcwp_client-*, custom keys)
             for (const key of variantMetaKeysForSave) {
-              if (key === "b2b_price" && SALE_PRICE_LIST_ID) continue // already handled above
+              if (key === "sale_price" && SALE_PRICE_LIST_ID) continue // already handled above
               const prev = getMeta(origV.metadata, key)
               const next = getMeta(v.metadata, key)
               if (prev !== next) {
                 if (next && next.trim()) {
                   metaUpdates[key] =
-                    key === "b2b_price" ? displayToAmount(next) : next.trim()
+                    key === "sale_price" ? displayToAmount(next) : next.trim()
                 } else {
                   delete metaUpdates[key]
                 }
@@ -2372,6 +2375,14 @@ const BulkEditPage = () => {
                     Sale price
                   </th>
                   )}
+                  {isColumnVisible("b2bDiscount") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ minWidth: 100 }}
+                  >
+                    B2B discount
+                  </th>
+                  )}
                   {isColumnVisible("clientA") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
@@ -2801,6 +2812,21 @@ const BulkEditPage = () => {
                             }
                             disabled
                             className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                          />
+                        </td>
+                        )}
+                        {isColumnVisible("b2bDiscount") && (
+                        <td className="px-3 py-2">
+                          <Input
+                            value={getMeta(row.metadata, B2B_DISCOUNT_META_KEY)}
+                            onChange={(e) =>
+                              updateProductMetadata(
+                                row.id,
+                                B2B_DISCOUNT_META_KEY,
+                                e.target.value || null
+                              )
+                            }
+                            placeholder="e.g. 10 or 10%"
                           />
                         </td>
                         )}
@@ -3273,13 +3299,13 @@ const BulkEditPage = () => {
                                     type="number"
                                     min={0}
                                     step="0.01"
-                                    value={getMeta(variant.metadata, "b2b_price")}
+                                    value={getMeta(variant.metadata, "sale_price")}
                                     onChange={(e) => {
                                       const val = e.target.value.trim()
                                       updateVariantMetadata(
                                         row.id,
                                         variant.id,
-                                        "b2b_price",
+                                        "sale_price",
                                         val ? (Number.isFinite(Number(val)) ? Number(val) : val) : null
                                       )
                                     }
@@ -3289,6 +3315,16 @@ const BulkEditPage = () => {
                                   />
                                 </td>
                               ) : null}
+                              {isColumnVisible("b2bDiscount") && (
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={getMeta(row.metadata, B2B_DISCOUNT_META_KEY)}
+                                  disabled
+                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                />
+                              </td>
+                              )}
                               {isColumnVisible("clientA") && (
                               <td className="px-3 py-2">
                                 <Input
