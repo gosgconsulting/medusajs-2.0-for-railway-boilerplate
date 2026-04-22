@@ -16,9 +16,11 @@ Video instructions: https://youtu.be/PPxenu7IjGM
 
 ### Product translations (DeepL)
 
-When `DEEPL_AUTH_KEY` and `DEEPL_TARGET_LANGS` (comma-separated, e.g. `DE,FR`) are set, the admin product editor shows **Translate (DeepL)**. That calls `POST /admin/products/:id/translate` and stores a JSON blob on the product under metadata key **`i18n`** (`schemaVersion`, `source` with `contentHash` and plain-text fields, `targets` keyed by lowercase locale, e.g. `de`).
+When `DEEPL_AUTH_KEY` and `DEEPL_TARGET_LANGS` (comma-separated, e.g. `DE,FR`) are set, the admin product editor shows **Translate (DeepL)**. That calls `POST /admin/products/:id/translate` and stores a JSON blob on the product under metadata key **`i18n`** (`schemaVersion` 2 for new runs, `source` with `contentHash` and plain-text fields, `targets` keyed by lowercase locale, e.g. `de`).
 
-**Storefront:** read `product.metadata.i18n` (parse JSON if your client receives a string). For locale `de`, use `targets.de.title`, `targets.de.subtitle`, `targets.de.description` when present; otherwise fall back to `product.title`, `product.subtitle`, `product.description`. Optional: `POST .../translate?force=true` re-runs DeepL even if the content hash matches.
+Optional **`DEEPL_METADATA_TRANSLATION_KEYS`**: comma-separated metadata keys on the product (e.g. `fabrication_et_composition,moq`). Their string values are translated in the same DeepL requests as title/subtitle/description; results appear as `targets.<locale>.metadata.<key>` while the original keys on `product.metadata` stay unchanged.
+
+**Storefront:** read `product.metadata.i18n` (parse JSON if your client receives a string). For locale `de`, use `targets.de.title`, `targets.de.subtitle`, `targets.de.description` when present; otherwise fall back to `product.title`, `product.subtitle`, `product.description`. For translated custom fields, use `targets.de.metadata?.<yourKey>`. Optional: `POST .../translate?force=true` re-runs DeepL even if the content hash matches.
 
 Optional `DEEPL_AUTO_TRANSLATE_ON_PRODUCT_UPDATE=true` runs the same logic on `product.updated` (failures are logged; product save is not blocked).
 

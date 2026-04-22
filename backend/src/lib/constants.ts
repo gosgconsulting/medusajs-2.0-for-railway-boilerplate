@@ -148,6 +148,13 @@ export const DEEPL_SOURCE_LANG =
 /** Comma-separated DeepL target language codes, e.g. DE,FR,IT */
 export const DEEPL_TARGET_LANGS = process.env.DEEPL_TARGET_LANGS?.trim() || ""
 /**
+ * Comma-separated product metadata keys to pass through DeepL with title/subtitle/description.
+ * Values are read from product.metadata; translations live under `i18n` JSON only (per locale).
+ * Never include the reserved key `i18n` here.
+ */
+export const DEEPL_METADATA_TRANSLATION_KEYS =
+  process.env.DEEPL_METADATA_TRANSLATION_KEYS?.trim() || ""
+/**
  * When true, subscribers run DeepL after product updates when source text changed.
  * Requires DEEPL_AUTH_KEY and DEEPL_TARGET_LANGS.
  */
