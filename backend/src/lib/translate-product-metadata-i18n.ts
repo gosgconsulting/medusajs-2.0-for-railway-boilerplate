@@ -2,7 +2,6 @@ import {
   ContainerRegistrationKeys,
   MedusaError,
 } from "@medusajs/framework/utils"
-import { updateProductsWorkflow } from "@medusajs/medusa/core-flows"
 import type { MedusaRequest } from "@medusajs/framework/http"
 import { deeplTranslateTexts } from "./deepl-translate"
 import {
@@ -260,6 +259,9 @@ export async function translateProductMetadataI18n(
     [PRODUCT_I18N_METADATA_KEY]: serializeProductI18n(payload),
   }
 
+  // Dynamic import avoids loading `@medusajs/medusa/core-flows` during parallel
+  // API route registration (can trigger duplicate workflow registration in some setups).
+  const { updateProductsWorkflow } = await import("@medusajs/medusa/core-flows")
   await updateProductsWorkflow(container).run({
     input: {
       products: [
