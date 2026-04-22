@@ -41,6 +41,41 @@ import { SimpleMarkdownEditor } from "../../../components/SimpleMarkdownEditor"
 const PAGE_SIZE = 20
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 
+/** Must match `PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY` in `src/lib/product-i18n-metadata.ts`. */
+const PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY = "i18n_auto_on_update"
+
+function normalizeLocaleKeyClient(lang: string): string {
+  return lang.trim().toLowerCase().replace(/_/g, "-")
+}
+
+function parseAutoTranslateLocalesFromMetadata(
+  metadata: Record<string, unknown> | undefined
+): Set<string> {
+  const out = new Set<string>()
+  if (!metadata) return out
+  const raw = metadata[PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY]
+  if (raw == null || raw === "") return out
+  let parsed: unknown
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw) as unknown
+    } catch {
+      return out
+    }
+  } else if (Array.isArray(raw)) {
+    parsed = raw
+  } else {
+    return out
+  }
+  if (!Array.isArray(parsed)) return out
+  for (const item of parsed) {
+    if (typeof item === "string" && item.trim()) {
+      out.add(normalizeLocaleKeyClient(item))
+    }
+  }
+  return out
+}
+
 /** Variant metadata keys editable in bulk */
 /** Product `metadata` key for B2B discount (product-level, not variant). */
 const B2B_DISCOUNT_META_KEY = "b2b_discount"
@@ -409,6 +444,9 @@ const BulkEditPage = () => {
     "variant_metadata" | "product_metadata"
   >("variant_metadata")
   const [newCustomKey, setNewCustomKey] = useState("")
+  const [i18nLocaleToggleBusy, setI18nLocaleToggleBusy] = useState<
+    Record<string, boolean>
+  >({})
 
   const extraVariantMetadataKeys = useMemo(() => {
     const s = new Set<string>()
@@ -549,6 +587,16 @@ const BulkEditPage = () => {
     queryKey: ["admin-product-categories-bulk"],
     queryFn: () => sdk.admin.productCategory.list({ limit: 200 }),
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const { data: deeplConfig } = useQuery({
+    queryKey: ["admin-deepl-config"],
+    queryFn: () =>
+      sdk.client.fetch<{ enabled: boolean; targetLangs: string[] }>(
+        "/admin/deepl/config"
+      ),
+    staleTime: 120_000,
     refetchOnWindowFocus: false,
   })
 
@@ -1551,6 +1599,58 @@ const BulkEditPage = () => {
     saveBatch()
   }, [hasErrors, hasDirty, isSaving, saveBatch])
 
+  const handleBulkI18nLocaleAuto = useCallback(
+    async (productId: string, localeCode: string, checked: boolean) => {
+      const busyKey = `${productId}:${normalizeLocaleKeyClient(localeCode)}`
+      setI18nLocaleToggleBusy((p) => ({ ...p, [busyKey]: true }))
+      try {
+        if (checked) {
+          const res = await sdk.client.fetch<{
+            skipped?: boolean
+            targetsWritten?: string[]
+          }>(`/admin/products/${productId}/translate`, {
+            method: "POST",
+            body: {
+              enableAutoOnUpdateForLocales: [localeCode.trim()],
+            },
+          })
+          const code = localeCode.trim().toUpperCase()
+          if (res.targetsWritten?.length) {
+            toast.success(
+              `${code}: translated now; auto-translate on product save enabled`
+            )
+          } else {
+            toast.success(
+              `${code}: already translated; auto-translate on product save enabled`
+            )
+          }
+        } else {
+          await sdk.client.fetch(`/admin/products/${productId}/translate`, {
+            method: "POST",
+            body: {
+              disableAutoOnUpdateForLocales: [localeCode.trim()],
+            },
+          })
+          toast.success(
+            `${localeCode.trim().toUpperCase()}: auto-translate on save off`
+          )
+        }
+        await queryClient.invalidateQueries({ queryKey: ["admin-products-bulk"] })
+      } catch (e: unknown) {
+        const msg =
+          e instanceof Error ? e.message : "Translation / settings request failed"
+        toast.error(msg)
+      } finally {
+        setI18nLocaleToggleBusy((p) => {
+          const next = { ...p }
+          delete next[busyKey]
+          return next
+        })
+      }
+    },
+    [queryClient]
+  )
+
   // Ctrl+S / ⌘S shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -2343,6 +2443,21 @@ const BulkEditPage = () => {
                     Status
                   </th>
                   )}
+                  {deeplConfig?.enabled &&
+                    (deeplConfig.targetLangs?.length ?? 0) > 0 && (
+                    <th
+                      className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                      style={{ minWidth: 128 }}
+                    >
+                      <span className="block">Auto-translate</span>
+                      <Text
+                        size="xsmall"
+                        className="block font-normal text-ui-fg-muted"
+                      >
+                        (per language, on save)
+                      </Text>
+                    </th>
+                  )}
                   {isColumnVisible("category") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
@@ -2700,6 +2815,46 @@ const BulkEditPage = () => {
                             <option value="rejected">Rejected</option>
                           </select>
                         </td>
+                        )}
+                        {deeplConfig?.enabled &&
+                          (deeplConfig.targetLangs?.length ?? 0) > 0 && (
+                          <td className="px-3 py-2 align-top">
+                            <div className="flex flex-col gap-1.5">
+                              {(deeplConfig.targetLangs ?? []).map((loc) => {
+                                const norm = normalizeLocaleKeyClient(loc)
+                                const autos =
+                                  parseAutoTranslateLocalesFromMetadata(
+                                    row.metadata
+                                  )
+                                const busyKey = `${row.id}:${norm}`
+                                return (
+                                  <label
+                                    key={`${row.id}:${loc}`}
+                                    className="flex cursor-pointer items-center gap-2"
+                                  >
+                                    <Checkbox
+                                      checked={autos.has(norm)}
+                                      disabled={!!i18nLocaleToggleBusy[busyKey]}
+                                      onCheckedChange={(v) => {
+                                        if (v === "indeterminate") return
+                                        void handleBulkI18nLocaleAuto(
+                                          row.id,
+                                          loc,
+                                          v === true
+                                        )
+                                      }}
+                                    />
+                                    <Text
+                                      size="xsmall"
+                                      className="w-8 shrink-0 text-ui-fg-subtle"
+                                    >
+                                      {loc.trim().toUpperCase()}
+                                    </Text>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </td>
                         )}
                         {isColumnVisible("category") && (
                         <td className="px-3 py-2">

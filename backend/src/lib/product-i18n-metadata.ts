@@ -161,15 +161,79 @@ export function hasAllTargetLocales(
 ): boolean {
   if (!payload) return false
   for (const lang of requiredLocales) {
-    const key = normalizeLocaleKey(lang)
-    const t = payload.targets[key]
-    if (!t) return false
-    if (requiredMetadataKeys.length === 0) continue
-    const meta = t.metadata
-    if (!meta) return false
-    for (const mk of requiredMetadataKeys) {
-      if (typeof meta[mk] !== "string") return false
+    if (!localeTranslationComplete(payload, lang, requiredMetadataKeys)) {
+      return false
     }
   }
   return true
+}
+
+/** Whether `payload` has a complete translation entry for one locale (incl. metadata keys when configured). */
+export function localeTranslationComplete(
+  payload: ProductI18nPayload | null,
+  locale: string,
+  requiredMetadataKeys: readonly string[]
+): boolean {
+  if (!payload) return false
+  const key = normalizeLocaleKey(locale)
+  const t = payload.targets[key]
+  if (!t) return false
+  if (requiredMetadataKeys.length === 0) return true
+  const meta = t.metadata
+  if (!meta) return false
+  for (const mk of requiredMetadataKeys) {
+    if (typeof meta[mk] !== "string") return false
+  }
+  return true
+}
+
+/** Product metadata key: JSON array of normalized locale keys with auto DeepL on `product.updated`. */
+export const PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY =
+  "i18n_auto_on_update" as const
+
+export function parseProductI18nAutoOnUpdateLocales(
+  metadata: Record<string, unknown> | null | undefined
+): string[] {
+  if (!metadata) return []
+  const raw = metadata[PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY]
+  if (raw == null || raw === "") return []
+  let parsed: unknown
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw) as unknown
+    } catch {
+      return []
+    }
+  } else if (Array.isArray(raw)) {
+    parsed = raw
+  } else {
+    return []
+  }
+  if (!Array.isArray(parsed)) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of parsed) {
+    if (typeof item !== "string") continue
+    const k = normalizeLocaleKey(item)
+    if (!k || seen.has(k)) continue
+    seen.add(k)
+    out.push(k)
+  }
+  out.sort()
+  return out
+}
+
+export function serializeProductI18nAutoOnUpdateLocales(
+  locales: readonly string[]
+): string {
+  const seen = new Set<string>()
+  const norm: string[] = []
+  for (const l of locales) {
+    const k = normalizeLocaleKey(l)
+    if (!k || seen.has(k)) continue
+    seen.add(k)
+    norm.push(k)
+  }
+  norm.sort()
+  return JSON.stringify(norm)
 }

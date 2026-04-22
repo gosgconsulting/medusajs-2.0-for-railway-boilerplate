@@ -7,11 +7,15 @@ import { deeplTranslateTexts } from "./deepl-translate"
 import {
   computeProductI18nContentHash,
   hasAllTargetLocales,
+  localeTranslationComplete,
   normalizeLocaleKey,
+  parseProductI18nAutoOnUpdateLocales,
   parseProductI18nFromMetadata,
+  PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY,
   PRODUCT_I18N_METADATA_KEY,
   PRODUCT_I18N_SCHEMA_LATEST,
   serializeProductI18n,
+  serializeProductI18nAutoOnUpdateLocales,
   type ProductI18nPayload,
 } from "./product-i18n-metadata"
 import {
@@ -72,8 +76,75 @@ function sliceMetadataForTranslation(
   return out
 }
 
+function cloneTargetFields(
+  t: ProductI18nPayload["targets"][string]
+): ProductI18nPayload["targets"][string] {
+  return {
+    title: t.title,
+    subtitle: t.subtitle,
+    description: t.description,
+    ...(t.metadata ? { metadata: { ...t.metadata } } : {}),
+  }
+}
+
+function mergeAutoLocalesIntoMetadata(
+  existingMeta: Record<string, unknown>,
+  configuredNorm: Set<string>,
+  add?: string[],
+  remove?: string[]
+): Record<string, unknown> {
+  const current = new Set(
+    parseProductI18nAutoOnUpdateLocales(existingMeta).filter((k) =>
+      configuredNorm.has(k)
+    )
+  )
+  for (const raw of add ?? []) {
+    const k = normalizeLocaleKey(raw)
+    if (k && configuredNorm.has(k)) current.add(k)
+  }
+  for (const raw of remove ?? []) {
+    current.delete(normalizeLocaleKey(raw))
+  }
+  const next = [...current].sort()
+  const out: Record<string, unknown> = { ...existingMeta }
+  if (next.length === 0) {
+    delete out[PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY]
+  } else {
+    out[PRODUCT_I18N_AUTO_ON_UPDATE_METADATA_KEY] =
+      serializeProductI18nAutoOnUpdateLocales(next)
+  }
+  return out
+}
+
+async function persistProductMetadata(
+  container: MedusaRequest["scope"],
+  productId: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const { updateProductsWorkflow } = await import("@medusajs/medusa/core-flows")
+  await updateProductsWorkflow(container).run({
+    input: {
+      products: [
+        {
+          id: productId,
+          metadata,
+        } as any,
+      ],
+    },
+  })
+}
+
 export type TranslateProductMetadataI18nOptions = {
   force?: boolean
+  /**
+   * When set, only these locales are considered for this run (must each appear in
+   * `DEEPL_TARGET_LANGS`). Other existing `i18n.targets` entries are preserved.
+   */
+  targetLocalesOnly?: string[]
+  /** Normalized locale keys to add to `i18n_auto_on_update` (filtered to configured targets). */
+  addAutoOnUpdateLocales?: string[]
+  /** Normalized locale keys to remove from `i18n_auto_on_update`. */
+  removeAutoOnUpdateLocales?: string[]
 }
 
 export type TranslateProductMetadataI18nResult = {
@@ -83,6 +154,7 @@ export type TranslateProductMetadataI18nResult = {
   contentHash: string
   targetsWritten: string[]
   metadataKeysTranslated?: string[]
+  autoOnUpdateLocales?: string[]
 }
 
 async function retrieveProductForI18n(
@@ -117,6 +189,46 @@ async function retrieveProductForI18n(
     subtitle: row.subtitle ?? "",
     description: row.description ?? "",
     metadata: row.metadata ?? null,
+  }
+}
+
+/**
+ * Updates only `i18n_auto_on_update` on the product (no DeepL calls).
+ */
+export async function updateProductI18nAutoLocalesOnly(
+  container: MedusaRequest["scope"],
+  productId: string,
+  opts: { add?: string[]; remove?: string[] }
+): Promise<{ productId: string; autoOnUpdateLocales: string[] }> {
+  const targetLangs = parseCommaList(DEEPL_TARGET_LANGS)
+  if (targetLangs.length === 0) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "No target languages configured (set DEEPL_TARGET_LANGS, e.g. DE,FR)."
+    )
+  }
+  const configuredNorm = new Set(targetLangs.map((l) => normalizeLocaleKey(l)))
+
+  const product = await retrieveProductForI18n(container, productId)
+  if (!product) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_FOUND,
+      `Product not found: ${productId}`
+    )
+  }
+
+  const existingMeta = { ...(product.metadata ?? {}) }
+  const merged = mergeAutoLocalesIntoMetadata(
+    existingMeta,
+    configuredNorm,
+    opts.add,
+    opts.remove
+  )
+
+  await persistProductMetadata(container, productId, merged)
+  return {
+    productId,
+    autoOnUpdateLocales: parseProductI18nAutoOnUpdateLocales(merged),
   }
 }
 
@@ -177,18 +289,67 @@ export async function translateProductMetadataI18n(
   const previous = parseProductI18nFromMetadata(existingMeta)
 
   const requiredKeys = targetLangs.map((l) => normalizeLocaleKey(l))
+  const configuredNorm = new Set(requiredKeys)
+  const isPartial =
+    Array.isArray(options?.targetLocalesOnly) &&
+    options!.targetLocalesOnly!.length > 0
+
+  const requestedLocalesNorm: string[] = []
+  const seenReq = new Set<string>()
+  const rawRequested = isPartial
+    ? (options!.targetLocalesOnly as string[])
+    : targetLangs
+  for (const raw of rawRequested) {
+    const k = normalizeLocaleKey(raw)
+    if (!k || seenReq.has(k)) continue
+    if (!configuredNorm.has(k)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Locale "${raw}" is not in DEEPL_TARGET_LANGS.`
+      )
+    }
+    seenReq.add(k)
+    requestedLocalesNorm.push(k)
+  }
+
   const needsMetadataInTargets = metadataKeyOrder.length > 0
   const previousMissingMetadataLayout =
     needsMetadataInTargets &&
     previous != null &&
     previous.schemaVersion !== PRODUCT_I18N_SCHEMA_LATEST
 
+  const hasAutoMutation =
+    (options?.addAutoOnUpdateLocales?.length ?? 0) > 0 ||
+    (options?.removeAutoOnUpdateLocales?.length ?? 0) > 0
+
+  const langsToDeepL = new Set<string>()
+  for (const k of requestedLocalesNorm) {
+    if (options?.force) {
+      langsToDeepL.add(k)
+      continue
+    }
+    if (previousMissingMetadataLayout) {
+      langsToDeepL.add(k)
+      continue
+    }
+    if (!localeTranslationComplete(previous, k, metadataKeyOrder)) {
+      langsToDeepL.add(k)
+      continue
+    }
+    if (previous?.source.contentHash !== contentHash) {
+      langsToDeepL.add(k)
+    }
+  }
+
   if (
     !options?.force &&
+    !isPartial &&
     previous &&
     previous.source.contentHash === contentHash &&
     hasAllTargetLocales(previous, requiredKeys, metadataKeyOrder) &&
-    !previousMissingMetadataLayout
+    !previousMissingMetadataLayout &&
+    langsToDeepL.size === 0 &&
+    !hasAutoMutation
   ) {
     return {
       productId,
@@ -196,6 +357,7 @@ export async function translateProductMetadataI18n(
       reason: "Translations already match current product text (contentHash).",
       contentHash,
       targetsWritten: [],
+      autoOnUpdateLocales: parseProductI18nAutoOnUpdateLocales(existingMeta),
       ...(metadataKeyOrder.length > 0
         ? { metadataKeysTranslated: [...metadataKeyOrder] }
         : {}),
@@ -203,13 +365,31 @@ export async function translateProductMetadataI18n(
   }
 
   const texts: string[] = [title, subtitle, description]
-  for (const k of metadataKeyOrder) {
-    texts.push(metadataSlice[k] ?? "")
+  for (const mk of metadataKeyOrder) {
+    texts.push(metadataSlice[mk] ?? "")
   }
 
   const targets: Record<string, ProductI18nPayload["targets"][string]> = {}
 
-  for (const targetLang of targetLangs) {
+  if (isPartial && previous?.targets) {
+    for (const [k, v] of Object.entries(previous.targets)) {
+      if (!requestedLocalesNorm.includes(k)) {
+        targets[k] = cloneTargetFields(v)
+      }
+    }
+  }
+
+  for (const k of requestedLocalesNorm) {
+    if (!langsToDeepL.has(k) && previous?.targets?.[k]) {
+      targets[k] = cloneTargetFields(previous.targets[k]!)
+    }
+  }
+
+  const resolveDeepLCode = (normKey: string): string =>
+    targetLangs.find((tl) => normalizeLocaleKey(tl) === normKey) ?? normKey
+
+  for (const normKey of langsToDeepL) {
+    const targetLang = resolveDeepLCode(normKey)
     const { translations } = await deeplTranslateTexts({
       apiBase,
       authKey,
@@ -223,17 +403,25 @@ export async function translateProductMetadataI18n(
         `DeepL returned ${translations.length} segments, expected ${texts.length}`
       )
     }
-    const key = normalizeLocaleKey(targetLang)
     const metaOut: Record<string, string> = {}
     for (let i = 0; i < metadataKeyOrder.length; i++) {
       const mk = metadataKeyOrder[i]
       metaOut[mk] = translations[3 + i] ?? ""
     }
-    targets[key] = {
+    targets[normKey] = {
       title: translations[0] ?? "",
       subtitle: translations[1] ?? "",
       description: translations[2] ?? "",
       ...(metadataKeyOrder.length > 0 ? { metadata: metaOut } : {}),
+    }
+  }
+
+  if (!isPartial) {
+    for (const k of requiredKeys) {
+      if (targets[k]) continue
+      if (previous?.targets?.[k]) {
+        targets[k] = cloneTargetFields(previous.targets[k]!)
+      }
     }
   }
 
@@ -254,32 +442,51 @@ export async function translateProductMetadataI18n(
     targets,
   }
 
-  const mergedMetadata: Record<string, unknown> = {
-    ...existingMeta,
-    [PRODUCT_I18N_METADATA_KEY]: serializeProductI18n(payload),
+  const shouldWriteI18n =
+    langsToDeepL.size > 0 || previousMissingMetadataLayout
+
+  if (!shouldWriteI18n && !hasAutoMutation) {
+    return {
+      productId,
+      skipped: true,
+      reason: "Nothing to update.",
+      contentHash,
+      targetsWritten: [],
+      autoOnUpdateLocales: parseProductI18nAutoOnUpdateLocales(existingMeta),
+      ...(metadataKeyOrder.length > 0
+        ? { metadataKeysTranslated: [...metadataKeyOrder] }
+        : {}),
+    }
   }
 
-  // Dynamic import avoids loading `@medusajs/medusa/core-flows` during parallel
-  // API route registration (can trigger duplicate workflow registration in some setups).
-  const { updateProductsWorkflow } = await import("@medusajs/medusa/core-flows")
-  await updateProductsWorkflow(container).run({
-    input: {
-      products: [
-        {
-          id: product.id,
-          metadata: mergedMetadata,
-        } as any,
-      ],
-    },
-  })
+  let mergedMetadata: Record<string, unknown> = { ...existingMeta }
+  if (shouldWriteI18n) {
+    mergedMetadata[PRODUCT_I18N_METADATA_KEY] = serializeProductI18n(payload)
+  }
+
+  mergedMetadata = mergeAutoLocalesIntoMetadata(
+    mergedMetadata,
+    configuredNorm,
+    options?.addAutoOnUpdateLocales,
+    options?.removeAutoOnUpdateLocales
+  )
+
+  const autoOnUpdateLocales =
+    parseProductI18nAutoOnUpdateLocales(mergedMetadata)
+
+  await persistProductMetadata(container, product.id, mergedMetadata)
 
   return {
     productId: product.id,
-    skipped: false,
+    skipped: langsToDeepL.size === 0,
+    ...(langsToDeepL.size === 0
+      ? { reason: "Auto-translate on update saved; translations unchanged." }
+      : {}),
     contentHash,
-    targetsWritten: Object.keys(targets),
+    targetsWritten: [...langsToDeepL],
+    autoOnUpdateLocales,
     ...(metadataKeyOrder.length > 0
       ? { metadataKeysTranslated: [...metadataKeyOrder] }
-      : {}),
+        : {}),
   }
 }
