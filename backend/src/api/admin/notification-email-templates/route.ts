@@ -1,6 +1,7 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { NOTIFICATION_EMAIL_TEMPLATE_MODULE } from "../../../modules/notification-email-template/constants"
 import { NOTIFICATION_TEMPLATE_CATALOG } from "../../../lib/notification-template-catalog"
+import { getNotificationFromByProvider } from "../../../lib/constants"
 import {
   getConfiguredNotificationLocales,
   normalizeNotificationLocale,
@@ -69,6 +70,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
   res.status(200).json({
     available_locales,
     default_locale,
+    email_from: getNotificationFromByProvider(),
     templates,
   })
 }

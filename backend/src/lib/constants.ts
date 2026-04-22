@@ -79,6 +79,24 @@ export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 export const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || process.env.SENDGRID_FROM;
 
 /**
+ * From addresses for notification email providers (same gating as medusa-config).
+ * Exposed in admin so staff see the effective sender; not sourced from a Resend HTTP API.
+ */
+export function getNotificationFromByProvider(): {
+  resend: string | null
+  sendgrid: string | null
+} {
+  return {
+    resend:
+      RESEND_API_KEY && RESEND_FROM_EMAIL ? RESEND_FROM_EMAIL : null,
+    sendgrid:
+      SENDGRID_API_KEY && SENDGRID_FROM_EMAIL
+        ? SENDGRID_FROM_EMAIL
+        : null,
+  }
+}
+
+/**
  * (optional) Stripe API key and webhook secret
  */
 export const STRIPE_API_KEY = process.env.STRIPE_API_KEY;

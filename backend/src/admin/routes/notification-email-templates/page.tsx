@@ -32,6 +32,8 @@ type CatalogEntry = {
 type ListResponse = {
   available_locales: string[]
   default_locale: string
+  /** Matches server env: RESEND / SendGrid "from" — not from Resend HTTP API. */
+  email_from?: { resend: string | null; sendgrid: string | null }
   templates: CatalogEntry[]
 }
 
@@ -44,6 +46,7 @@ type DetailResponse = {
   reply_to: string
   is_enabled: boolean
   html_body: string
+  email_from?: { resend: string | null; sendgrid: string | null }
   defaults: { subject: string; html_body: string }
 }
 
@@ -302,6 +305,33 @@ const NotificationEmailTemplatesPage = () => {
       <div className="flex shrink-0 items-center justify-between px-6 py-4">
         <div>
           <Heading level="h1">Notification emails</Heading>
+          {!listLoading && listData ? (
+            <div className="mt-1.5 flex max-w-2xl flex-col gap-1">
+              {listData.email_from?.resend ? (
+                <Text size="small" className="text-ui-fg-subtle">
+                  From (Resend): {listData.email_from.resend}
+                </Text>
+              ) : null}
+              {listData.email_from?.sendgrid ? (
+                <Text size="small" className="text-ui-fg-subtle">
+                  From (SendGrid): {listData.email_from.sendgrid}
+                </Text>
+              ) : null}
+              {listData.email_from &&
+              !listData.email_from.resend &&
+              !listData.email_from.sendgrid ? (
+                <Text size="small" className="text-ui-fg-muted">
+                  No notification email from-address is configured. Set
+                  {" "}
+                  <code className="txt-compact-xsmall">RESEND_API_KEY</code> and
+                  {" "}
+                  <code className="txt-compact-xsmall">RESEND_FROM_EMAIL</code>
+                  {" "}
+                  (or SendGrid equivalents) in the server environment.
+                </Text>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 

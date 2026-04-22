@@ -7,6 +7,7 @@ import {
   normalizeNotificationLocale,
   resolveDefaultNotificationLocale,
 } from "../../../../lib/notification-email-locales"
+import { getNotificationFromByProvider } from "../../../../lib/constants"
 import {
   getDefaultHtmlBodyForTemplateKey,
   getDefaultSubjectForTemplateKey,
@@ -98,6 +99,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
     reply_to: row?.reply_to ?? "",
     is_enabled: row?.is_enabled ?? false,
     html_body: row?.html_body ?? "",
+    email_from: getNotificationFromByProvider(),
     defaults: {
       subject: getDefaultSubjectForTemplateKey(templateKey),
       html_body: getDefaultHtmlBodyForTemplateKey(templateKey),
