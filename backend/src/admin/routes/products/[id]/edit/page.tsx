@@ -24,6 +24,9 @@ import { SimpleMarkdownEditor } from "../../../../components/SimpleMarkdownEdito
 import { sdk } from "../../../../lib/sdk"
 import { stripHtmlTags } from "../../../../lib/strip-html"
 
+/** Must match `PRODUCT_I18N_METADATA_KEY` in `src/lib/product-i18n-metadata.ts`. */
+const PRODUCT_I18N_METADATA_KEY = "i18n"
+
 const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 
 /** Shown above Options (in order); excluded from the generic Metadata list. */
@@ -45,6 +48,11 @@ const PROMOTED_METADATA_ORDER = [
 
 const PROMOTED_METADATA_KEY_SET = new Set<string>(PROMOTED_METADATA_ORDER)
 
+/** Managed by DeepL; hidden from the generic metadata editor and preserved on save. */
+const RESERVED_METADATA_KEYS = new Set<string>([
+  PRODUCT_I18N_METADATA_KEY,
+])
+
 function mergePromotedMetadataRows(
   raw: { key: string; value: string }[]
 ): { key: string; value: string }[] {
@@ -52,7 +60,10 @@ function mergePromotedMetadataRows(
   const promoted = PROMOTED_METADATA_ORDER.map(
     (k) => byKey.get(k) ?? { key: k, value: "" }
   )
-  const rest = raw.filter((e) => !PROMOTED_METADATA_KEY_SET.has(e.key))
+  const rest = raw.filter(
+    (e) =>
+      !PROMOTED_METADATA_KEY_SET.has(e.key) && !RESERVED_METADATA_KEYS.has(e.key)
+  )
   const suffix =
     rest.length > 0 ? rest : [{ key: "", value: "" }]
   return [...promoted, ...suffix]
@@ -164,14 +175,17 @@ const ProductEditPage = () => {
     { key: string; value: string }[]
   >(() => {
     const raw = initialProduct?.metadata
-      ? Object.entries(initialProduct.metadata).map(([k, v]) => ({
-          key: k,
-          value: String(v),
-        }))
+      ? Object.entries(initialProduct.metadata)
+          .filter(([k]) => !RESERVED_METADATA_KEYS.has(k))
+          .map(([k, v]) => ({
+            key: k,
+            value: String(v),
+          }))
       : []
     const base = raw.length > 0 ? raw : [{ key: "", value: "" }]
     return mergePromotedMetadataRows(base)
   })
+  const [translatingDeepL, setTranslatingDeepL] = useState(false)
 
 
   useEffect(() => {
@@ -212,10 +226,12 @@ const ProductEditPage = () => {
       )
     )
     const raw = initialProduct.metadata
-      ? Object.entries(initialProduct.metadata).map(([k, v]) => ({
-          key: k,
-          value: String(v),
-        }))
+      ? Object.entries(initialProduct.metadata)
+          .filter(([k]) => !RESERVED_METADATA_KEYS.has(k))
+          .map(([k, v]) => ({
+            key: k,
+            value: String(v),
+          }))
       : []
     const base = raw.length > 0 ? raw : [{ key: "", value: "" }]
     setMetadataEntries(mergePromotedMetadataRows(base))
@@ -232,6 +248,19 @@ const ProductEditPage = () => {
       }
       return acc
     }, {} as Record<string, string>)
+
+    const preservedI18n = (
+      initialProduct?.metadata as Record<string, unknown> | undefined
+    )?.[PRODUCT_I18N_METADATA_KEY]
+    if (
+      preservedI18n != null &&
+      parsedMetadata[PRODUCT_I18N_METADATA_KEY] === undefined
+    ) {
+      parsedMetadata[PRODUCT_I18N_METADATA_KEY] =
+        typeof preservedI18n === "string"
+          ? preservedI18n
+          : JSON.stringify(preservedI18n)
+    }
 
     try {
       const tags = tagsInput
@@ -291,11 +320,39 @@ const ProductEditPage = () => {
     hsCode,
     externalId,
     metadataEntries,
+    initialProduct?.metadata,
   ])
 
   const refetchProduct = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["admin-product", id] })
   }, [queryClient, id])
+
+  const handleTranslateDeepL = useCallback(async () => {
+    if (!id) return
+    setTranslatingDeepL(true)
+    try {
+      const body = await sdk.client.fetch<{
+        skipped?: boolean
+        reason?: string
+        targetsWritten?: string[]
+      }>(`/admin/products/${id}/translate`, { method: "POST" })
+      if (body.skipped) {
+        toast.success(body.reason ?? "Translations already up to date")
+      } else {
+        toast.success(
+          body.targetsWritten?.length
+            ? `Translated: ${body.targetsWritten.join(", ")}`
+            : "Translations saved"
+        )
+      }
+      refetchProduct()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Translation request failed"
+      toast.error(msg)
+    } finally {
+      setTranslatingDeepL(false)
+    }
+  }, [id, refetchProduct])
 
   const handleUploadImages = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -570,6 +627,13 @@ const ProductEditPage = () => {
           <Badge color={status === "published" ? "green" : "grey"}>
             {status === "published" ? "Published" : "Draft"}
           </Badge>
+          <Button
+            variant="secondary"
+            onClick={handleTranslateDeepL}
+            disabled={saving || translatingDeepL || !id}
+          >
+            {translatingDeepL ? "Translating…" : "Translate"}
+          </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>

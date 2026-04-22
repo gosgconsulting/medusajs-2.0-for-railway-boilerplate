@@ -14,6 +14,14 @@ Video instructions: https://youtu.be/PPxenu7IjGM
 - **MinIO storage** (Automatic setup when using the Railway template) - fallback to local storage.
 - **Meilisearch** (Automatic setup when using the Railway template)
 
+### Product translations (DeepL)
+
+When `DEEPL_AUTH_KEY` and `DEEPL_TARGET_LANGS` (comma-separated, e.g. `DE,FR`) are set, the admin product editor shows **Translate (DeepL)**. That calls `POST /admin/products/:id/translate` and stores a JSON blob on the product under metadata key **`i18n`** (`schemaVersion`, `source` with `contentHash` and plain-text fields, `targets` keyed by lowercase locale, e.g. `de`).
+
+**Storefront:** read `product.metadata.i18n` (parse JSON if your client receives a string). For locale `de`, use `targets.de.title`, `targets.de.subtitle`, `targets.de.description` when present; otherwise fall back to `product.title`, `product.subtitle`, `product.description`. Optional: `POST .../translate?force=true` re-runs DeepL even if the content hash matches.
+
+Optional `DEEPL_AUTO_TRANSLATE_ON_PRODUCT_UPDATE=true` runs the same logic on `product.updated` (failures are logged; product save is not blocked).
+
 ### commands
 
 `cd backend/`

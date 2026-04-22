@@ -134,3 +134,22 @@ export const DEFERRED_INVOICE_PAYMENT_URL_TEMPLATE =
 export const WC_API_URL = process.env.WC_API_URL?.trim() || undefined
 export const WC_CONSUMER_KEY = process.env.WC_CONSUMER_KEY?.trim() || undefined
 export const WC_CONSUMER_SECRET = process.env.WC_CONSUMER_SECRET?.trim() || undefined
+
+/**
+ * DeepL — optional. When DEEPL_AUTH_KEY and DEEPL_TARGET_LANGS are set, admin can
+ * translate product copy into metadata key `i18n` (JSON).
+ */
+export const DEEPL_AUTH_KEY = process.env.DEEPL_AUTH_KEY?.trim() || undefined
+/** e.g. https://api-free.deepl.com/v2 or https://api.deepl.com/v2 */
+export const DEEPL_API_BASE =
+  process.env.DEEPL_API_BASE?.trim() || "https://api-free.deepl.com/v2"
+export const DEEPL_SOURCE_LANG =
+  process.env.DEEPL_SOURCE_LANG?.trim() || "EN"
+/** Comma-separated DeepL target language codes, e.g. DE,FR,IT */
+export const DEEPL_TARGET_LANGS = process.env.DEEPL_TARGET_LANGS?.trim() || ""
+/**
+ * When true, subscribers run DeepL after product updates when source text changed.
+ * Requires DEEPL_AUTH_KEY and DEEPL_TARGET_LANGS.
+ */
+export const DEEPL_AUTO_TRANSLATE_ON_PRODUCT_UPDATE =
+  process.env.DEEPL_AUTO_TRANSLATE_ON_PRODUCT_UPDATE === "true"
