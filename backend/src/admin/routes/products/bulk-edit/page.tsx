@@ -1384,20 +1384,27 @@ const BulkEditPage = () => {
           }
         }
 
-        // Include dirty variant updates
+        // Include all existing variants when any variant is edited.
+        // Medusa product batch updates may treat `variants` as replace semantics,
+        // so omitting untouched variants can remove them.
         const dirtyVariants = dirtyVariantMap.get(id)
         if (dirtyVariants && dirtyVariants.size > 0) {
-          patch.variants = Array.from(dirtyVariants).map((variantId) => {
-            const v = row.variants.find((v) => v.id === variantId)!
+          patch.variants = row.variants.map((currentVariant) => {
+            const variantId = currentVariant.id
             const origV = orig.variants.find((v) => v.id === variantId)!
+            if (!dirtyVariants.has(variantId)) {
+              return { id: variantId }
+            }
             const vPatch: Record<string, unknown> & { id: string } = {
               id: variantId,
             }
-            if (v.sku !== origV.sku) vPatch.sku = v.sku || null
+            if (currentVariant.sku !== origV.sku) {
+              vPatch.sku = currentVariant.sku || null
+            }
             if (
-              JSON.stringify(v.prices) !== JSON.stringify(origV.prices)
+              JSON.stringify(currentVariant.prices) !== JSON.stringify(origV.prices)
             ) {
-              vPatch.prices = v.prices
+              vPatch.prices = currentVariant.prices
                 .filter((p) => p.amount !== "")
                 .map((p) => ({
                   ...(p.id ? { id: p.id } : {}),
@@ -1406,11 +1413,11 @@ const BulkEditPage = () => {
                 }))
             }
             // Variant thumbnail is a top-level field in Medusa API
-            if (v.thumbnail !== origV.thumbnail) {
-              vPatch.thumbnail = v.thumbnail?.trim() || null
+            if (currentVariant.thumbnail !== origV.thumbnail) {
+              vPatch.thumbnail = currentVariant.thumbnail?.trim() || null
             }
-            if (v.manage_inventory !== origV.manage_inventory) {
-              vPatch.manage_inventory = v.manage_inventory
+            if (currentVariant.manage_inventory !== origV.manage_inventory) {
+              vPatch.manage_inventory = currentVariant.manage_inventory
             }
 
             // Build merged metadata for sale_price, color_hex, wcwp_client-*, etc.
@@ -1422,9 +1429,9 @@ const BulkEditPage = () => {
             // Sale price metadata via price list when configured
             if (
               SALE_PRICE_LIST_ID &&
-              v.sale_price_amount !== origV.sale_price_amount
+              currentVariant.sale_price_amount !== origV.sale_price_amount
             ) {
-              const next = v.sale_price_amount.trim()
+              const next = currentVariant.sale_price_amount.trim()
               const prev = origV.sale_price_amount.trim()
 
               if (prev === "" && next !== "") {
@@ -1457,7 +1464,7 @@ const BulkEditPage = () => {
             for (const key of variantMetaKeysForSave) {
               if (key === "sale_price" && SALE_PRICE_LIST_ID) continue // already handled above
               const prev = getMeta(origV.metadata, key)
-              const next = getMeta(v.metadata, key)
+              const next = getMeta(currentVariant.metadata, key)
               if (prev !== next) {
                 if (next && next.trim()) {
                   metaUpdates[key] =
