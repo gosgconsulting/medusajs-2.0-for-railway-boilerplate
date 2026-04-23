@@ -272,7 +272,7 @@ diff --git a/dist/product-edit-XPUNYMD7.mjs b/dist/product-edit-XPUNYMD7.mjs
 index 47e953a6f71c959b81d5f20bed000238a762ca8d..016f568ddce4f3f0ad15c0c425a2c90a597262f7 100644
 --- a/dist/product-edit-XPUNYMD7.mjs
 +++ b/dist/product-edit-XPUNYMD7.mjs
-@@ -89,6 +89,21 @@ import { Button, Input, Select, Text, Textarea, toast } from "@medusajs/ui";
+@@ -89,6 +89,21 @@
  import { useTranslation } from "react-i18next";
  import * as zod from "zod";
  import { jsx, jsxs } from "react/jsx-runtime";
@@ -294,7 +294,7 @@ index 47e953a6f71c959b81d5f20bed000238a762ca8d..016f568ddce4f3f0ad15c0c425a2c90a
  var EditProductSchema = zod.object({
    status: zod.enum(["draft", "published", "proposed", "rejected"]),
    title: zod.string().min(1),
-@@ -108,11 +123,11 @@ var EditProductForm = ({ product }) => {
+@@ -108,11 +123,11 @@
    const form = useExtendableForm({
      defaultValues: {
        status: product.status,
@@ -309,7 +309,7 @@ index 47e953a6f71c959b81d5f20bed000238a762ca8d..016f568ddce4f3f0ad15c0c425a2c90a
        discountable: product.discountable
      },
      schema: EditProductSchema,
-@@ -122,25 +137,30 @@ var EditProductForm = ({ product }) => {
+@@ -122,10 +137,15 @@
    const { mutateAsync, isPending } = useUpdateProduct(product.id);
    const handleSubmit = form.handleSubmit(async (data) => {
      const { title, discountable, handle, status, ...optional } = data;
@@ -327,18 +327,51 @@ index 47e953a6f71c959b81d5f20bed000238a762ca8d..016f568ddce4f3f0ad15c0c425a2c90a
          discountable,
          handle,
          status,
-         ...nullableData
-       },
-       {
-         onSuccess: ({ product: product2 }) => {
-           toast.success(
-             t("products.edit.successToast", { title: product2.title })
-           );
-           handleSuccess();
-         },
-         onError: (e) => {
-           toast.error(e.message);
-         }
-       }
-     );
-   });
+diff --git a/dist/chunk-BYOPZAGX.mjs b/dist/chunk-BYOPZAGX.mjs
+index cebcbc2878bcff4ac9c4bcfc91a1623ce68b3a8f..e436c3ab88163da9bdb4a54231b5464de2afb250 100644
+--- a/dist/chunk-BYOPZAGX.mjs
++++ b/dist/chunk-BYOPZAGX.mjs
+@@ -3,7 +3,7 @@
+ import { Text, clx } from "@medusajs/ui";
+ import { useRef, useState } from "react";
+ import { jsx, jsxs } from "react/jsx-runtime";
+-var DEFAULT_MAX_FILE_SIZE = 1024 * 1024;
++var DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+ var FileUpload = ({
+   label,
+   hint,
+diff --git a/dist/chunk-DODQ3KJT.mjs b/dist/chunk-DODQ3KJT.mjs
+index 068317b48d9e15296e6e1931e180a912cf03f8c6..e6c9f0db57810311cca5184e7a191f98c0af9109 100644
+--- a/dist/chunk-DODQ3KJT.mjs
++++ b/dist/chunk-DODQ3KJT.mjs
+@@ -288,7 +288,7 @@
+           type: "file_too_large",
+           message: t("products.media.fileTooLarge", {
+             name: fileNames,
+-            size: "1MB"
++            size: "10MB"
+           })
+         });
+         hasInvalidFile = true;
+diff --git a/dist/app.js b/dist/app.js
+index a811fb3933518fd9dac5310a9041bea1ef05e688..c8c8ad27f97e9b0521e8ea79ebfcf42fd27b26f1 100644
+--- a/dist/app.js
++++ b/dist/app.js
+@@ -106865,7 +106865,7 @@
+     import_ui55 = require("@medusajs/ui");
+     import_react71 = require("react");
+     import_jsx_runtime77 = require("react/jsx-runtime");
+-    DEFAULT_MAX_FILE_SIZE = 1024 * 1024;
++    DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+     FileUpload = ({
+       label,
+       hint,
+@@ -107046,7 +107046,7 @@
+               type: "file_too_large",
+               message: t5("products.media.fileTooLarge", {
+                 name: fileNames,
+-                size: "1MB"
++                size: "10MB"
+               })
+             });
+             hasInvalidFile = true;
