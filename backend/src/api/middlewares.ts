@@ -31,6 +31,16 @@ function requireDeferredCheckoutEnabled(
 export default defineMiddlewares({
   routes: [
     {
+      matcher: "/admin/uploads",
+      methods: ["POST"],
+      bodyParser: { sizeLimit: "10mb" },
+    },
+    {
+      matcher: "/admin/uploads/protected",
+      methods: ["POST"],
+      bodyParser: { sizeLimit: "10mb" },
+    },
+    {
       matcher: "/store/carts/:id/complete-deferred",
       methods: ["POST"],
       middlewares: [

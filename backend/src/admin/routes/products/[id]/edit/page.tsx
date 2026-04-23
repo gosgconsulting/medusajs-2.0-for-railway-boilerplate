@@ -33,11 +33,13 @@ const ACCEPT_IMAGES = "image/jpeg,image/png,image/gif,image/webp"
 const FABRICATION_METADATA_KEY = "fabrication_et_composition"
 const PRODUCT_INFORMATION_DETAIL_KEY = "product_information_detail"
 const SIZE_GUIDE_DESCRIPTION_KEY = "size_guide_description"
+/** MoonDK storefront: shown as “Storage & Usage” in admin when `VITE_FRONTPAGE_SHOP_NAME=moondk`. */
+const STORAGE_METADATA_KEY = "storage"
 const LA_SILHOUETE_JULIA_IMAGE_KEY = "la_silhouete_julia_image"
 const MOQ_METADATA_KEY = "moq"
 const OSQ_METADATA_KEY = "osq"
 
-const PROMOTED_METADATA_ORDER = [
+const PROMOTED_METADATA_ORDER_BASE = [
   FABRICATION_METADATA_KEY,
   PRODUCT_INFORMATION_DETAIL_KEY,
   SIZE_GUIDE_DESCRIPTION_KEY,
@@ -46,7 +48,31 @@ const PROMOTED_METADATA_ORDER = [
   OSQ_METADATA_KEY,
 ] as const
 
-const PROMOTED_METADATA_KEY_SET = new Set<string>(PROMOTED_METADATA_ORDER)
+const FRONTPAGE_SHOP_SLUG =
+  typeof import.meta !== "undefined" &&
+  typeof import.meta.env?.VITE_FRONTPAGE_SHOP_NAME === "string"
+    ? import.meta.env.VITE_FRONTPAGE_SHOP_NAME.trim().toLowerCase()
+    : ""
+const isMoonDK = FRONTPAGE_SHOP_SLUG === "moondk"
+
+function getPromotedMetadataOrder(): string[] {
+  if (isMoonDK) {
+    return [
+      FABRICATION_METADATA_KEY,
+      PRODUCT_INFORMATION_DETAIL_KEY,
+      SIZE_GUIDE_DESCRIPTION_KEY,
+      STORAGE_METADATA_KEY,
+      LA_SILHOUETE_JULIA_IMAGE_KEY,
+      MOQ_METADATA_KEY,
+      OSQ_METADATA_KEY,
+    ]
+  }
+  return [...PROMOTED_METADATA_ORDER_BASE]
+}
+
+function getPromotedMetadataKeySet(): Set<string> {
+  return new Set(getPromotedMetadataOrder())
+}
 
 /** Managed by DeepL; hidden from the generic metadata editor and preserved on save. */
 const RESERVED_METADATA_KEYS = new Set<string>([
@@ -56,13 +82,15 @@ const RESERVED_METADATA_KEYS = new Set<string>([
 function mergePromotedMetadataRows(
   raw: { key: string; value: string }[]
 ): { key: string; value: string }[] {
+  const order = getPromotedMetadataOrder()
+  const keySet = getPromotedMetadataKeySet()
   const byKey = new Map(raw.map((e) => [e.key, e]))
-  const promoted = PROMOTED_METADATA_ORDER.map(
+  const promoted = order.map(
     (k) => byKey.get(k) ?? { key: k, value: "" }
   )
   const rest = raw.filter(
     (e) =>
-      !PROMOTED_METADATA_KEY_SET.has(e.key) && !RESERVED_METADATA_KEYS.has(e.key)
+      !keySet.has(e.key) && !RESERVED_METADATA_KEYS.has(e.key)
   )
   const suffix =
     rest.length > 0 ? rest : [{ key: "", value: "" }]
@@ -581,6 +609,9 @@ const ProductEditPage = () => {
   const sizeGuideDescriptionMetadataIndex = metadataEntries.findIndex(
     (e) => e.key === SIZE_GUIDE_DESCRIPTION_KEY
   )
+  const storageMetadataIndex = metadataEntries.findIndex(
+    (e) => e.key === STORAGE_METADATA_KEY
+  )
   const silhouetteImageMetadataIndex = metadataEntries.findIndex(
     (e) => e.key === LA_SILHOUETE_JULIA_IMAGE_KEY
   )
@@ -590,6 +621,7 @@ const ProductEditPage = () => {
   const osqMetadataIndex = metadataEntries.findIndex(
     (e) => e.key === OSQ_METADATA_KEY
   )
+  const promotedMetadataKeySet = getPromotedMetadataKeySet()
 
   return (
     <div className="flex flex-col gap-6 pb-8">
@@ -780,7 +812,9 @@ const ProductEditPage = () => {
           {fabricationMetadataIndex >= 0 ? (
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
-                <Heading level="h2">Fabrication et composition</Heading>
+                <Heading level="h2">
+                  {isMoonDK ? "Product Details" : "Fabrication et composition"}
+                </Heading>
               </div>
               <div className="px-6 py-4">
                 <SimpleMarkdownEditor
@@ -800,7 +834,9 @@ const ProductEditPage = () => {
           {productInformationDetailMetadataIndex >= 0 ? (
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
-                <Heading level="h2">Product information detail</Heading>
+                <Heading level="h2">
+                  {isMoonDK ? "Chef's Notes" : "Product information detail"}
+                </Heading>
               </div>
               <div className="px-6 py-4">
                   <SimpleMarkdownEditor
@@ -826,7 +862,9 @@ const ProductEditPage = () => {
           {sizeGuideDescriptionMetadataIndex >= 0 ? (
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
-                <Heading level="h2">Size guide description</Heading>
+                <Heading level="h2">
+                  {isMoonDK ? "Their Story" : "Size guide description"}
+                </Heading>
               </div>
               <div className="px-6 py-4">
                   <SimpleMarkdownEditor
@@ -847,8 +885,28 @@ const ProductEditPage = () => {
             </Container>
           ) : null}
 
-          {/* La silhouette Julia image (metadata URL) — below size guide */}
-          {silhouetteImageMetadataIndex >= 0 ? (
+          {/* Storage & usage (metadata) — MoonDK only, below Their Story / size guide */}
+          {isMoonDK && storageMetadataIndex >= 0 ? (
+            <Container className="divide-y p-0">
+              <div className="px-6 py-4">
+                <Heading level="h2">Storage & Usage</Heading>
+              </div>
+              <div className="px-6 py-4">
+                <SimpleMarkdownEditor
+                  id="metadata-storage-value"
+                  value={metadataEntries[storageMetadataIndex].value}
+                  onChange={(val) =>
+                    updateMetadataValue(storageMetadataIndex, val)
+                  }
+                  placeholder="Storage & usage…"
+                  minHeight={200}
+                />
+              </div>
+            </Container>
+          ) : null}
+
+          {/* La silhouette Julia image (metadata URL) — below size guide; hidden for MoonDK */}
+          {!isMoonDK && silhouetteImageMetadataIndex >= 0 ? (
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
                 <Heading level="h2">La silhouette Julia image</Heading>
@@ -934,8 +992,8 @@ const ProductEditPage = () => {
             </Container>
           ) : null}
 
-          {/* MOQ & OSQ (numeric metadata) */}
-          {moqMetadataIndex >= 0 && osqMetadataIndex >= 0 ? (
+          {/* MOQ & OSQ (numeric metadata); hidden for MoonDK */}
+          {!isMoonDK && moqMetadataIndex >= 0 && osqMetadataIndex >= 0 ? (
             <Container className="divide-y p-0">
               <div className="px-6 py-4">
                 <Heading level="h2">Order quantities</Heading>
@@ -1132,7 +1190,7 @@ const ProductEditPage = () => {
             </div>
             <div className="px-6 py-4 flex flex-col gap-4">
               {metadataEntries.map((entry, i) => {
-                if (PROMOTED_METADATA_KEY_SET.has(entry.key)) {
+                if (promotedMetadataKeySet.has(entry.key)) {
                   return null
                 }
                 return (
