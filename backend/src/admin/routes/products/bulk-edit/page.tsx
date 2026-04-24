@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSpreadsheet } from "./use-spreadsheet"
+import { useColumnResize } from "./use-column-resize"
 import { Link } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -13,20 +15,21 @@ import {
   Text,
   toast,
 } from "@medusajs/ui"
-import { ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
+import { ArrowUturnLeft, Check, ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
 import { hydrateProductVariantsInventoryQuantity } from "../../../lib/hydrate-product-variant-inventory"
 import { sdk } from "../../../lib/sdk"
 import {
-  applyProductColumnPrefsPayload,
   fetchRemoteProductColumnPrefs,
-  loadColumnPrefs,
+  loadSavedViews,
   newCustomColumnId,
-  saveColumnPrefs,
-  saveRemoteProductColumnPrefs,
+  newSavedViewId,
+  saveSavedViews,
   type CustomColumnDef,
+  type SavedView,
 } from "../../../lib/product-column-prefs"
 import { stripHtmlTags } from "../../../lib/strip-html"
 import {
+  DEFAULT_COLUMN_ORDER,
   DEFAULT_VISIBLE_COLUMNS,
   SUGGESTED_PRODUCT_METADATA_KEYS,
   TOGGLEABLE_COLUMNS,
@@ -112,6 +115,7 @@ type VariantRow = {
   sale_price_id?: string
   sale_price_amount: string // display amount for configured price list
   thumbnail: string | null
+  images: { id?: string; url: string }[]
   manage_inventory: boolean
   inventory_quantity: number | null
   /** First linked inventory item (Medusa v2 stock is on levels, not variant fields). */
@@ -128,12 +132,16 @@ type ProductRow = {
   handle: string
   status: ProductStatus
   category_ids: string[]
+  collection_id: string | null
+  sales_channel_ids: string[]
   material: string
   tags: string      // comma-separated
   weight: string    // as string for input control
   width: string     // as string for input control
   height: string    // as string for input control
   thumbnail: string | null
+  images: { id?: string; url: string }[]
+  options: { id: string; title: string; values: { id: string; value: string }[] }[]
   metadata: Record<string, unknown>
   variants: VariantRow[]
 }
@@ -168,12 +176,21 @@ type ApiProduct = {
   handle?: string | null
   status?: string | null
   categories?: { id?: string; name?: string }[] | null
+  collection?: { id?: string; title?: string | null } | null
+  collection_id?: string | null
+  sales_channels?: { id?: string; name?: string | null }[] | null
   material?: string | null
   weight?: number | null
   width?: number | null
   height?: number | null
   thumbnail?: string | null
+  images?: { id?: string; url?: string }[] | null
   tags?: { id?: string; value?: string }[] | null
+  options?: {
+    id?: string
+    title?: string | null
+    values?: { id?: string; value?: string | null }[] | null
+  }[] | null
   metadata?: Record<string, unknown> | null
   variants?: ApiVariant[] | null
 }
@@ -221,6 +238,33 @@ function toVariantRow(v: ApiVariant): VariantRow {
         ? amountToDisplay(meta.sale_price as number)
         : "",
     thumbnail,
+    // Medusa v2's variant update endpoint does NOT accept an `images` array,
+    // so we persist the variant gallery in metadata.variant_images (array of URLs)
+    // and fall back to the relation images if metadata is absent.
+    images: (() => {
+      const metaImgs = meta?.variant_images
+      if (Array.isArray(metaImgs)) {
+        const out: { id?: string; url: string }[] = []
+        for (const m of metaImgs) {
+          if (typeof m === "string" && m) {
+            out.push({ url: m })
+          } else if (m && typeof m === "object") {
+            const url = (m as { url?: unknown }).url
+            const id = (m as { id?: unknown }).id
+            if (typeof url === "string" && url) {
+              out.push({
+                url,
+                ...(typeof id === "string" ? { id } : {}),
+              })
+            }
+          }
+        }
+        return out
+      }
+      return (v.images ?? [])
+        .map((i) => ({ id: i.id, url: i.url ?? "" }))
+        .filter((i) => !!i.url)
+    })(),
     manage_inventory: v.manage_inventory ?? false,
     inventory_quantity: v.inventory_quantity ?? null,
     inventory_item_id: inventoryItemId,
@@ -241,12 +285,28 @@ function toRow(p: ApiProduct): ProductRow {
     category_ids: (p.categories ?? [])
       .map((c) => c.id ?? "")
       .filter(Boolean),
+    collection_id: p.collection?.id ?? p.collection_id ?? null,
+    sales_channel_ids: (p.sales_channels ?? [])
+      .map((c) => c.id ?? "")
+      .filter(Boolean),
     material: p.material ?? "",
     tags: tagsToString(p.tags),
     weight: p.weight != null ? String(p.weight) : "",
     width: p.width != null ? String(p.width) : "",
     height: p.height != null ? String(p.height) : "",
     thumbnail: p.thumbnail ?? null,
+    images: (p.images ?? [])
+      .map((i) => ({ id: i.id, url: i.url ?? "" }))
+      .filter((i) => i.url),
+    options: (p.options ?? [])
+      .filter((o) => o.id && o.title)
+      .map((o) => ({
+        id: o.id as string,
+        title: o.title as string,
+        values: (o.values ?? [])
+          .filter((v) => v.id && v.value)
+          .map((v) => ({ id: v.id as string, value: v.value as string })),
+      })),
     metadata: { ...(p.metadata ?? {}) } as Record<string, unknown>,
     variants: (p.variants ?? []).map(toVariantRow),
   }
@@ -392,6 +452,8 @@ CategoryMenuCheckboxRow.displayName = "CategoryMenuCheckboxRow"
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const BulkEditPage = () => {
+  useSpreadsheet("table.sheet-table")
+  useColumnResize("table.sheet-table")
   const queryClient = useQueryClient()
   const mergedServerColumnPrefsRef = React.useRef(false)
   const productThumbnailInputRef = React.useRef<HTMLInputElement>(null)
@@ -429,24 +491,83 @@ const BulkEditPage = () => {
   const [working, setWorking] = useState<ProductRow[]>([])
   const [errors, setErrors] = useState<RowErrors>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  // selectedIds holds both variant IDs (for variant rows) and product IDs (for 0-variant products)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [richTextEdit, setRichTextEdit] = useState<RichTextEditState>(null)
-  const [columnMode, setColumnMode] = useState<"default" | "custom">(
-    () => loadColumnPrefs().mode
+  const [addingVariantFor, setAddingVariantFor] = useState<string | null>(null)
+  const [newVariantStep, setNewVariantStep] = useState<1 | 2 | 3>(1)
+  const [newVariantDraft, setNewVariantDraft] = useState<{
+    title: string
+    optionValues: Record<string, string>
+    prices: { currency_code: string; amount: string }[]
+    sku: string
+    manage_inventory: boolean
+    inventory_quantity: string
+  }>({
+    title: "",
+    optionValues: {},
+    prices: [{ currency_code: "usd", amount: "" }],
+    sku: "",
+    manage_inventory: true,
+    inventory_quantity: "",
+  })
+  const [isCreatingVariant, setIsCreatingVariant] = useState(false)
+  // Saved views — Default (null) shows all columns; saved views store a specific selection
+  const [savedViews, setSavedViews] = useState<SavedView[]>(
+    () => loadSavedViews().savedViews
   )
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-    () => loadColumnPrefs().visible
+  const [currentViewId, setCurrentViewIdState] = useState<string | null>(
+    () => loadSavedViews().currentViewId
   )
-  const [customColumns, setCustomColumns] = useState<CustomColumnDef[]>(
-    () => loadColumnPrefs().customColumns
-  )
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
+    const { savedViews: sv, currentViewId: id } = loadSavedViews()
+    const view = id ? sv.find((v) => v.id === id) : null
+    return view
+      ? new Set(view.visible)
+      : new Set(DEFAULT_VISIBLE_COLUMNS)
+  })
+  const [customColumns, setCustomColumns] = useState<CustomColumnDef[]>(() => {
+    const { savedViews: sv, currentViewId: id } = loadSavedViews()
+    const view = id ? sv.find((v) => v.id === id) : null
+    return view ? view.customColumns : []
+  })
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    const { savedViews: sv, currentViewId: id } = loadSavedViews()
+    const view = id ? sv.find((v) => v.id === id) : null
+    // Merge saved order with DEFAULT_COLUMN_ORDER so newly-added columns still show up
+    const saved = view?.order ?? []
+    const merged = [...saved]
+    for (const col of DEFAULT_COLUMN_ORDER) {
+      if (!merged.includes(col)) merged.push(col)
+    }
+    return merged
+  })
+  const colDragSrcRef = useRef<string | null>(null)
   const [newCustomLabel, setNewCustomLabel] = useState("")
   const [newCustomSourceKind, setNewCustomSourceKind] = useState<
     "variant_metadata" | "product_metadata"
   >("variant_metadata")
   const [newCustomKey, setNewCustomKey] = useState("")
+  const [newViewNameInput, setNewViewNameInput] = useState("")
+  const [isNamingNewView, setIsNamingNewView] = useState(false)
   const [i18nLocaleToggleBusy, setI18nLocaleToggleBusy] = useState<
     Record<string, boolean>
   >({})
+
+  // Image modal state
+  const [imageModalFor, setImageModalFor] = useState<
+    | { mode: "product"; productId: string }
+    | { mode: "variant"; productId: string; variantId: string }
+    | null
+  >(null)
+  const [modalProductImages, setModalProductImages] = useState<{ id?: string; url: string }[]>([])
+  const [modalVariantImages, setModalVariantImages] = useState<{ id?: string; url: string }[]>([])
+  const [isSavingImages, setIsSavingImages] = useState(false)
+  const [isUploadingProductImages, setIsUploadingProductImages] = useState(false)
+  const [isUploadingVariantImages, setIsUploadingVariantImages] = useState(false)
+  const modalProductImagesInputRef = useRef<HTMLInputElement>(null)
+  const modalVariantImagesInputRef = useRef<HTMLInputElement>(null)
+  const imgDragSrcRef = useRef<{ section: "product" | "variant"; idx: number } | null>(null)
 
   const extraVariantMetadataKeys = useMemo(() => {
     const s = new Set<string>()
@@ -456,9 +577,144 @@ const BulkEditPage = () => {
     return s
   }, [customColumns])
 
+  // Persist saved views + current view selection
   useEffect(() => {
-    saveColumnPrefs(columnMode, visibleColumns, customColumns)
-  }, [columnMode, visibleColumns, customColumns])
+    saveSavedViews(savedViews, currentViewId)
+  }, [savedViews, currentViewId])
+
+  // Is the current in-memory state different from the selected saved view?
+  const isViewDirty = useMemo(() => {
+    const currentView = currentViewId
+      ? savedViews.find((v) => v.id === currentViewId)
+      : null
+    // Default view (null): dirty if state differs from defaults
+    if (!currentView) {
+      if (customColumns.length > 0) return true
+      if (visibleColumns.size !== DEFAULT_VISIBLE_COLUMNS.size) return true
+      for (const id of DEFAULT_VISIBLE_COLUMNS) {
+        if (!visibleColumns.has(id)) return true
+      }
+      // Dirty if column order differs from default
+      if (columnOrder.length !== DEFAULT_COLUMN_ORDER.length) return true
+      for (let i = 0; i < DEFAULT_COLUMN_ORDER.length; i++) {
+        if (columnOrder[i] !== DEFAULT_COLUMN_ORDER[i]) return true
+      }
+      return false
+    }
+    const savedVisible = new Set(currentView.visible)
+    if (savedVisible.size !== visibleColumns.size) return true
+    for (const id of visibleColumns) if (!savedVisible.has(id)) return true
+    if (currentView.customColumns.length !== customColumns.length) return true
+    for (let i = 0; i < customColumns.length; i++) {
+      const a = customColumns[i]
+      const b = currentView.customColumns[i]
+      if (!b || a.id !== b.id || a.label !== b.label) return true
+      if (a.source.kind !== b.source.kind || a.source.key !== b.source.key) {
+        return true
+      }
+    }
+    // Compare column order
+    const savedOrder = currentView.order ?? DEFAULT_COLUMN_ORDER
+    if (savedOrder.length !== columnOrder.length) return true
+    for (let i = 0; i < savedOrder.length; i++) {
+      if (savedOrder[i] !== columnOrder[i]) return true
+    }
+    return false
+  }, [currentViewId, savedViews, visibleColumns, customColumns, columnOrder])
+
+  const selectView = useCallback(
+    (viewId: string | null) => {
+      setCurrentViewIdState(viewId)
+      const view = viewId ? savedViews.find((v) => v.id === viewId) : null
+      if (view) {
+        setVisibleColumns(new Set(view.visible))
+        setCustomColumns(view.customColumns)
+        const saved = view.order ?? []
+        const merged = [...saved]
+        for (const col of DEFAULT_COLUMN_ORDER) {
+          if (!merged.includes(col)) merged.push(col)
+        }
+        setColumnOrder(merged)
+      } else {
+        setVisibleColumns(new Set(DEFAULT_VISIBLE_COLUMNS))
+        setCustomColumns([])
+        setColumnOrder([...DEFAULT_COLUMN_ORDER])
+      }
+    },
+    [savedViews]
+  )
+
+  const saveCurrentAsNewView = useCallback(() => {
+    const name = newViewNameInput.trim()
+    if (!name) {
+      toast.error("Enter a view name")
+      return
+    }
+    const id = newSavedViewId()
+    const newView: SavedView = {
+      id,
+      name,
+      visible: [...visibleColumns],
+      customColumns,
+      order: [...columnOrder],
+    }
+    setSavedViews((prev) => [...prev, newView])
+    setCurrentViewIdState(id)
+    setNewViewNameInput("")
+    setIsNamingNewView(false)
+    toast.success(`View "${name}" saved`)
+  }, [newViewNameInput, visibleColumns, customColumns, columnOrder])
+
+  const updateCurrentView = useCallback(() => {
+    if (!currentViewId) return
+    setSavedViews((prev) =>
+      prev.map((v) =>
+        v.id === currentViewId
+          ? {
+              ...v,
+              visible: [...visibleColumns],
+              customColumns,
+              order: [...columnOrder],
+            }
+          : v
+      )
+    )
+    const view = savedViews.find((v) => v.id === currentViewId)
+    toast.success(`View "${view?.name ?? ""}" updated`)
+  }, [currentViewId, savedViews, visibleColumns, customColumns, columnOrder])
+
+  const deleteCurrentView = useCallback(() => {
+    if (!currentViewId) return
+    const view = savedViews.find((v) => v.id === currentViewId)
+    if (!view) return
+    if (!window.confirm(`Delete view "${view.name}"? This cannot be undone.`)) {
+      return
+    }
+    setSavedViews((prev) => prev.filter((v) => v.id !== currentViewId))
+    setCurrentViewIdState(null)
+    setVisibleColumns(new Set(DEFAULT_VISIBLE_COLUMNS))
+    setCustomColumns([])
+    setColumnOrder([...DEFAULT_COLUMN_ORDER])
+    toast.success(`View "${view.name}" deleted`)
+  }, [currentViewId, savedViews])
+
+  const moveColumn = useCallback((fromId: string, toId: string) => {
+    if (fromId === toId) return
+    setColumnOrder((prev) => {
+      const next = [...prev]
+      const fromIdx = next.indexOf(fromId)
+      const toIdx = next.indexOf(toId)
+      if (fromIdx < 0 || toIdx < 0) return prev
+      const [item] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, item)
+      return next
+    })
+  }, [])
+
+  const currentViewName = useMemo(() => {
+    if (!currentViewId) return "Default"
+    return savedViews.find((v) => v.id === currentViewId)?.name ?? "Default"
+  }, [currentViewId, savedViews])
 
   const {
     data: remoteColumnPrefs,
@@ -477,47 +733,19 @@ const BulkEditPage = () => {
     if (!remoteColumnPrefs) return
     if (mergedServerColumnPrefsRef.current) return
     mergedServerColumnPrefsRef.current = true
-    const visibleArr =
-      remoteColumnPrefs.visible?.length
-        ? remoteColumnPrefs.visible
-        : [...DEFAULT_VISIBLE_COLUMNS]
-    setColumnMode(remoteColumnPrefs.mode)
-    setVisibleColumns(new Set(visibleArr))
-    setCustomColumns(remoteColumnPrefs.customColumns ?? [])
-    applyProductColumnPrefsPayload({
-      mode: remoteColumnPrefs.mode,
-      visible: visibleArr,
-      customColumns: remoteColumnPrefs.customColumns ?? [],
-    })
+    // Legacy remote prefs (mode/visible/customColumns) are ignored here;
+    // saved views are local-only for now (can be synced later with a dedicated endpoint).
   }, [remoteColumnPrefsFetchDone, remoteColumnPrefs])
-
-  useEffect(() => {
-    if (!remoteColumnPrefsFetchDone) return
-    const t = window.setTimeout(() => {
-      void saveRemoteProductColumnPrefs(sdk, {
-        mode: columnMode,
-        visible: [...visibleColumns],
-        customColumns,
-      }).catch(() => {
-        /* offline */
-      })
-    }, 900)
-    return () => window.clearTimeout(t)
-  }, [
-    remoteColumnPrefsFetchDone,
-    columnMode,
-    visibleColumns,
-    customColumns,
-  ])
 
   const isColumnVisible = useCallback(
     (id: string) => {
       if (id === "expand" || id === "image" || id === "title" || id === "status")
         return true
-      if (columnMode === "default") return true
+      // Default view (no saved view selected) and no modifications: show all columns
+      if (!currentViewId && !isViewDirty) return true
       return visibleColumns.has(id)
     },
-    [columnMode, visibleColumns]
+    [currentViewId, isViewDirty, visibleColumns]
   )
 
   useEffect(() => {
@@ -554,7 +782,7 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
         fields:
-          "+thumbnail,+tags,*categories,+description,+material,+weight,+width,+height,+metadata,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,*variants.inventory_items,+variants.metadata",
+          "+thumbnail,+images,+tags,*categories,*collection,*sales_channels,*options,*options.values,+description,+material,+weight,+width,+height,+metadata,+variants,+variants.prices,+variants.thumbnail,+variants.images,+variants.manage_inventory,*variants.inventory_items,+variants.metadata",
       } as Parameters<typeof sdk.admin.product.list>[0])
       await hydrateProductVariantsInventoryQuantity(res.products ?? [])
       return res
@@ -586,6 +814,13 @@ const BulkEditPage = () => {
   const { data: categoriesData } = useQuery({
     queryKey: ["admin-product-categories-bulk"],
     queryFn: () => sdk.admin.productCategory.list({ limit: 200 }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const { data: collectionsData } = useQuery({
+    queryKey: ["admin-product-collections-bulk"],
+    queryFn: () => sdk.admin.productCollection.list({ limit: 200 }),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
@@ -710,6 +945,31 @@ const BulkEditPage = () => {
     }
   }, [allExpanded, working])
 
+  // ── Selection (checkbox column + bulk actions) ──────────────────────────
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  // All selectable IDs: variant IDs for products with variants, product IDs for 0-variant products
+  const allSelectableIds = useMemo(() => [
+    ...working.flatMap((r) => r.variants.map((v) => v.id)),
+    ...working.filter((r) => r.variants.length === 0).map((r) => r.id),
+  ], [working])
+
+  const allSelected =
+    allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.has(id))
+  const someSelected =
+    !allSelected && allSelectableIds.some((id) => selectedIds.has(id))
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(allSelectableIds))
+  }, [allSelected, allSelectableIds])
+
   // ── Dirty tracking ──────────────────────────────────────────────────────
   const dirtyProductIds = useMemo(() => {
     const set = new Set<string>()
@@ -723,6 +983,9 @@ const BulkEditPage = () => {
         row.handle !== orig.handle ||
         row.status !== orig.status ||
         JSON.stringify(row.category_ids) !== JSON.stringify(orig.category_ids) ||
+        (row.collection_id ?? null) !== (orig.collection_id ?? null) ||
+        JSON.stringify(row.sales_channel_ids) !==
+          JSON.stringify(orig.sales_channel_ids) ||
         row.material !== orig.material ||
         row.tags !== orig.tags ||
         row.weight !== orig.weight ||
@@ -755,6 +1018,7 @@ const BulkEditPage = () => {
             (k) => getMeta(variant.metadata, k) !== getMeta(origV.metadata, k)
           )
         if (
+          variant.title !== origV.title ||
           variant.sku !== origV.sku ||
           JSON.stringify(variant.prices) !== JSON.stringify(origV.prices) ||
           variant.sale_price_amount !== origV.sale_price_amount ||
@@ -780,6 +1044,30 @@ const BulkEditPage = () => {
 
   const hasDirty = dirtyIds.size > 0
   const hasErrors = Object.keys(errors).length > 0
+
+  // Maps variant ID → parent product ID; used for variant-level delete
+  const variantToProductIdMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const row of working) {
+      for (const v of row.variants) map.set(v.id, row.id)
+    }
+    return map
+  }, [working])
+
+  const selectedVariantCount = useMemo(() =>
+    Array.from(selectedIds).filter((id) => variantToProductIdMap.has(id)).length,
+    [selectedIds, variantToProductIdMap]
+  )
+  const selectedProductCount = useMemo(() =>
+    Array.from(selectedIds).filter((id) => !variantToProductIdMap.has(id)).length,
+    [selectedIds, variantToProductIdMap]
+  )
+  const deleteSelectionLabel = useMemo(() => {
+    const parts: string[] = []
+    if (selectedVariantCount > 0) parts.push(`${selectedVariantCount} variant${selectedVariantCount !== 1 ? "s" : ""}`)
+    if (selectedProductCount > 0) parts.push(`${selectedProductCount} product${selectedProductCount !== 1 ? "s" : ""}`)
+    return parts.length > 0 ? `Delete ${parts.join(" & ")}` : `Delete ${selectedIds.size}`
+  }, [selectedVariantCount, selectedProductCount, selectedIds.size])
 
   // ── Update handlers ─────────────────────────────────────────────────────
   const updateRow = useCallback(
@@ -878,6 +1166,23 @@ const BulkEditPage = () => {
             ...row,
             variants: row.variants.map((v) =>
               v.id === variantId ? { ...v, sku } : v
+            ),
+          }
+        })
+      )
+    },
+    []
+  )
+
+  const updateVariantTitle = useCallback(
+    (productId: string, variantId: string, title: string) => {
+      setWorking((prev) =>
+        prev.map((row) => {
+          if (row.id !== productId) return row
+          return {
+            ...row,
+            variants: row.variants.map((v) =>
+              v.id === variantId ? { ...v, title } : v
             ),
           }
         })
@@ -1149,18 +1454,56 @@ const BulkEditPage = () => {
         const { files: uploaded } = await sdk.admin.upload.create({
           files: Array.from(files),
         })
-        if (uploaded?.length && (uploaded[0] as { url?: string }).url) {
-          updateRow(productId, "thumbnail", (uploaded[0] as { url: string }).url)
-          toast.success("Thumbnail updated")
-        } else {
+        const urls = (uploaded ?? [])
+          .map((f: { url?: string }) => f.url)
+          .filter((u): u is string => !!u)
+        if (!urls.length) {
           toast.error("Upload failed")
+          e.target.value = ""
+          return
+        }
+        // First uploaded image → thumbnail (flows through the save button).
+        updateRow(productId, "thumbnail", urls[0])
+        // Additional images → attach to the product gallery immediately.
+        if (urls.length > 1) {
+          try {
+            const existing = await sdk.admin.product.retrieve(productId, {
+              fields: "images",
+            } as Parameters<typeof sdk.admin.product.retrieve>[1])
+            const existingUrls = (
+              ((existing as { product: { images?: { url?: string }[] } }).product
+                ?.images ?? []) as { url?: string }[]
+            )
+              .map((i) => i.url)
+              .filter((u): u is string => !!u)
+            const nextImages = [
+              ...existingUrls,
+              ...urls,
+            ].map((url) => ({ url }))
+            await sdk.admin.product.update(
+              productId,
+              { images: nextImages } as Parameters<
+                typeof sdk.admin.product.update
+              >[1]
+            )
+            await queryClient.invalidateQueries({
+              queryKey: ["admin-products-bulk"],
+            })
+            toast.success(
+              `${urls.length} images uploaded (thumbnail + ${urls.length - 1} to gallery)`
+            )
+          } catch {
+            toast.error("Gallery update failed; thumbnail saved on next click.")
+          }
+        } else {
+          toast.success("Thumbnail updated")
         }
       } catch {
         toast.error("Upload failed")
       }
       e.target.value = ""
     },
-    [uploadingThumbnailFor, updateRow]
+    [queryClient, uploadingThumbnailFor, updateRow]
   )
 
   const handleVariantThumbnailUpload = useCallback(
@@ -1191,24 +1534,211 @@ const BulkEditPage = () => {
     [uploadingVariantThumbnailFor, updateVariantThumbnail]
   )
 
+  // ── Image modal handlers ────────────────────────────────────────────────────
+
+  const openImageModalForProduct = useCallback(
+    (productId: string) => {
+      const row = working.find((r) => r.id === productId)
+      if (!row) return
+      // Seed from images[] if present, else fallback to the lone thumbnail so
+      // the modal isn't visually empty when the product only has a thumbnail.
+      const seed =
+        row.images && row.images.length > 0
+          ? row.images
+          : row.thumbnail
+          ? [{ url: row.thumbnail }]
+          : []
+      setModalProductImages([...seed])
+      setModalVariantImages([])
+      setImageModalFor({ mode: "product", productId })
+    },
+    [working]
+  )
+
+  const openImageModalForVariant = useCallback(
+    (productId: string, variantId: string) => {
+      const row = working.find((r) => r.id === productId)
+      if (!row) return
+      const v = row.variants.find((v) => v.id === variantId)
+      const seed =
+        v?.images && v.images.length > 0
+          ? v.images
+          : v?.thumbnail
+          ? [{ url: v.thumbnail }]
+          : []
+      setModalVariantImages([...seed])
+      setModalProductImages([])
+      setImageModalFor({ mode: "variant", productId, variantId })
+    },
+    [working]
+  )
+
+  const saveImageModal = useCallback(async () => {
+    if (!imageModalFor) return
+    setIsSavingImages(true)
+    try {
+      if (imageModalFor.mode === "product") {
+        const { productId } = imageModalFor
+        await sdk.admin.product.update(productId, {
+          images: modalProductImages.map((i) => ({ id: i.id, url: i.url })),
+          thumbnail: modalProductImages[0]?.url || null,
+        } as Parameters<typeof sdk.admin.product.update>[1])
+        setWorking((prev) =>
+          prev.map((r) =>
+            r.id !== productId
+              ? r
+              : {
+                  ...r,
+                  images: modalProductImages,
+                  thumbnail: modalProductImages[0]?.url ?? r.thumbnail,
+                }
+          )
+        )
+        setSource((prev) =>
+          prev.map((r) =>
+            r.id !== productId
+              ? r
+              : {
+                  ...r,
+                  images: modalProductImages,
+                  thumbnail: modalProductImages[0]?.url ?? r.thumbnail,
+                }
+          )
+        )
+      } else {
+        const { productId, variantId } = imageModalFor
+        // Medusa v2's variant update payload does NOT accept an `images` array,
+        // so we persist the gallery in metadata.variant_images instead. The
+        // first image still drives the variant thumbnail (which IS accepted).
+        const row = working.find((r) => r.id === productId)
+        const currentVariant = row?.variants.find((v) => v.id === variantId)
+        const nextMetadata: Record<string, unknown> = {
+          ...(currentVariant?.metadata ?? {}),
+          variant_images: modalVariantImages.map((i) => ({
+            ...(i.id ? { id: i.id } : {}),
+            url: i.url,
+          })),
+        }
+        await sdk.client.fetch(
+          `/admin/products/${productId}/variants/${variantId}`,
+          {
+            method: "POST",
+            body: {
+              thumbnail: modalVariantImages[0]?.url || null,
+              metadata: nextMetadata,
+            },
+          }
+        )
+        const applyVariantUpdate = (r: ProductRow) =>
+          r.id !== productId
+            ? r
+            : {
+                ...r,
+                variants: r.variants.map((v) =>
+                  v.id !== variantId
+                    ? v
+                    : {
+                        ...v,
+                        images: modalVariantImages,
+                        thumbnail: modalVariantImages[0]?.url ?? v.thumbnail,
+                        metadata: nextMetadata,
+                      }
+                ),
+              }
+        setWorking((prev) => prev.map(applyVariantUpdate))
+        setSource((prev) => prev.map(applyVariantUpdate))
+      }
+      setImageModalFor(null)
+      toast.success("Images saved")
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to save images")
+    } finally {
+      setIsSavingImages(false)
+    }
+  }, [imageModalFor, modalProductImages, modalVariantImages, working])
+
+  const handleModalProductImagesUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!files?.length) return
+      setIsUploadingProductImages(true)
+      try {
+        const { files: uploaded } = await sdk.admin.upload.create({
+          files: Array.from(files),
+        })
+        const urls = (uploaded ?? [])
+          .map((f: { url?: string }) => f.url)
+          .filter((u): u is string => !!u)
+        if (urls.length) {
+          setModalProductImages((prev) => [
+            ...prev,
+            ...urls.map((url) => ({ url })),
+          ])
+        }
+      } catch {
+        toast.error("Upload failed")
+      } finally {
+        setIsUploadingProductImages(false)
+        e.target.value = ""
+      }
+    },
+    []
+  )
+
+  const handleModalVariantImagesUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!files?.length) return
+      setIsUploadingVariantImages(true)
+      try {
+        const { files: uploaded } = await sdk.admin.upload.create({
+          files: Array.from(files),
+        })
+        const urls = (uploaded ?? [])
+          .map((f: { url?: string }) => f.url)
+          .filter((u): u is string => !!u)
+        if (urls.length) {
+          setModalVariantImages((prev) => [
+            ...prev,
+            ...urls.map((url) => ({ url })),
+          ])
+        }
+      } catch {
+        toast.error("Upload failed")
+      } finally {
+        setIsUploadingVariantImages(false)
+        e.target.value = ""
+      }
+    },
+    []
+  )
+
   const discard = useCallback(() => {
     setWorking(source)
     setErrors({})
   }, [source])
 
+  // Track whether the user has been prompted about dirty changes during this
+  // search session — prompting on every keystroke blocks typing entirely.
+  const searchDirtyPromptedRef = useRef(false)
   const handleSearchChange = useCallback(
     (value: string) => {
-      if (hasDirty) {
+      // Always accept keystrokes into local state; the debounced effect below
+      // drives the actual re-query, so typing never gets swallowed by a prompt.
+      if (hasDirty && !searchDirtyPromptedRef.current) {
+        searchDirtyPromptedRef.current = true
         if (
           !window.confirm(
-            "You have unsaved changes. Discard them and change search?"
+            "You have unsaved changes. Keep typing will discard them on the next search. Continue?"
           )
         ) {
+          // User cancelled — leave value unchanged
           return
         }
         discard()
       }
       setSearch(value)
+      if (!value.trim()) searchDirtyPromptedRef.current = false
     },
     [discard, hasDirty]
   )
@@ -1374,14 +1904,27 @@ const BulkEditPage = () => {
         if (row.thumbnail !== orig.thumbnail) {
           patch.thumbnail = row.thumbnail || null
         }
+        if ((row.collection_id ?? null) !== (orig.collection_id ?? null)) {
+          patch.collection_id = row.collection_id
+        }
+        if (
+          JSON.stringify(row.sales_channel_ids) !==
+          JSON.stringify(orig.sales_channel_ids)
+        ) {
+          patch.sales_channels = row.sales_channel_ids.map((id) => ({ id }))
+        }
         if (
           JSON.stringify(row.metadata ?? {}) !==
           JSON.stringify(orig.metadata ?? {})
         ) {
-          patch.metadata = {
-            ...(orig.metadata ?? {}),
-            ...(row.metadata ?? {}),
+          // Medusa v2 metadata updates merge — sending {a:1} keeps prior keys.
+          // To DELETE a key (e.g. clearing B2B discount), we must explicitly
+          // send it as null so the server strips it.
+          const nextMeta: Record<string, unknown> = { ...(row.metadata ?? {}) }
+          for (const k of Object.keys(orig.metadata ?? {})) {
+            if (!(k in nextMeta)) nextMeta[k] = null
           }
+          patch.metadata = nextMeta
         }
 
         // Include all existing variants when any variant is edited.
@@ -1397,6 +1940,9 @@ const BulkEditPage = () => {
             }
             const vPatch: Record<string, unknown> & { id: string } = {
               id: variantId,
+            }
+            if (currentVariant.title !== origV.title) {
+              vPatch.title = currentVariant.title || null
             }
             if (currentVariant.sku !== origV.sku) {
               vPatch.sku = currentVariant.sku || null
@@ -1487,7 +2033,20 @@ const BulkEditPage = () => {
       })
       )
 
-      let inventorySaveNeedsLocation = false
+      // Collect all variants that need an inventory-level change (qty or manage_inventory→true).
+      // Variants where manage_inventory was just enabled have inventoryItemId=null; those need
+      // a full item+link+level setup (Medusa does NOT auto-create inventory items on variant update).
+      type InvQtyChange = {
+        productId: string
+        variantId: string
+        variantSku: string
+        inventoryItemId: string | null
+        /** true when manage_inventory just became true (item must be created & linked) */
+        isNew: boolean
+        stocked_quantity: number
+      }
+      const invQtyChanges: InvQtyChange[] = []
+
       for (const id of dirtyIds) {
         const row = working.find((r) => r.id === id)
         const orig = source.find((s) => s.id === id)
@@ -1499,14 +2058,26 @@ const BulkEditPage = () => {
           const origV = orig.variants.find((x) => x.id === variantId)
           if (!v || !origV) continue
           if (!v.manage_inventory) continue
-          if (v.inventory_quantity === origV.inventory_quantity) continue
-          if (!origV.inventory_item_id) continue
-          inventorySaveNeedsLocation = true
-          break
+          const qtyChanged = v.inventory_quantity !== origV.inventory_quantity
+          const manageOn = !origV.manage_inventory && v.manage_inventory
+          if (!qtyChanged && !manageOn) continue
+          const req = Math.max(1, origV.inventory_required_quantity)
+          const qty =
+            v.inventory_quantity != null
+              ? Math.max(0, Math.round(v.inventory_quantity))
+              : 0
+          invQtyChanges.push({
+            productId: id,
+            variantId,
+            variantSku: v.sku ?? "",
+            inventoryItemId: origV.inventory_item_id,
+            isNew: manageOn && !origV.inventory_item_id,
+            stocked_quantity: qty * req,
+          })
         }
-        if (inventorySaveNeedsLocation) break
       }
-      if (inventorySaveNeedsLocation && !primaryStockLocationId) {
+
+      if (invQtyChanges.length && !primaryStockLocationId) {
         throw new Error(
           "Stock quantity was changed but no stock location exists. Create a stock location in Settings (Inventory → Locations), then save again."
         )
@@ -1516,47 +2087,80 @@ const BulkEditPage = () => {
         { update } as Parameters<typeof sdk.admin.product.batch>[0]
       )
 
-      const inventoryLevelUpdates: {
-        inventory_item_id: string
-        location_id: string
-        stocked_quantity: number
-      }[] = []
+      if (invQtyChanges.length && primaryStockLocationId) {
+        // ── Newly managed variants: create inventory item → link to variant → create level ──
+        // Medusa does NOT auto-create an inventory item when manage_inventory is set to true
+        // on an existing variant via the batch/update endpoint. We must do it explicitly.
+        for (const chg of invQtyChanges.filter((c) => c.isNew)) {
+          try {
+            const body: Record<string, unknown> = {}
+            if (chg.variantSku) body.sku = chg.variantSku
+            const newItemRes = await sdk.admin.inventoryItem.create(
+              body as Parameters<typeof sdk.admin.inventoryItem.create>[0]
+            )
+            const newItemId = (newItemRes as { inventory_item?: { id?: string } }).inventory_item?.id
+            if (!newItemId) continue
 
-      if (primaryStockLocationId) {
-        for (const id of dirtyIds) {
-          const row = working.find((r) => r.id === id)
-          const orig = source.find((s) => s.id === id)
-          if (!row || !orig) continue
-          const dirtyVs = dirtyVariantMap.get(id)
-          if (!dirtyVs) continue
-          for (const variantId of dirtyVs) {
-            const v = row.variants.find((x) => x.id === variantId)
-            const origV = orig.variants.find((x) => x.id === variantId)
-            if (!v || !origV) continue
-            if (!v.manage_inventory) continue
-            if (v.inventory_quantity === origV.inventory_quantity) continue
-            const itemId = origV.inventory_item_id
-            if (!itemId) continue
-            const req = Math.max(1, origV.inventory_required_quantity)
-            const qty =
-              v.inventory_quantity != null
-                ? Math.max(0, Math.round(v.inventory_quantity))
-                : 0
-            inventoryLevelUpdates.push({
-              inventory_item_id: itemId,
-              location_id: primaryStockLocationId,
-              stocked_quantity: qty * req,
-            })
-          }
+            // Link inventory item to variant
+            await sdk.client.fetch(
+              `/admin/products/${chg.productId}/variants/${chg.variantId}/inventory-items`,
+              { method: "POST", body: { inventory_item_id: newItemId, required_quantity: 1 } }
+            )
+
+            // Create inventory level at primary location
+            await sdk.admin.inventoryItem.batchInventoryItemLocationLevels(
+              newItemId,
+              {
+                create: [{ location_id: primaryStockLocationId, stocked_quantity: chg.stocked_quantity }],
+              } as Parameters<typeof sdk.admin.inventoryItem.batchInventoryItemLocationLevels>[1]
+            )
+
+            chg.inventoryItemId = newItemId
+            chg.isNew = false
+          } catch { /* skip this variant — non-fatal */ }
         }
-      }
 
-      if (inventoryLevelUpdates.length) {
-        await sdk.admin.inventoryItem.batchInventoryItemsLocationLevels({
-          update: inventoryLevelUpdates,
-        } as Parameters<
-          typeof sdk.admin.inventoryItem.batchInventoryItemsLocationLevels
-        >[0])
+        // ── Existing inventory items: update or create level at primary location ──
+        const createLevels: {
+          inventory_item_id: string
+          location_id: string
+          stocked_quantity: number
+        }[] = []
+        const updateLevels: {
+          inventory_item_id: string
+          location_id: string
+          stocked_quantity: number
+        }[] = []
+
+        await Promise.all(
+          invQtyChanges
+            .filter((c) => !!c.inventoryItemId && !c.isNew)
+            .map(async (chg) => {
+              const itemId = chg.inventoryItemId!
+              let levelExists = false
+              try {
+                const lvlRes = await sdk.admin.inventoryItem.listLevels(itemId, {
+                  location_id: primaryStockLocationId,
+                } as Parameters<typeof sdk.admin.inventoryItem.listLevels>[1])
+                levelExists = (lvlRes.inventory_levels ?? []).length > 0
+              } catch { /* assume not found — will create */ }
+              const entry = {
+                inventory_item_id: itemId,
+                location_id: primaryStockLocationId,
+                stocked_quantity: chg.stocked_quantity,
+              }
+              if (levelExists) updateLevels.push(entry)
+              else createLevels.push(entry)
+            })
+        )
+
+        if (createLevels.length || updateLevels.length) {
+          await sdk.admin.inventoryItem.batchInventoryItemsLocationLevels(
+            { create: createLevels, update: updateLevels, delete: [] } as unknown as Parameters<
+              typeof sdk.admin.inventoryItem.batchInventoryItemsLocationLevels
+            >[0]
+          )
+        }
       }
 
       // Product categories are managed through category endpoints, not product batch update.
@@ -1605,6 +2209,57 @@ const BulkEditPage = () => {
     if (hasErrors || !hasDirty || isSaving) return
     saveBatch()
   }, [hasErrors, hasDirty, isSaving, saveBatch])
+
+  const { mutate: deleteBulk, isPending: isDeleting } = useMutation({
+    mutationFn: async (args: {
+      productIds: string[]
+      variants: { variantId: string; productId: string }[]
+    }) => {
+      for (const { variantId, productId } of args.variants) {
+        await sdk.client.fetch(`/admin/products/${productId}/variants/${variantId}`, {
+          method: "DELETE",
+        })
+      }
+      if (args.productIds.length > 0) {
+        await sdk.admin.product.batch(
+          { delete: args.productIds } as Parameters<typeof sdk.admin.product.batch>[0]
+        )
+      }
+      return args
+    },
+    onSuccess: (args) => {
+      if (!args) return
+      setSelectedIds(new Set())
+      if (args.variants.length > 0) {
+        const deletedVIds = new Set(args.variants.map((v) => v.variantId))
+        const removeVariants = (rows: ProductRow[]) =>
+          rows.map((r) => ({ ...r, variants: r.variants.filter((v) => !deletedVIds.has(v.id)) }))
+        setSource(removeVariants)
+        setWorking(removeVariants)
+      }
+      if (args.productIds.length > 0) {
+        const deletedPIds = new Set(args.productIds)
+        setSource((prev) => prev.filter((p) => !deletedPIds.has(p.id)))
+        setWorking((prev) => prev.filter((p) => !deletedPIds.has(p.id)))
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin-products-bulk"] })
+      queryClient.invalidateQueries({ queryKey: ["products"] })
+    },
+  })
+  const handleBulkDelete = useCallback(() => {
+    if (isDeleting || selectedIds.size === 0) return
+    const selectedArr = Array.from(selectedIds)
+    const variantArgs = selectedArr
+      .filter((id) => variantToProductIdMap.has(id))
+      .map((id) => ({ variantId: id, productId: variantToProductIdMap.get(id)! }))
+    const productIds = selectedArr.filter((id) => !variantToProductIdMap.has(id))
+    if (variantArgs.length === 0 && productIds.length === 0) return
+    const parts: string[] = []
+    if (variantArgs.length > 0) parts.push(`${variantArgs.length} variant${variantArgs.length !== 1 ? "s" : ""}`)
+    if (productIds.length > 0) parts.push(`${productIds.length} product${productIds.length !== 1 ? "s" : ""}`)
+    if (!window.confirm(`Delete ${parts.join(" and ")}? This cannot be undone.`)) return
+    deleteBulk({ productIds, variants: variantArgs })
+  }, [deleteBulk, isDeleting, selectedIds, variantToProductIdMap])
 
   const handleBulkI18nLocaleAuto = useCallback(
     async (productId: string, localeCode: string, checked: boolean) => {
@@ -1658,6 +2313,77 @@ const BulkEditPage = () => {
     [queryClient]
   )
 
+  const openCreateVariant = useCallback(
+    (productId: string) => {
+      const row = working.find((r) => r.id === productId)
+      // Seed currency from an existing variant's first price, fallback to "usd"
+      const seedCurrency =
+        row?.variants[0]?.prices[0]?.currency_code?.toLowerCase() || "usd"
+      setAddingVariantFor(productId)
+      setNewVariantStep(1)
+      setNewVariantDraft({
+        title: "",
+        optionValues: {},
+        prices: [{ currency_code: seedCurrency, amount: "" }],
+        sku: "",
+        manage_inventory: true,
+        inventory_quantity: "",
+      })
+    },
+    [working]
+  )
+
+  const closeCreateVariant = useCallback(() => {
+    setAddingVariantFor(null)
+    setNewVariantStep(1)
+  }, [])
+
+  const handleCreateVariant = useCallback(async () => {
+    const productId = addingVariantFor
+    if (!productId) return
+    const title = newVariantDraft.title.trim()
+    if (!title) {
+      toast.error("Variant name is required")
+      return
+    }
+    const validPrices = newVariantDraft.prices
+      .map((p) => ({
+        currency_code: p.currency_code.trim().toLowerCase(),
+        amount: Number(p.amount),
+      }))
+      .filter((p) => p.currency_code && Number.isFinite(p.amount) && p.amount >= 0)
+    if (validPrices.length === 0) {
+      toast.error("At least one price is required")
+      return
+    }
+    setIsCreatingVariant(true)
+    try {
+      const body: Record<string, unknown> = {
+        title,
+        prices: validPrices,
+        manage_inventory: newVariantDraft.manage_inventory,
+      }
+      const optionValues = Object.fromEntries(
+        Object.entries(newVariantDraft.optionValues).filter(
+          ([, v]) => v && v.trim()
+        )
+      )
+      if (Object.keys(optionValues).length > 0) body.options = optionValues
+      if (newVariantDraft.sku.trim()) body.sku = newVariantDraft.sku.trim()
+      await sdk.client.fetch(`/admin/products/${productId}/variants`, {
+        method: "POST",
+        body,
+      })
+      closeCreateVariant()
+      toast.success("Variant added")
+      await queryClient.invalidateQueries({ queryKey: ["admin-products-bulk"] })
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to add variant")
+    } finally {
+      setIsCreatingVariant(false)
+    }
+  }, [addingVariantFor, newVariantDraft, queryClient, closeCreateVariant])
+
   // Ctrl+S / ⌘S shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1696,6 +2422,7 @@ const BulkEditPage = () => {
       <input
         ref={productThumbnailInputRef}
         type="file"
+        multiple
         accept={ACCEPT_IMAGES}
         className="hidden"
         onChange={handleProductThumbnailUpload}
@@ -1707,6 +2434,396 @@ const BulkEditPage = () => {
         className="hidden"
         onChange={handleVariantThumbnailUpload}
       />
+      <input
+        ref={modalProductImagesInputRef}
+        type="file"
+        multiple
+        accept={ACCEPT_IMAGES}
+        className="hidden"
+        onChange={handleModalProductImagesUpload}
+      />
+      <input
+        ref={modalVariantImagesInputRef}
+        type="file"
+        multiple
+        accept={ACCEPT_IMAGES}
+        className="hidden"
+        onChange={handleModalVariantImagesUpload}
+      />
+
+      {/* Image editing modal */}
+      {imageModalFor && (
+        <FocusModal
+          open
+          onOpenChange={(open) => { if (!open && !isSavingImages) setImageModalFor(null) }}
+        >
+          <FocusModal.Content className="max-w-2xl">
+            <FocusModal.Header>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => setImageModalFor(null)}
+                  disabled={isSavingImages}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => void saveImageModal()}
+                  disabled={isSavingImages}
+                >
+                  {isSavingImages ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </FocusModal.Header>
+            <FocusModal.Body className="flex flex-col gap-4 overflow-y-auto p-6">
+              {(() => {
+                const isProduct = imageModalFor.mode === "product"
+                const images = isProduct ? modalProductImages : modalVariantImages
+                const setImages = isProduct ? setModalProductImages : setModalVariantImages
+                const isUploading = isProduct ? isUploadingProductImages : isUploadingVariantImages
+                const openUpload = () =>
+                  (isProduct ? modalProductImagesInputRef : modalVariantImagesInputRef).current?.click()
+                const section: "product" | "variant" = isProduct ? "product" : "variant"
+                return (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Heading level="h3">Media</Heading>
+                        <Text size="small" className="text-ui-fg-subtle">
+                          Drag to reorder. First image becomes the thumbnail.
+                        </Text>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={isUploading}
+                        onClick={openUpload}
+                      >
+                        {isUploading ? "Uploading…" : "Upload images"}
+                      </Button>
+                    </div>
+                    {images.length === 0 ? (
+                      <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-ui-border-base text-ui-fg-muted">
+                        <Text size="small">No images yet</Text>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-3">
+                        {images.map((img, idx) => (
+                          <div
+                            key={img.url + idx}
+                            draggable
+                            onDragStart={() => { imgDragSrcRef.current = { section, idx } }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              const src = imgDragSrcRef.current
+                              if (!src || src.section !== section || src.idx === idx) return
+                              setImages((prev) => {
+                                const next = [...prev]
+                                const [item] = next.splice(src.idx, 1)
+                                next.splice(idx, 0, item)
+                                return next
+                              })
+                              imgDragSrcRef.current = null
+                            }}
+                            className="group relative aspect-square cursor-grab overflow-hidden rounded-md border border-ui-border-base bg-ui-bg-subtle"
+                          >
+                            <img
+                              src={img.url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              draggable={false}
+                            />
+                            {idx === 0 && (
+                              <span className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px] text-white">
+                                Thumbnail
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setImages((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="absolute right-1 top-1 hidden rounded bg-black/60 px-1 py-0.5 text-white group-hover:flex items-center justify-center"
+                              title="Remove"
+                            >
+                              <XMarkMini className="size-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </FocusModal.Body>
+          </FocusModal.Content>
+        </FocusModal>
+      )}
+
+      {/* Create variant modal */}
+      {addingVariantFor && (() => {
+        const productRow = working.find((r) => r.id === addingVariantFor)
+        if (!productRow) return null
+        const productOptions = productRow.options
+        const hasOptions = productOptions.length > 0
+        const stepLabels: Record<number, string> = {
+          1: "1 / Name & options",
+          2: "2 / Pricing",
+          3: "3 / Inventory (optional)",
+        }
+        const canGoNextFromStep1 = newVariantDraft.title.trim().length > 0
+        const canGoNextFromStep2 = newVariantDraft.prices.some(
+          (p) => p.currency_code.trim() && Number(p.amount) >= 0 && p.amount !== ""
+        )
+        return (
+          <FocusModal
+            open
+            onOpenChange={(o) => { if (!o && !isCreatingVariant) closeCreateVariant() }}
+          >
+            <FocusModal.Content className="max-w-xl">
+              <FocusModal.Header>
+                <div className="flex items-center gap-3 w-full">
+                  <Text size="small" className="text-ui-fg-subtle">
+                    New variant · {productRow.title || "Untitled"}
+                  </Text>
+                  <span className="text-ui-fg-muted txt-compact-small ml-auto">
+                    {stepLabels[newVariantStep]}
+                  </span>
+                </div>
+              </FocusModal.Header>
+              <FocusModal.Body className="flex flex-col gap-5 overflow-y-auto p-6">
+                {newVariantStep === 1 && (
+                  <>
+                    <div>
+                      <Text size="small" weight="plus" className="mb-2 block">
+                        Variant name <span className="text-ui-fg-error">*</span>
+                      </Text>
+                      <Input
+                        autoFocus
+                        value={newVariantDraft.title}
+                        onChange={(e) =>
+                          setNewVariantDraft((d) => ({ ...d, title: e.target.value }))
+                        }
+                        placeholder="e.g. Red / Medium"
+                      />
+                    </div>
+                    {hasOptions ? (
+                      <div className="flex flex-col gap-3">
+                        <Text size="small" weight="plus" className="block">
+                          Options
+                        </Text>
+                        <Text size="xsmall" className="text-ui-fg-muted -mt-2">
+                          Pick an existing value or type a new one. Empty = not set.
+                        </Text>
+                        {productOptions.map((opt) => {
+                          const current = newVariantDraft.optionValues[opt.title] ?? ""
+                          return (
+                            <div key={opt.id} className="flex flex-col gap-1">
+                              <Text size="xsmall" className="text-ui-fg-subtle">
+                                {opt.title}
+                              </Text>
+                              <div className="flex gap-2">
+                                <select
+                                  value={
+                                    opt.values.some((v) => v.value === current) ? current : ""
+                                  }
+                                  onChange={(e) =>
+                                    setNewVariantDraft((d) => ({
+                                      ...d,
+                                      optionValues: { ...d.optionValues, [opt.title]: e.target.value },
+                                    }))
+                                  }
+                                  className="txt-compact-small rounded-md border border-ui-border-base bg-ui-bg-field px-2 py-1.5 flex-1"
+                                >
+                                  <option value="">— select existing —</option>
+                                  {opt.values.map((v) => (
+                                    <option key={v.id} value={v.value}>
+                                      {v.value}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Input
+                                  placeholder="or new value"
+                                  value={
+                                    opt.values.some((v) => v.value === current) ? "" : current
+                                  }
+                                  onChange={(e) =>
+                                    setNewVariantDraft((d) => ({
+                                      ...d,
+                                      optionValues: { ...d.optionValues, [opt.title]: e.target.value },
+                                    }))
+                                  }
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed border-ui-border-base bg-ui-bg-subtle p-3">
+                        <Text size="xsmall" className="text-ui-fg-muted">
+                          This product has no options defined. You can still add a variant,
+                          but without options it won't be distinguishable from other variants.
+                          Add options (Color, Size, etc.) on the product detail page first.
+                        </Text>
+                      </div>
+                    )}
+                  </>
+                )}
+                {newVariantStep === 2 && (
+                  <div className="flex flex-col gap-3">
+                    <Text size="small" weight="plus" className="block">
+                      Pricing <span className="text-ui-fg-error">*</span>
+                    </Text>
+                    <Text size="xsmall" className="text-ui-fg-muted -mt-2">
+                      At least one price is required. Amount is in the currency's main units.
+                    </Text>
+                    {newVariantDraft.prices.map((p, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          className="w-24"
+                          value={p.currency_code}
+                          onChange={(e) =>
+                            setNewVariantDraft((d) => ({
+                              ...d,
+                              prices: d.prices.map((pp, i) =>
+                                i === idx ? { ...pp, currency_code: e.target.value } : pp
+                              ),
+                            }))
+                          }
+                          placeholder="usd"
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="flex-1"
+                          value={p.amount}
+                          onChange={(e) =>
+                            setNewVariantDraft((d) => ({
+                              ...d,
+                              prices: d.prices.map((pp, i) =>
+                                i === idx ? { ...pp, amount: e.target.value } : pp
+                              ),
+                            }))
+                          }
+                          placeholder="0.00"
+                        />
+                        <Button
+                          variant="transparent"
+                          size="small"
+                          disabled={newVariantDraft.prices.length === 1}
+                          onClick={() =>
+                            setNewVariantDraft((d) => ({
+                              ...d,
+                              prices: d.prices.filter((_, i) => i !== idx),
+                            }))
+                          }
+                          className="text-ui-fg-error"
+                        >
+                          <XMarkMini />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      onClick={() =>
+                        setNewVariantDraft((d) => ({
+                          ...d,
+                          prices: [...d.prices, { currency_code: "", amount: "" }],
+                        }))
+                      }
+                    >
+                      Add price
+                    </Button>
+                  </div>
+                )}
+                {newVariantStep === 3 && (
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <Text size="small" weight="plus" className="mb-2 block">
+                        SKU (optional)
+                      </Text>
+                      <Input
+                        value={newVariantDraft.sku}
+                        onChange={(e) =>
+                          setNewVariantDraft((d) => ({ ...d, sku: e.target.value }))
+                        }
+                        placeholder="SKU-001"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={newVariantDraft.manage_inventory}
+                        onCheckedChange={(v) =>
+                          setNewVariantDraft((d) => ({
+                            ...d,
+                            manage_inventory: v === true,
+                          }))
+                        }
+                      />
+                      <Text size="small">Manage stock for this variant</Text>
+                    </label>
+                    <Text size="xsmall" className="text-ui-fg-muted -mt-2">
+                      Stock quantity can be set in the spreadsheet after creation.
+                    </Text>
+                  </div>
+                )}
+              </FocusModal.Body>
+              <FocusModal.Footer>
+                <div className="flex items-center gap-2 w-full">
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={closeCreateVariant}
+                    disabled={isCreatingVariant}
+                  >
+                    Cancel
+                  </Button>
+                  <div className="ml-auto flex items-center gap-2">
+                    {newVariantStep > 1 && (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => setNewVariantStep((s) => (s - 1) as 1 | 2 | 3)}
+                        disabled={isCreatingVariant}
+                      >
+                        Back
+                      </Button>
+                    )}
+                    {newVariantStep < 3 ? (
+                      <Button
+                        size="small"
+                        onClick={() => setNewVariantStep((s) => (s + 1) as 1 | 2 | 3)}
+                        disabled={
+                          isCreatingVariant ||
+                          (newVariantStep === 1 && !canGoNextFromStep1) ||
+                          (newVariantStep === 2 && !canGoNextFromStep2)
+                        }
+                      >
+                        Next
+                      </Button>
+                    ) : (
+                      <Button
+                        size="small"
+                        onClick={() => void handleCreateVariant()}
+                        disabled={isCreatingVariant}
+                      >
+                        {isCreatingVariant ? "Creating…" : "Create variant"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </FocusModal.Footer>
+            </FocusModal.Content>
+          </FocusModal>
+        )
+      })()}
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4" >
         <div className="flex items-center gap-3">
@@ -1717,249 +2834,9 @@ const BulkEditPage = () => {
             </Button>
           </Link>
           <span className="text-ui-fg-muted">/</span>
-          <span className="txt-small text-ui-fg-subtle">Bulk Edit</span>
+          <span className="txt-small text-ui-fg-subtle">Edit with spreadsheet</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {hasDirty && (
-            <Text size="small" className="text-ui-fg-subtle">
-              {dirtyIds.size} unsaved change{dirtyIds.size !== 1 ? "s" : ""}
-            </Text>
-          )}
-          <Button
-            variant="secondary"
-            size="small"
-            onClick={discard}
-            disabled={!hasDirty || isSaving}
-          >
-            Discard
-          </Button>
-          <Button
-            size="small"
-            onClick={handleSave}
-            disabled={!hasDirty || hasErrors || isSaving}
-          >
-            {isSaving ? "Saving…" : "Save changes"}
-          </Button>
-          <DropdownMenu>
-              <DropdownMenu.Trigger asChild>
-                <Button variant="secondary" size="small" disabled={isSaving}>
-                  Manage columns <ChevronDown className="ml-1" />
-                </Button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content className="w-[min(100vw-2rem,360px)]">
-                <div className="flex flex-col gap-3 p-3">
-                  <Text size="xsmall" className="text-ui-fg-muted">
-                    Expand, image, title, and status always stay visible. Same
-                    as the main products list.
-                  </Text>
-                  <div className="flex flex-col gap-1">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="bulk-column-mode"
-                        checked={columnMode === "default"}
-                        onChange={() => setColumnMode("default")}
-                        disabled={isSaving}
-                        className="rounded-full text-ui-fg-interactive"
-                      />
-                      <Text size="small">Default (all columns)</Text>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="bulk-column-mode"
-                        checked={columnMode === "custom"}
-                        onChange={() => setColumnMode("custom")}
-                        disabled={isSaving}
-                        className="rounded-full text-ui-fg-interactive"
-                      />
-                      <Text size="small">Custom</Text>
-                    </label>
-                  </div>
-                  {columnMode === "custom" && (
-                    <div className="border-t border-ui-border-base pt-2">
-                      <Text
-                        size="xsmall"
-                        className="mb-2 block text-ui-fg-muted"
-                      >
-                        Select columns to display:
-                      </Text>
-                      <div className="max-h-[min(320px,50vh)] flex flex-col gap-0.5 overflow-y-auto">
-                        {TOGGLEABLE_COLUMNS.map((col) => (
-                          <label
-                            key={col.id}
-                            className="flex cursor-pointer items-center gap-2 rounded-md py-1.5 pl-1 pr-1 hover:bg-ui-bg-base-hover"
-                          >
-                            <Checkbox
-                              checked={visibleColumns.has(col.id)}
-                              onCheckedChange={(checked) => {
-                                setVisibleColumns((prev) => {
-                                  const next = new Set(prev)
-                                  if (checked === true) next.add(col.id)
-                                  else next.delete(col.id)
-                                  return next
-                                })
-                              }}
-                            />
-                            <Text size="small">{col.label}</Text>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="border-t border-ui-border-base pt-2">
-                    <Text size="xsmall" className="mb-2 block text-ui-fg-muted">
-                      Custom columns (read from metadata keys)
-                    </Text>
-                    {SUGGESTED_PRODUCT_METADATA_KEYS.length > 0 && (
-                      <div className="mb-3">
-                        <Text
-                          size="xsmall"
-                          className="mb-1.5 block text-ui-fg-subtle"
-                        >
-                          Product metadata presets — off by default; check to
-                          add a column (same as Product + key below).
-                        </Text>
-                        <div className="max-h-[min(220px,40vh)] flex flex-col gap-0.5 overflow-y-auto rounded-md border border-ui-border-base p-1.5">
-                          {SUGGESTED_PRODUCT_METADATA_KEYS.map(({ key, label }) => {
-                            const checked = customColumns.some(
-                              (c) =>
-                                c.source.kind === "product_metadata" &&
-                                c.source.key === key
-                            )
-                            return (
-                              <label
-                                key={key}
-                                className="flex cursor-pointer items-center gap-2 rounded-md py-1.5 pl-1 pr-1 hover:bg-ui-bg-base-hover"
-                              >
-                                <Checkbox
-                                  checked={checked}
-                                  disabled={isSaving}
-                                  onCheckedChange={(v) =>
-                                    toggleSuggestedProductMetadataColumn(
-                                      key,
-                                      label,
-                                      v === true
-                                    )
-                                  }
-                                />
-                                <span className="flex min-w-0 flex-1 flex-col">
-                                  <Text size="small" className="truncate">
-                                    {label}
-                                  </Text>
-                                  <Text
-                                    size="xsmall"
-                                    className="truncate font-mono text-ui-fg-muted"
-                                  >
-                                    {key}
-                                  </Text>
-                                </span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-2">
-                      <Input
-                        size="small"
-                        placeholder="Column label"
-                        value={newCustomLabel}
-                        onChange={(e) => setNewCustomLabel(e.target.value)}
-                        disabled={isSaving}
-                      />
-                      <select
-                        className="txt-compact-small rounded-md border border-ui-border-base bg-ui-bg-field px-2 py-1.5"
-                        value={newCustomSourceKind}
-                        onChange={(e) =>
-                          setNewCustomSourceKind(
-                            e.target.value === "product_metadata"
-                              ? "product_metadata"
-                              : "variant_metadata"
-                          )
-                        }
-                        disabled={isSaving}
-                      >
-                        <option value="variant_metadata">
-                          Variant metadata
-                        </option>
-                        <option value="product_metadata">
-                          Product metadata
-                        </option>
-                      </select>
-                      <Input
-                        size="small"
-                        placeholder="Metadata key (e.g. my_field)"
-                        value={newCustomKey}
-                        onChange={(e) => setNewCustomKey(e.target.value)}
-                        disabled={isSaving}
-                      />
-                      <Button
-                        size="small"
-                        variant="secondary"
-                        type="button"
-                        onClick={addCustomColumn}
-                        disabled={isSaving}
-                      >
-                        Add column
-                      </Button>
-                    </div>
-                    {customColumns.length > 0 && (
-                      <div className="mt-2 max-h-[min(200px,40vh)] flex flex-col gap-1 overflow-y-auto">
-                        {customColumns.map((cc) => (
-                          <div
-                            key={cc.id}
-                            className="flex items-center gap-2 rounded-md py-1 pl-1 pr-1 hover:bg-ui-bg-base-hover"
-                          >
-                            {columnMode === "custom" ? (
-                              <Checkbox
-                                checked={visibleColumns.has(cc.id)}
-                                onCheckedChange={(checked) => {
-                                  setVisibleColumns((prev) => {
-                                    const next = new Set(prev)
-                                    if (checked === true) next.add(cc.id)
-                                    else next.delete(cc.id)
-                                    return next
-                                  })
-                                }}
-                              />
-                            ) : (
-                              <span className="w-5 shrink-0" aria-hidden />
-                            )}
-                            <div className="flex min-w-0 flex-1 flex-col">
-                              <Text size="small" className="truncate">
-                                {cc.label}
-                              </Text>
-                              <Text
-                                size="xsmall"
-                                className="truncate text-ui-fg-muted"
-                              >
-                                {cc.source.kind === "variant_metadata"
-                                  ? "Variant"
-                                  : "Product"}{" "}
-                                · {cc.source.key}
-                              </Text>
-                            </div>
-                            <Button
-                              size="small"
-                              variant="transparent"
-                              type="button"
-                              className="shrink-0 text-ui-fg-error"
-                              disabled={isSaving}
-                              onClick={() => removeCustomColumn(cc.id)}
-                            >
-                              <XMarkMini />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </DropdownMenu.Content>
-            </DropdownMenu>
-        </div>
       </div>
 
       {/* Page title */}
@@ -2313,6 +3190,289 @@ const BulkEditPage = () => {
             </DropdownMenu>
 
 
+            <DropdownMenu>
+              <DropdownMenu.Trigger asChild>
+                <Button variant="secondary" size="small" disabled={isSaving}>
+                  View: {currentViewName}{isViewDirty ? " •" : ""} <ChevronDown className="ml-1" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content className="w-[min(100vw-2rem,360px)]">
+                <div className="flex flex-col gap-3 p-3">
+                  <div className="flex flex-col gap-1">
+                    <Text size="xsmall" className="text-ui-fg-muted">
+                      Active view
+                    </Text>
+                    <select
+                      className="txt-compact-small rounded-md border border-ui-border-base bg-ui-bg-field px-2 py-1.5"
+                      value={currentViewId ?? ""}
+                      onChange={(e) => selectView(e.target.value || null)}
+                      disabled={isSaving}
+                    >
+                      <option value="">Default (all columns)</option>
+                      {savedViews.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                    {isViewDirty && (
+                      <Text size="xsmall" className="text-ui-fg-muted">
+                        Unsaved changes to this view
+                      </Text>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {isNamingNewView ? (
+                      <div className="flex w-full flex-col gap-2">
+                        <Input
+                          size="small"
+                          placeholder="View name"
+                          value={newViewNameInput}
+                          onChange={(e) => setNewViewNameInput(e.target.value)}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveCurrentAsNewView()
+                            if (e.key === "Escape") {
+                              setIsNamingNewView(false)
+                              setNewViewNameInput("")
+                            }
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="small"
+                            onClick={saveCurrentAsNewView}
+                            disabled={!newViewNameInput.trim()}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => {
+                              setIsNamingNewView(false)
+                              setNewViewNameInput("")
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Button
+                          size="small"
+                          variant="secondary"
+                          onClick={() => setIsNamingNewView(true)}
+                          disabled={isSaving}
+                        >
+                          Save view
+                        </Button>
+                        {currentViewId && isViewDirty && (
+                          <Button
+                            size="small"
+                            onClick={updateCurrentView}
+                            disabled={isSaving}
+                          >
+                            Update view
+                          </Button>
+                        )}
+                        {currentViewId && (
+                          <Button
+                            size="small"
+                            variant="transparent"
+                            onClick={deleteCurrentView}
+                            disabled={isSaving}
+                            className="text-ui-fg-error"
+                          >
+                            Delete view
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="border-t border-ui-border-base pt-2">
+                    <Text size="xsmall" className="mb-2 block text-ui-fg-muted">
+                      Select columns to display. Drag rows to reorder them.
+                      Expand, image, title, and status always stay visible.
+                    </Text>
+                    <div className="max-h-[min(320px,50vh)] flex flex-col gap-0.5 overflow-y-auto">
+                      {columnOrder.map((id) => {
+                        const col = TOGGLEABLE_COLUMNS.find((c) => c.id === id)
+                        if (!col) return null
+                        return (
+                          <label
+                            key={col.id}
+                            draggable
+                            onDragStart={(e) => {
+                              colDragSrcRef.current = col.id
+                              e.dataTransfer.effectAllowed = "move"
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              const src = colDragSrcRef.current
+                              if (src && src !== col.id) moveColumn(src, col.id)
+                              colDragSrcRef.current = null
+                            }}
+                            className="flex cursor-grab items-center gap-2 rounded-md py-1.5 pl-1 pr-1 hover:bg-ui-bg-base-hover"
+                          >
+                            <span className="text-ui-fg-muted text-xs select-none" aria-hidden>⋮⋮</span>
+                            <Checkbox
+                              checked={visibleColumns.has(col.id)}
+                              onCheckedChange={(checked) => {
+                                setVisibleColumns((prev) => {
+                                  const next = new Set(prev)
+                                  if (checked === true) next.add(col.id)
+                                  else next.delete(col.id)
+                                  return next
+                                })
+                              }}
+                            />
+                            <Text size="small">{col.label}</Text>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="border-t border-ui-border-base pt-2">
+                    <Text size="xsmall" className="mb-2 block text-ui-fg-muted">
+                      Custom columns (read from metadata keys)
+                    </Text>
+                    {SUGGESTED_PRODUCT_METADATA_KEYS.length > 0 && (
+                      <div className="mb-3">
+                        <Text size="xsmall" className="mb-1.5 block text-ui-fg-subtle">
+                          Product metadata presets — off by default; check to
+                          add a column (same as Product + key below).
+                        </Text>
+                        <div className="max-h-[min(220px,40vh)] flex flex-col gap-0.5 overflow-y-auto rounded-md border border-ui-border-base p-1.5">
+                          {SUGGESTED_PRODUCT_METADATA_KEYS.map(({ key, label }) => {
+                            const checked = customColumns.some(
+                              (c) =>
+                                c.source.kind === "product_metadata" &&
+                                c.source.key === key
+                            )
+                            return (
+                              <label
+                                key={key}
+                                className="flex cursor-pointer items-center gap-2 rounded-md py-1.5 pl-1 pr-1 hover:bg-ui-bg-base-hover"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  disabled={isSaving}
+                                  onCheckedChange={(v) =>
+                                    toggleSuggestedProductMetadataColumn(
+                                      key,
+                                      label,
+                                      v === true
+                                    )
+                                  }
+                                />
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                  <Text size="small" className="truncate">
+                                    {label}
+                                  </Text>
+                                  <Text
+                                    size="xsmall"
+                                    className="truncate font-mono text-ui-fg-muted"
+                                  >
+                                    {key}
+                                  </Text>
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <Input
+                        size="small"
+                        placeholder="Column label"
+                        value={newCustomLabel}
+                        onChange={(e) => setNewCustomLabel(e.target.value)}
+                        disabled={isSaving}
+                      />
+                      <select
+                        className="txt-compact-small rounded-md border border-ui-border-base bg-ui-bg-field px-2 py-1.5"
+                        value={newCustomSourceKind}
+                        onChange={(e) =>
+                          setNewCustomSourceKind(
+                            e.target.value === "product_metadata"
+                              ? "product_metadata"
+                              : "variant_metadata"
+                          )
+                        }
+                        disabled={isSaving}
+                      >
+                        <option value="variant_metadata">Variant metadata</option>
+                        <option value="product_metadata">Product metadata</option>
+                      </select>
+                      <Input
+                        size="small"
+                        placeholder="Metadata key (e.g. my_field)"
+                        value={newCustomKey}
+                        onChange={(e) => setNewCustomKey(e.target.value)}
+                        disabled={isSaving}
+                      />
+                      <Button
+                        size="small"
+                        variant="secondary"
+                        type="button"
+                        onClick={addCustomColumn}
+                        disabled={isSaving}
+                      >
+                        Add column
+                      </Button>
+                    </div>
+                    {customColumns.length > 0 && (
+                      <div className="mt-2 max-h-[min(200px,40vh)] flex flex-col gap-1 overflow-y-auto">
+                        {customColumns.map((cc) => (
+                          <div
+                            key={cc.id}
+                            className="flex items-center gap-2 rounded-md py-1 pl-1 pr-1 hover:bg-ui-bg-base-hover"
+                          >
+                            <Checkbox
+                              checked={visibleColumns.has(cc.id)}
+                              onCheckedChange={(checked) => {
+                                setVisibleColumns((prev) => {
+                                  const next = new Set(prev)
+                                  if (checked === true) next.add(cc.id)
+                                  else next.delete(cc.id)
+                                  return next
+                                })
+                              }}
+                            />
+                            <div className="flex min-w-0 flex-1 flex-col">
+                              <Text size="small" className="truncate">
+                                {cc.label}
+                              </Text>
+                              <Text size="xsmall" className="truncate text-ui-fg-muted">
+                                {cc.source.kind === "variant_metadata"
+                                  ? "Variant"
+                                  : "Product"}{" "}
+                                · {cc.source.key}
+                              </Text>
+                            </div>
+                            <Button
+                              size="small"
+                              variant="transparent"
+                              type="button"
+                              className="shrink-0 text-ui-fg-error"
+                              disabled={isSaving}
+                              onClick={() => removeCustomColumn(cc.id)}
+                            >
+                              <XMarkMini />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </DropdownMenu.Content>
+            </DropdownMenu>
+
             {hasAnyFilters && (
               <Button
                 variant="transparent"
@@ -2325,11 +3485,35 @@ const BulkEditPage = () => {
             )}
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="w-full sm:w-[360px]">
+            {hasDirty && (
+              <span className="txt-compact-small text-ui-fg-subtle whitespace-nowrap">
+                {dirtyIds.size} unsaved
+              </span>
+            )}
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={discard}
+              disabled={!hasDirty || isSaving}
+              title="Discard changes"
+              className="!px-2"
+            >
+              <ArrowUturnLeft />
+            </Button>
+            <Button
+              size="small"
+              onClick={handleSave}
+              disabled={!hasDirty || hasErrors || isSaving}
+              title={isSaving ? "Saving…" : "Save changes"}
+              className="!px-2"
+            >
+              <Check />
+            </Button>
+            <div className="w-full sm:w-[240px]">
               <Input
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search products by title, handle, or SKU…"
+                placeholder="Search products…"
               />
             </div>
             {search.trim() !== "" && (
@@ -2387,25 +3571,155 @@ const BulkEditPage = () => {
             )}
           </div>
         ) : (
+          <>
+          {selectedIds.size > 0 && (
+            <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-ui-border-base bg-ui-bg-highlight px-3 py-2">
+              <div className="flex items-center gap-3">
+                <span className="txt-compact-small-plus">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="txt-compact-small text-ui-fg-subtle hover:text-ui-fg-base"
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="rounded-md border border-ui-border-error bg-ui-bg-base px-3 py-1 txt-compact-small-plus text-ui-fg-error hover:bg-ui-bg-error-hover disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting…" : deleteSelectionLabel}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
-            <table className="w-full" style={{ minWidth: 1400 }}>
+            <style>{`
+              .sheet-table {
+                border-collapse: separate;
+                border-spacing: 0;
+                /* Fixed layout so column widths are authoritative and
+                   long content can't expand a cell past its declared width. */
+                table-layout: fixed;
+              }
+              .sheet-table thead th {
+                border-right: 1px solid var(--border-base, rgba(17,24,39,0.1));
+                border-bottom: 1px solid var(--border-base, rgba(17,24,39,0.15));
+                padding: 6px 8px !important;
+                position: sticky;
+                top: 0;
+                background: var(--bg-subtle, #f9fafb);
+                z-index: 2;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+              .sheet-table td[data-cell] {
+                overflow: hidden;
+              }
+              /* Dropdown / popover portals must stack above the sticky thead (z:2) */
+              [data-radix-popper-content-wrapper] { z-index: 60 !important; }
+              /* FocusModal (Radix Dialog) overlay + content must also be above the sticky thead */
+              .bg-ui-bg-overlay.fixed.inset-0 { z-index: 70 !important; }
+              [role="dialog"].fixed.inset-2,
+              [role="dialog"].shadow-elevation-modal { z-index: 71 !important; }
+              .sheet-table td[data-cell] {
+                outline: none;
+                position: relative;
+                padding: 2px 4px !important;
+                border-right: 1px solid rgba(17,24,39,0.08);
+                border-bottom: 1px solid rgba(17,24,39,0.08);
+                vertical-align: middle;
+                user-select: none;
+              }
+              /* Flatten inputs / buttons / selects so cells feel spreadsheet-y */
+              .sheet-table td[data-cell] input:not([type=checkbox]):not([type=radio]),
+              .sheet-table td[data-cell] textarea,
+              .sheet-table td[data-cell] select,
+              .sheet-table td[data-cell] > button {
+                border: none !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                height: 26px !important;
+                min-height: 26px !important;
+                padding: 0 4px !important;
+                margin: 0 !important;
+                width: 100%;
+                font-size: 13px;
+              }
+              .sheet-table td[data-cell] input:not([type=checkbox]):not([type=radio]):focus,
+              .sheet-table td[data-cell] textarea:focus,
+              .sheet-table td[data-cell] select:focus {
+                outline: none !important;
+                box-shadow: inset 0 0 0 2px rgb(59,130,246) !important;
+              }
+              /* Medusa Input wraps in a relative div — collapse that wrapper. */
+              .sheet-table td[data-cell] > div.relative,
+              .sheet-table td[data-cell] > div > input,
+              .sheet-table td[data-cell] > div > textarea,
+              .sheet-table td[data-cell] > div > select {
+                margin: 0 !important;
+              }
+              .sheet-table td[data-cell] > div.relative > * {
+                height: 26px !important;
+              }
+              .sheet-table td[data-cell].sheet-cell-selected {
+                background-color: rgba(59,130,246,0.12);
+              }
+              .sheet-table td[data-cell].sheet-cell-active {
+                box-shadow: inset 0 0 0 2px rgb(59,130,246);
+                background-color: rgba(59,130,246,0.05);
+                z-index: 5;
+              }
+              .sheet-table tbody tr:hover td[data-cell]:not(.sheet-cell-selected):not(.sheet-cell-active) {
+                background-color: rgba(17,24,39,0.02);
+              }
+              /* "Not applicable" placeholder cell (e.g. per-product columns on a variant row). */
+              .sheet-table td[data-cell].sheet-cell-na {
+                background-image: repeating-linear-gradient(
+                  45deg,
+                  rgba(17,24,39,0.04) 0 4px,
+                  transparent 4px 8px
+                );
+                cursor: not-allowed;
+              }
+              #sheet-fill-handle:hover { transform: scale(1.25); }
+            `}</style>
+            <table className="w-full sheet-table" style={{ minWidth: 1400 }}>
               <thead>
                 <tr className="border-b border-ui-border-base bg-ui-bg-subtle">
                   {isColumnVisible("expand") && (
-                  <th className="px-3 py-3" style={{ minWidth: 40 }}>
-                    <button
-                      onClick={toggleExpandAll}
-                      className="text-ui-fg-muted hover:text-ui-fg-base transition-colors"
-                      title={allExpanded ? "Collapse all" : "Expand all variants"}
-                    >
-                      {allExpanded ? <ChevronDown /> : <ChevronRight />}
-                    </button>
+                  <th className="px-3 py-3 text-center align-middle" style={{ width: 40, minWidth: 40 }}>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someSelected
+                      }}
+                      onChange={toggleSelectAll}
+                      title={allSelected ? "Deselect all" : "Select all"}
+                      className="cursor-pointer"
+                    />
                   </th>
                   )}
                   {isColumnVisible("image") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 56 }}
+                    style={{ width: 72, minWidth: 72 }}
+                  >
+                    Featured image
+                  </th>
+                  )}
+                  {isColumnVisible("image") && (
+                  <th
+                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
+                    style={{ width: 56, minWidth: 56 }}
                   >
                     Image
                   </th>
@@ -2413,39 +3727,23 @@ const BulkEditPage = () => {
                   {isColumnVisible("title") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 180 }}
+                    style={{ width: 200, minWidth: 180 }}
                   >
                     Title
                   </th>
                   )}
-                  {isColumnVisible("subtitle") && (
+                  {isColumnVisible("title") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 150 }}
+                    style={{ width: 160, minWidth: 150 }}
                   >
-                    Subtitle
-                  </th>
-                  )}
-                  {isColumnVisible("description") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 260 }}
-                  >
-                    Description
-                  </th>
-                  )}
-                  {isColumnVisible("handle") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 150 }}
-                  >
-                    Handle
+                    Variant
                   </th>
                   )}
                   {isColumnVisible("status") && (
                   <th
                     className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 130 }}
+                    style={{ width: 130, minWidth: 130 }}
                   >
                     Status
                   </th>
@@ -2454,7 +3752,7 @@ const BulkEditPage = () => {
                     (deeplConfig.targetLangs?.length ?? 0) > 0 && (
                     <th
                       className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                      style={{ minWidth: 128 }}
+                      style={{ width: 128, minWidth: 128 }}
                     >
                       <span className="block">Auto-translate</span>
                       <Text
@@ -2465,148 +3763,67 @@ const BulkEditPage = () => {
                       </Text>
                     </th>
                   )}
-                  {isColumnVisible("category") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 200 }}
-                  >
-                    Category
-                  </th>
-                  )}
-                  {isColumnVisible("sku") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 150 }}
-                  >
-                    SKU
-                  </th>
-                  )}
-                  {isColumnVisible("basePrice") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 100 }}
-                  >
-                    Base price
-                  </th>
-                  )}
-                  {isColumnVisible("salePrice") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 100 }}
-                  >
-                    Sale price
-                  </th>
-                  )}
-                  {isColumnVisible("b2bDiscount") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 100 }}
-                  >
-                    B2B discount
-                  </th>
-                  )}
-                  {isColumnVisible("clientA") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 90 }}
-                  >
-                    Client A
-                  </th>
-                  )}
-                  {isColumnVisible("clientB") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 90 }}
-                  >
-                    Client B
-                  </th>
-                  )}
-                  {isColumnVisible("clientC") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 90 }}
-                  >
-                    Client C
-                  </th>
-                  )}
-                  {isColumnVisible("clientD") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 90 }}
-                  >
-                    Client D
-                  </th>
-                  )}
-                  {isColumnVisible("manageStock") && (
-                  <th
-                    className="px-3 py-3 text-center txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 100 }}
-                  >
-                    Manage Stock
-                  </th>
-                  )}
-                  {isColumnVisible("stockQty") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 90 }}
-                  >
-                    Stock qty
-                  </th>
-                  )}
-                  {isColumnVisible("tags") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 170 }}
-                  >
-                    Tags
-                  </th>
-                  )}
-                  {isColumnVisible("material") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 120 }}
-                  >
-                    Material
-                  </th>
-                  )}
-                  {isColumnVisible("weight") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 100 }}
-                  >
-                    Weight (g)
-                  </th>
-                  )}
-                  {isColumnVisible("width") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 80 }}
-                  >
-                    Width
-                  </th>
-                  )}
-                  {isColumnVisible("height") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 80 }}
-                  >
-                    Height
-                  </th>
-                  )}
-                  {isColumnVisible("color") && (
-                  <th
-                    className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                    style={{ minWidth: 90 }}
-                  >
-                    Color
-                  </th>
-                  )}
+                  {(() => {
+                    const thMap: Record<string, React.ReactNode> = {}
+                    const th = (id: string, label: string, style: React.CSSProperties) => {
+                      // Derive explicit width so `table-layout: fixed` respects it
+                      const width =
+                        typeof style.width === "number" ? style.width :
+                        typeof style.minWidth === "number" ? style.minWidth : 140
+                      return (thMap[id] = (
+                        <th
+                          key={id}
+                          draggable
+                          onDragStart={(e) => {
+                            colDragSrcRef.current = id
+                            e.dataTransfer.effectAllowed = "move"
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            const src = colDragSrcRef.current
+                            if (src && src !== id) moveColumn(src, id)
+                            colDragSrcRef.current = null
+                          }}
+                          className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted cursor-grab"
+                          style={{ ...style, width }}
+                          title={`Drag to reorder — ${label}`}
+                        >
+                          {label}
+                        </th>
+                      ))
+                    }
+                    if (isColumnVisible("subtitle")) th("subtitle", "Subtitle", { minWidth: 150 })
+                    if (isColumnVisible("description")) th("description", "Description", { minWidth: 180, maxWidth: 260, width: 200 })
+                    if (isColumnVisible("handle")) th("handle", "Handle", { minWidth: 150 })
+                    if (isColumnVisible("category")) th("category", "Category", { minWidth: 200 })
+                    if (isColumnVisible("collection")) th("collection", "Collection", { minWidth: 180 })
+                    if (isColumnVisible("salesChannels")) th("salesChannels", "Sales channels", { minWidth: 180 })
+                    if (isColumnVisible("sku")) th("sku", "SKU", { minWidth: 150 })
+                    if (isColumnVisible("basePrice")) th("basePrice", "Base price", { minWidth: 100 })
+                    if (isColumnVisible("salePrice")) th("salePrice", "Sale price", { minWidth: 100 })
+                    if (isColumnVisible("b2bDiscount")) th("b2bDiscount", "B2B discount", { minWidth: 100 })
+                    if (isColumnVisible("clientA")) th("clientA", "Client A", { minWidth: 90 })
+                    if (isColumnVisible("clientB")) th("clientB", "Client B", { minWidth: 90 })
+                    if (isColumnVisible("clientC")) th("clientC", "Client C", { minWidth: 90 })
+                    if (isColumnVisible("clientD")) th("clientD", "Client D", { minWidth: 90 })
+                    if (isColumnVisible("stockQty")) th("stockQty", "Stock qty", { minWidth: 90 })
+                    if (isColumnVisible("tags")) th("tags", "Tags", { minWidth: 170 })
+                    if (isColumnVisible("material")) th("material", "Material", { minWidth: 120 })
+                    if (isColumnVisible("weight")) th("weight", "Weight (g)", { minWidth: 100 })
+                    if (isColumnVisible("width")) th("width", "Width", { minWidth: 80 })
+                    if (isColumnVisible("height")) th("height", "Height", { minWidth: 80 })
+                    if (isColumnVisible("color")) th("color", "Color", { minWidth: 90 })
+                    return columnOrder
+                      .filter((id) => thMap[id])
+                      .map((id) => thMap[id])
+                  })()}
                   {customColumns.map((cc) =>
                     isColumnVisible(cc.id) ? (
                       <th
                         key={cc.id}
                         className="px-3 py-3 text-left txt-compact-small-plus text-ui-fg-muted"
-                        style={{ minWidth: 120 }}
+                        style={{ width: 140, minWidth: 120 }}
                       >
                         {cc.label}
                       </th>
@@ -2615,7 +3832,7 @@ const BulkEditPage = () => {
                   {isColumnVisible("changed") && (
                   <th
                     className="px-3 py-3"
-                    style={{ minWidth: 90 }}
+                    style={{ width: 100, minWidth: 90 }}
                     aria-label="Changed"
                   />
                   )}
@@ -2632,121 +3849,73 @@ const BulkEditPage = () => {
 
                   return (
                     <React.Fragment key={row.id}>
-                      {/* ── Product row ── */}
+                      {/* ── Product-only row (shown only for products with NO variants) ── */}
+                      {row.variants.length === 0 && (
                       <tr
-                        className={
-                          isDirty ? "bg-ui-bg-highlight" : "bg-ui-bg-base"
-                        }
+                        className={isDirty ? "bg-ui-bg-highlight" : ""}
                       >
                         {isColumnVisible("expand") && (
-                        <td className="px-3 py-2">
-                          {row.variants.length > 0 && (
-                            <button
-                              onClick={() => toggleExpand(row.id)}
-                              className="text-ui-fg-muted hover:text-ui-fg-base transition-colors"
-                              title={
-                                isExpanded
-                                  ? "Collapse variants"
-                                  : `Expand ${row.variants.length} variant${row.variants.length !== 1 ? "s" : ""}`
-                              }
-                            >
-                              {isExpanded ? (
-                                <ChevronDown />
-                              ) : (
-                                <ChevronRight />
-                              )}
-                            </button>
-                          )}
+                        <td tabIndex={-1} data-cell="" className="px-3 py-2 text-center align-middle">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(row.id)}
+                            onChange={() => toggleSelect(row.id)}
+                            title="Select product"
+                            className="cursor-pointer"
+                          />
                         </td>
                         )}
                         {isColumnVisible("image") && (
-                        <td className="px-3 py-2">
-                          <DropdownMenu>
-                            <DropdownMenu.Trigger asChild>
-                              <button
-                                type="button"
-                                className="flex items-center gap-1.5 rounded border border-ui-border-base hover:border-ui-border-interactive transition-colors overflow-hidden focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
-                              >
-                                {row.thumbnail ? (
-                                  <img
-                                    src={row.thumbnail}
-                                    alt=""
-                                    className="w-9 h-9 object-contain"
-                                  />
-                                ) : (
-                                  <div className="w-9 h-9 bg-ui-bg-subtle" />
-                                )}
-                                <PencilSquare className="w-4 h-4 text-ui-fg-muted shrink-0 mr-1" />
-                              </button>
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Content align="start" className="w-64">
-                              <div className="p-2 flex flex-col gap-2">
-                                <Button
-                                  size="small"
-                                  variant="secondary"
-                                  className="w-full"
-                                  disabled={uploadingThumbnailFor === row.id}
-                                  onClick={() => {
-                                    setUploadingThumbnailFor(row.id)
-                                    productThumbnailInputRef.current?.click()
-                                  }}
-                                >
-                                  {uploadingThumbnailFor === row.id
-                                    ? "Uploading…"
-                                    : "Upload image"}
-                                </Button>
-                                <div className="flex flex-col gap-1">
-                                  <Text size="xsmall" className="text-ui-fg-muted">
-                                    Or paste URL
-                                  </Text>
-                                  <Input
-                                    size="small"
-                                    placeholder="https://..."
-                                    value={row.thumbnail ?? ""}
-                                    onChange={(e) =>
-                                      updateRow(
-                                        row.id,
-                                        "thumbnail",
-                                        e.target.value || null
-                                      )
-                                    }
-                                  />
-                                </div>
-                                {row.thumbnail && (
-                                  <Button
-                                    size="small"
-                                    variant="transparent"
-                                    className="w-full text-ui-fg-error"
-                                    onClick={() =>
-                                      updateRow(row.id, "thumbnail", null)
-                                    }
-                                  >
-                                    Clear
-                                  </Button>
-                                )}
-                              </div>
-                            </DropdownMenu.Content>
-                          </DropdownMenu>
+                        <td tabIndex={-1} data-cell="" className="px-3 py-2">
+                          <div className="flex items-center gap-1.5">
+                            {row.thumbnail ? (
+                              <img
+                                src={row.thumbnail}
+                                alt=""
+                                className="w-9 h-9 rounded border border-ui-border-base object-cover"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded border border-ui-border-base bg-ui-bg-subtle" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openImageModalForProduct(row.id)
+                              }}
+                              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-ui-fg-muted hover:bg-ui-bg-base-hover hover:text-ui-fg-base"
+                              title="Edit featured image"
+                            >
+                              <PencilSquare className="size-3.5" />
+                            </button>
+                          </div>
                         </td>
                         )}
+                        {isColumnVisible("image") && (
+                        <td tabIndex={-1} data-cell="" className="px-3 py-2 sheet-cell-na" />
+                        )}
                         {isColumnVisible("title") && (
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openRichTextEdit(row.id, {
-                                title: row.title,
-                                subtitle: row.subtitle,
-                                description: row.description,
-                              })
-                            }
-                            className={`${cellInput} flex min-w-[140px] cursor-pointer items-center justify-between gap-2 text-left hover:bg-ui-bg-base-hover`}
-                          >
-                            <span className="min-w-0 truncate">
-                              {stripForPreview(row.title, 120) || "Edit title…"}
-                            </span>
-                            <PencilSquare className="size-4 shrink-0 text-ui-fg-muted" />
-                          </button>
+                        <td tabIndex={-1} data-cell="" className="px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={row.title}
+                              onChange={(e) =>
+                                updateRow(row.id, "title", e.target.value)
+                              }
+                              placeholder="Title"
+                              className={cellInput}
+                              style={{ flex: 1 }}
+                            />
+                            <button
+                              type="button"
+                              title="Add variant"
+                              onClick={() => openCreateVariant(row.id)}
+                              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-ui-border-base text-ui-fg-muted hover:bg-ui-bg-base-hover hover:text-ui-fg-base font-bold"
+                            >
+                              +
+                            </button>
+                          </div>
                           {rowError && (
                             <p className="mt-1 txt-small text-ui-fg-error">
                               {rowError}
@@ -2754,61 +3923,11 @@ const BulkEditPage = () => {
                           )}
                         </td>
                         )}
-                        {isColumnVisible("subtitle") && (
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openRichTextEdit(row.id, {
-                                title: row.title,
-                                subtitle: row.subtitle,
-                                description: row.description,
-                              })
-                            }
-                            className={`${cellInput} flex min-h-8 min-w-[140px] cursor-pointer items-center justify-between gap-2 py-2 text-left hover:bg-ui-bg-base-hover`}
-                          >
-                            <span className="line-clamp-2 min-w-0 flex-1 text-left">
-                              {stripForPreview(row.subtitle, 160) ||
-                                "Edit subtitle…"}
-                            </span>
-                            <PencilSquare className="size-4 shrink-0 self-start text-ui-fg-muted" />
-                          </button>
-                        </td>
-                        )}
-                        {isColumnVisible("description") && (
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openRichTextEdit(row.id, {
-                                title: row.title,
-                                subtitle: row.subtitle,
-                                description: row.description,
-                              })
-                            }
-                            className={`${cellInput} flex min-h-8 min-w-[160px] cursor-pointer items-center justify-between gap-2 py-2 text-left hover:bg-ui-bg-base-hover`}
-                          >
-                            <span className="line-clamp-2 min-w-0 flex-1 text-left">
-                              {stripForPreview(row.description, 180) ||
-                                "Edit description…"}
-                            </span>
-                            <PencilSquare className="size-4 shrink-0 self-start text-ui-fg-muted" />
-                          </button>
-                        </td>
-                        )}
-                        {isColumnVisible("handle") && (
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.handle}
-                            onChange={(e) =>
-                              updateRow(row.id, "handle", e.target.value)
-                            }
-                            placeholder="product-handle"
-                          />
-                        </td>
+                        {isColumnVisible("title") && (
+                        <td tabIndex={-1} data-cell="" className="px-3 py-2 sheet-cell-na" />
                         )}
                         {isColumnVisible("status") && (
-                        <td className="px-3 py-2">
+                        <td tabIndex={-1} data-cell="" className="px-3 py-2">
                           <select
                             value={row.status}
                             onChange={(e) =>
@@ -2825,7 +3944,7 @@ const BulkEditPage = () => {
                         )}
                         {deeplConfig?.enabled &&
                           (deeplConfig.targetLangs?.length ?? 0) > 0 && (
-                          <td className="px-3 py-2 align-top">
+                          <td tabIndex={-1} data-cell="" className="px-3 py-2 align-top">
                             <div className="flex flex-col gap-1.5">
                               {(deeplConfig.targetLangs ?? []).map((loc) => {
                                 const norm = normalizeLocaleKeyClient(loc)
@@ -2863,282 +3982,211 @@ const BulkEditPage = () => {
                             </div>
                           </td>
                         )}
-                        {isColumnVisible("category") && (
-                        <td className="px-3 py-2">
-                          <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
-                            <DropdownMenu.Trigger asChild>
-                              <button
-                                type="button"
-                                className={`${cellInput} text-left flex items-center justify-between gap-2`}
-                              >
-                                <span className="truncate">
-                                  {row.category_ids.length > 0
-                                    ? row.category_ids
-                                        .map((id) => {
-                                          return (
-                                            categoryBreadcrumbById.get(id) ??
-                                            (categoriesData as any)?.product_categories?.find(
-                                              (x: any) => x.id === id
-                                            )?.name ??
-                                            id
-                                          )
-                                        })
-                                        .join(", ")
-                                    : "—"}
+                        {(() => {
+                          const cellMap: Record<string, React.ReactNode> = {}
+                          if (isColumnVisible("subtitle")) cellMap.subtitle = (
+                            <td key="subtitle" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={row.subtitle}
+                                onChange={(e) => updateRow(row.id, "subtitle", e.target.value)}
+                                placeholder="Subtitle"
+                                className={cellInput}
+                              />
+                            </td>
+                          )
+                          if (isColumnVisible("description")) cellMap.description = (
+                            <td key="description" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <div className="flex h-8 items-center gap-2">
+                                <span className="min-w-0 flex-1 truncate txt-small text-ui-fg-base">
+                                  {stripForPreview(row.description, 180) || (
+                                    <span className="text-ui-fg-muted">—</span>
+                                  )}
                                 </span>
-                                <ChevronDown className="shrink-0" />
-                              </button>
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Content className="w-[320px]">
-                              <div className="p-3 flex flex-col gap-2">
-                                <Input
-                                  value={filterSearch}
-                                  onChange={(e) => setFilterSearch(e.target.value)}
-                                  placeholder="Search categories"
-                                />
-                                <div className="max-h-[260px] overflow-auto">
-                                  {hierarchicalCategories
-                                    .filter((c) =>
-                                      c.breadcrumb
-                                        .toLowerCase()
-                                        .includes(filterSearch.toLowerCase().trim())
-                                    )
-                                    .map((c) => {
-                                      const checked = row.category_ids.includes(c.id)
+                                <button
+                                  type="button"
+                                  title="Edit rich-text description"
+                                  onClick={() =>
+                                    openRichTextEdit(row.id, {
+                                      title: row.title,
+                                      subtitle: row.subtitle,
+                                      description: row.description,
+                                    })
+                                  }
+                                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-ui-border-base text-ui-fg-muted hover:bg-ui-bg-base-hover hover:text-ui-fg-base"
+                                >
+                                  <PencilSquare className="size-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          )
+                          if (isColumnVisible("handle")) cellMap.handle = (
+                            <td key="handle" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <Input value={row.handle} onChange={(e) => updateRow(row.id, "handle", e.target.value)} placeholder="product-handle" />
+                            </td>
+                          )
+                          if (isColumnVisible("category")) cellMap.category = (
+                            <td key="category" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
+                                <DropdownMenu.Trigger asChild>
+                                  <button type="button" className={`${cellInput} text-left flex items-center justify-between gap-2`}>
+                                    <span className="truncate">
+                                      {row.category_ids.length > 0
+                                        ? row.category_ids
+                                            .map((id) => categoryBreadcrumbById.get(id) ?? (categoriesData as any)?.product_categories?.find((x: any) => x.id === id)?.name ?? id)
+                                            .join(", ")
+                                        : "—"}
+                                    </span>
+                                    <ChevronDown className="shrink-0" />
+                                  </button>
+                                </DropdownMenu.Trigger>
+                                <DropdownMenu.Content className="w-[320px]">
+                                  <div className="p-3 flex flex-col gap-2">
+                                    <Input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Search categories" />
+                                    <div className="max-h-[260px] overflow-auto">
+                                      {hierarchicalCategories
+                                        .filter((c) => c.breadcrumb.toLowerCase().includes(filterSearch.toLowerCase().trim()))
+                                        .map((c) => {
+                                          const checked = row.category_ids.includes(c.id)
+                                          return (
+                                            <DropdownMenu.Item key={c.id} asChild onSelect={(e) => {
+                                              e.preventDefault()
+                                              const next = checked
+                                                ? row.category_ids.filter((id) => id !== c.id)
+                                                : Array.from(new Set([...row.category_ids, c.id]))
+                                              updateRow(row.id, "category_ids", next)
+                                            }}>
+                                              <CategoryMenuCheckboxRow checked={checked} depth={c.depth} breadcrumb={c.breadcrumb} name={c.name} />
+                                            </DropdownMenu.Item>
+                                          )
+                                        })}
+                                    </div>
+                                  </div>
+                                </DropdownMenu.Content>
+                              </DropdownMenu>
+                            </td>
+                          )
+                          if (isColumnVisible("collection")) cellMap.collection = (
+                            <td key="collection" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <select value={row.collection_id ?? ""} onChange={(e) => updateRow(row.id, "collection_id", e.target.value || null)} className={cellInput}>
+                                <option value="">—</option>
+                                {((collectionsData as any)?.collections ?? []).map((c: { id: string; title?: string }) => (
+                                  <option key={c.id} value={c.id}>{c.title ?? c.id}</option>
+                                ))}
+                              </select>
+                            </td>
+                          )
+                          if (isColumnVisible("salesChannels")) cellMap.salesChannels = (
+                            <td key="salesChannels" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
+                                <DropdownMenu.Trigger asChild>
+                                  <button type="button" className={`${cellInput} text-left flex items-center justify-between gap-2`}>
+                                    <span className="truncate">
+                                      {row.sales_channel_ids.length > 0
+                                        ? row.sales_channel_ids.map((id) => ((channelsData as any)?.sales_channels ?? []).find((c: { id: string }) => c.id === id)?.name ?? id).join(", ")
+                                        : "—"}
+                                    </span>
+                                    <ChevronDown className="shrink-0" />
+                                  </button>
+                                </DropdownMenu.Trigger>
+                                <DropdownMenu.Content className="w-[280px]">
+                                  <div className="max-h-[260px] overflow-auto p-2">
+                                    {((channelsData as any)?.sales_channels ?? []).map((c: { id: string; name?: string }) => {
+                                      const checked = row.sales_channel_ids.includes(c.id)
                                       return (
-                                        <DropdownMenu.Item
-                                          key={c.id}
-                                          asChild
-                                          onSelect={(e) => {
-                                            e.preventDefault()
-                                            const next = checked
-                                              ? row.category_ids.filter(
-                                                  (id) => id !== c.id
-                                                )
-                                              : Array.from(
-                                                  new Set([
-                                                    ...row.category_ids,
-                                                    c.id,
-                                                  ])
-                                                )
-                                            updateRow(
-                                              row.id,
-                                              "category_ids",
-                                              next
-                                            )
-                                          }}
-                                        >
-                                          <CategoryMenuCheckboxRow
-                                            checked={checked}
-                                            depth={c.depth}
-                                            breadcrumb={c.breadcrumb}
-                                            name={c.name}
-                                          />
-                                        </DropdownMenu.Item>
+                                        <DropdownMenu.CheckboxItem key={c.id} checked={checked} onCheckedChange={(v) => {
+                                          const next = v === true
+                                            ? Array.from(new Set([...row.sales_channel_ids, c.id]))
+                                            : row.sales_channel_ids.filter((id) => id !== c.id)
+                                          updateRow(row.id, "sales_channel_ids", next)
+                                        }}>{c.name ?? c.id}</DropdownMenu.CheckboxItem>
                                       )
                                     })}
-                                </div>
-                              </div>
-                            </DropdownMenu.Content>
-                          </DropdownMenu>
-                        </td>
-                        )}
-                        {isColumnVisible("sku") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value="—"
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("basePrice") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={
-                              row.variants[0]?.prices[0]?.amount ?? "—"
-                            }
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("salePrice") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={
-                              row.variants[0]?.sale_price_amount ?? "—"
-                            }
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("b2bDiscount") && (
-                        <td className="px-3 py-2">
-                          <Input
-                            value={getMeta(row.metadata, B2B_DISCOUNT_META_KEY)}
-                            onChange={(e) =>
-                              updateProductMetadata(
-                                row.id,
-                                B2B_DISCOUNT_META_KEY,
-                                e.target.value || null
-                              )
-                            }
-                            placeholder="e.g. 10 or 10%"
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("clientA") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={getVariantPriceRange(row.variants, "wcwp_client-a")}
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("clientB") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={getVariantPriceRange(row.variants, "wcwp_client-b")}
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("clientC") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={getVariantPriceRange(row.variants, "wcwp_client-c")}
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("clientD") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={getVariantPriceRange(row.variants, "wcwp_client-d")}
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("manageStock") && (
-                        <td className="px-3 py-2 text-center">
-                          <input
-                            type="text"
-                            value={
-                              row.variants.some((v) => v.manage_inventory)
-                                ? "Yes"
-                                : "No"
-                            }
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("stockQty") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={String(
-                              row.variants.reduce(
-                                (sum, v) =>
-                                  sum + (v.inventory_quantity ?? 0),
-                                0
-                              )
-                            )}
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("tags") && (
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.tags}
-                            onChange={(e) =>
-                              updateRow(row.id, "tags", e.target.value)
-                            }
-                            placeholder="tag1, tag2"
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("material") && (
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.material}
-                            onChange={(e) =>
-                              updateRow(row.id, "material", e.target.value)
-                            }
-                            placeholder="e.g. Cotton"
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("weight") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            value={row.weight}
-                            onChange={(e) =>
-                              updateRow(row.id, "weight", e.target.value)
-                            }
-                            placeholder="0"
-                            className={cellInput}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("width") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            value={row.width}
-                            onChange={(e) =>
-                              updateRow(row.id, "width", e.target.value)
-                            }
-                            placeholder="0"
-                            className={cellInput}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("height") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            value={row.height}
-                            onChange={(e) =>
-                              updateRow(row.id, "height", e.target.value)
-                            }
-                            placeholder="0"
-                            className={cellInput}
-                          />
-                        </td>
-                        )}
-                        {isColumnVisible("color") && (
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value=""
-                            disabled
-                            className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                          />
-                        </td>
-                        )}
+                                  </div>
+                                </DropdownMenu.Content>
+                              </DropdownMenu>
+                            </td>
+                          )
+                          if (isColumnVisible("sku")) cellMap.sku = (
+                            <td key="sku" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value="—" disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("basePrice")) cellMap.basePrice = (
+                            <td key="basePrice" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value={row.variants[0]?.prices[0]?.amount ?? "—"} disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("salePrice")) cellMap.salePrice = (
+                            <td key="salePrice" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value={row.variants[0]?.sale_price_amount ?? "—"} disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("b2bDiscount")) cellMap.b2bDiscount = (
+                            <td key="b2bDiscount" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <Input value={getMeta(row.metadata, B2B_DISCOUNT_META_KEY)} onChange={(e) => updateProductMetadata(row.id, B2B_DISCOUNT_META_KEY, e.target.value || null)} placeholder="e.g. 10 or 10%" />
+                            </td>
+                          )
+                          if (isColumnVisible("clientA")) cellMap.clientA = (
+                            <td key="clientA" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value={getVariantPriceRange(row.variants, "wcwp_client-a")} disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("clientB")) cellMap.clientB = (
+                            <td key="clientB" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value={getVariantPriceRange(row.variants, "wcwp_client-b")} disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("clientC")) cellMap.clientC = (
+                            <td key="clientC" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value={getVariantPriceRange(row.variants, "wcwp_client-c")} disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("clientD")) cellMap.clientD = (
+                            <td key="clientD" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value={getVariantPriceRange(row.variants, "wcwp_client-d")} disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("stockQty")) cellMap.stockQty = (
+                            <td key="stockQty" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value={String(row.variants.reduce((sum, v) => sum + (v.inventory_quantity ?? 0), 0))} disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          if (isColumnVisible("tags")) cellMap.tags = (
+                            <td key="tags" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <Input value={row.tags} onChange={(e) => updateRow(row.id, "tags", e.target.value)} placeholder="tag1, tag2" />
+                            </td>
+                          )
+                          if (isColumnVisible("material")) cellMap.material = (
+                            <td key="material" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <Input value={row.material} onChange={(e) => updateRow(row.id, "material", e.target.value)} placeholder="e.g. Cotton" />
+                            </td>
+                          )
+                          if (isColumnVisible("weight")) cellMap.weight = (
+                            <td key="weight" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="number" min={0} value={row.weight} onChange={(e) => updateRow(row.id, "weight", e.target.value)} placeholder="0" className={cellInput} />
+                            </td>
+                          )
+                          if (isColumnVisible("width")) cellMap.width = (
+                            <td key="width" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="number" min={0} value={row.width} onChange={(e) => updateRow(row.id, "width", e.target.value)} placeholder="0" className={cellInput} />
+                            </td>
+                          )
+                          if (isColumnVisible("height")) cellMap.height = (
+                            <td key="height" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="number" min={0} value={row.height} onChange={(e) => updateRow(row.id, "height", e.target.value)} placeholder="0" className={cellInput} />
+                            </td>
+                          )
+                          if (isColumnVisible("color")) cellMap.color = (
+                            <td key="color" tabIndex={-1} data-cell="" className="px-3 py-2">
+                              <input type="text" value="" disabled className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`} />
+                            </td>
+                          )
+                          return columnOrder.filter((id) => cellMap[id]).map((id) => cellMap[id])
+                        })()}
                         {customColumns.map((cc) =>
                           isColumnVisible(cc.id) ? (
-                            <td key={cc.id} className="px-3 py-2">
+                            <td tabIndex={-1} data-cell="" key={cc.id} className="px-3 py-2">
                               {cc.source.kind === "variant_metadata" ? (
                                 <input
                                   type="text"
@@ -3169,7 +4217,7 @@ const BulkEditPage = () => {
                           ) : null
                         )}
                         {isColumnVisible("changed") && (
-                        <td className="px-3 py-2 text-right">
+                        <td tabIndex={-1} data-cell="" className="px-3 py-2 text-right">
                           <div className="flex flex-col items-end gap-1">
                             {dirtyProductIds.has(row.id) && (
                               <Badge color="orange" className="whitespace-nowrap">
@@ -3190,10 +4238,11 @@ const BulkEditPage = () => {
                         </td>
                         )}
                       </tr>
+                      )}
 
-                      {/* ── Variant rows (same column level as product) ── */}
-                      {isExpanded &&
-                        row.variants.map((variant) => {
+                      {/* ── Variant rows (merged: first row carries product-level settings) ── */}
+                      {row.variants.map((variant, vIdx) => {
+                          const isFirst = vIdx === 0
                           const vDirty = dirtyVariantMap
                             .get(row.id)
                             ?.has(variant.id)
@@ -3214,487 +4263,424 @@ const BulkEditPage = () => {
                           return (
                             <tr
                               key={variant.id}
-                              className={
-                                vDirty
-                                  ? "bg-ui-bg-highlight"
-                                  : "bg-ui-bg-subtle"
-                              }
+                              className={vDirty ? "bg-ui-bg-highlight" : ""}
                             >
                               {isColumnVisible("expand") && (
-                              <td className="px-3 py-2" />
-                              )}
-                              {isColumnVisible("image") && (
-                              <td className="px-3 py-2">
-                                <DropdownMenu>
-                                  <DropdownMenu.Trigger asChild>
-                                    <button
-                                      type="button"
-                                      className="flex items-center gap-1.5 rounded border border-ui-border-base hover:border-ui-border-interactive transition-colors overflow-hidden focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
-                                    >
-                                      {variant.thumbnail ? (
-                                        <img
-                                          src={variant.thumbnail}
-                                          alt=""
-                                          className="w-8 h-8 object-contain"
-                                        />
-                                      ) : (
-                                        <div className="w-8 h-8 bg-ui-bg-base" />
-                                      )}
-                                      <PencilSquare className="w-4 h-4 text-ui-fg-muted shrink-0 mr-1" />
-                                    </button>
-                                  </DropdownMenu.Trigger>
-                                  <DropdownMenu.Content align="start" className="w-64">
-                                    <div className="p-2 flex flex-col gap-2">
-                                      <Button
-                                        size="small"
-                                        variant="secondary"
-                                        className="w-full"
-                                        disabled={
-                                          uploadingVariantThumbnailFor?.productId === row.id &&
-                                          uploadingVariantThumbnailFor?.variantId === variant.id
-                                        }
-                                        onClick={() => {
-                                          setUploadingVariantThumbnailFor({
-                                            productId: row.id,
-                                            variantId: variant.id,
-                                          })
-                                          variantThumbnailInputRef.current?.click()
-                                        }}
-                                      >
-                                        {uploadingVariantThumbnailFor?.productId === row.id &&
-                                        uploadingVariantThumbnailFor?.variantId === variant.id
-                                          ? "Uploading…"
-                                          : "Upload image"}
-                                      </Button>
-                                      <div className="flex flex-col gap-1">
-                                        <Text size="xsmall" className="text-ui-fg-muted">
-                                          Or paste URL
-                                        </Text>
-                                        <Input
-                                          size="small"
-                                          placeholder="https://..."
-                                          value={variant.thumbnail ?? ""}
-                                          onChange={(e) =>
-                                            updateVariantThumbnail(
-                                              row.id,
-                                              variant.id,
-                                              e.target.value || null
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                      {variant.thumbnail && (
-                                        <Button
-                                          size="small"
-                                          variant="transparent"
-                                          className="w-full text-ui-fg-error"
-                                          onClick={() =>
-                                            updateVariantThumbnail(
-                                              row.id,
-                                              variant.id,
-                                              null
-                                            )
-                                          }
-                                        >
-                                          Clear
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </DropdownMenu.Content>
-                                </DropdownMenu>
+                              <td tabIndex={-1} data-cell="" className="px-3 py-2 text-center align-middle">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.has(variant.id)}
+                                  onChange={() => toggleSelect(variant.id)}
+                                  title="Select variant"
+                                  className="cursor-pointer"
+                                />
                               </td>
                               )}
-                              {isColumnVisible("title") && (
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                  <Text
-                                    size="small"
-                                    className="text-ui-fg-base font-medium"
-                                  >
-                                    {variant.title}
-                                  </Text>
-                                  {vDirty && (
-                                    <Badge
-                                      color="orange"
-                                      className="whitespace-nowrap"
+                              {isColumnVisible("image") && (
+                              <td
+                                tabIndex={-1}
+                                data-cell=""
+                                className={`px-3 py-2 ${isFirst ? "" : "sheet-cell-na"}`}
+                              >
+                                {isFirst && (
+                                  <div className="flex items-center gap-1.5">
+                                    {row.thumbnail ? (
+                                      <img
+                                        src={row.thumbnail}
+                                        alt=""
+                                        className="w-8 h-8 rounded border border-ui-border-base object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded border border-ui-border-base bg-ui-bg-base" />
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        openImageModalForProduct(row.id)
+                                      }}
+                                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-ui-fg-muted hover:bg-ui-bg-base-hover hover:text-ui-fg-base"
+                                      title="Edit featured image"
                                     >
-                                      Changed
-                                    </Badge>
+                                      <PencilSquare className="size-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                              )}
+                              {isColumnVisible("image") && (
+                              <td tabIndex={-1} data-cell="" className="px-3 py-2">
+                                <div className="flex items-center gap-1.5">
+                                  {variant.thumbnail ? (
+                                    <img
+                                      src={variant.thumbnail}
+                                      alt=""
+                                      className="w-8 h-8 rounded border border-ui-border-base object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded border border-ui-border-base bg-ui-bg-base" />
                                   )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openImageModalForVariant(row.id, variant.id)
+                                    }}
+                                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-ui-fg-muted hover:bg-ui-bg-base-hover hover:text-ui-fg-base"
+                                    title="Edit variant media"
+                                  >
+                                    <PencilSquare className="size-3.5" />
+                                  </button>
                                 </div>
                               </td>
                               )}
-                              {isColumnVisible("subtitle") && (
-                              <td className="px-3 py-2">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openRichTextEdit(row.id, {
-                                      title: row.title,
-                                      subtitle: row.subtitle,
-                                      description: row.description,
-                                    })
-                                  }
-                                  className={`${cellInput} flex min-w-[120px] cursor-pointer items-center justify-between gap-2 text-left hover:bg-ui-bg-base-hover`}
-                                >
-                                  <span className="min-w-0 truncate">
-                                    {stripForPreview(row.subtitle, 80) ||
-                                      "Edit subtitle…"}
-                                  </span>
-                                  <PencilSquare className="size-4 shrink-0 text-ui-fg-muted" />
-                                </button>
+                              {isColumnVisible("title") && (
+                              <td
+                                tabIndex={-1}
+                                data-cell=""
+                                className={`px-3 py-2 ${isFirst ? "" : "sheet-cell-na"}`}
+                              >
+                                {isFirst && (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="text"
+                                      value={row.title}
+                                      onChange={(e) =>
+                                        updateRow(row.id, "title", e.target.value)
+                                      }
+                                      placeholder="Title"
+                                      className={cellInput}
+                                      style={{ flex: 1 }}
+                                    />
+                                    <button
+                                      type="button"
+                                      title="Add variant"
+                                      onClick={() => openCreateVariant(row.id)}
+                                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-ui-border-base text-ui-fg-muted hover:bg-ui-bg-base-hover hover:text-ui-fg-base font-bold"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                )}
+                                {isFirst && rowError && (
+                                  <p className="mt-1 txt-small text-ui-fg-error">
+                                    {rowError}
+                                  </p>
+                                )}
                               </td>
                               )}
-                              {isColumnVisible("description") && (
-                              <td className="px-3 py-2">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openRichTextEdit(row.id, {
-                                      title: row.title,
-                                      subtitle: row.subtitle,
-                                      description: row.description,
-                                    })
-                                  }
-                                  className={`${cellInput} flex min-w-[120px] cursor-pointer items-center justify-between gap-2 text-left hover:bg-ui-bg-base-hover`}
-                                >
-                                  <span className="min-w-0 truncate">
-                                    {stripForPreview(row.description, 80) ||
-                                      "Edit description…"}
-                                  </span>
-                                  <PencilSquare className="size-4 shrink-0 text-ui-fg-muted" />
-                                </button>
-                              </td>
-                              )}
-                              {isColumnVisible("handle") && (
-                              <td className="px-3 py-2">
+                              {isColumnVisible("title") && (
+                              <td tabIndex={-1} data-cell="" className="px-3 py-2">
                                 <input
                                   type="text"
-                                  value={row.handle}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
+                                  value={variant.title}
+                                  onChange={(e) =>
+                                    updateVariantTitle(row.id, variant.id, e.target.value)
+                                  }
+                                  placeholder="Variant name"
+                                  className={cellInput}
                                 />
                               </td>
                               )}
                               {isColumnVisible("status") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.status}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("category") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={categoryLabel}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("sku") && (
-                              <td className="px-3 py-2">
-                                <Input
-                                  value={variant.sku}
-                                  onChange={(e) =>
-                                    updateVariantSku(
-                                      row.id,
-                                      variant.id,
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="SKU-001"
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("basePrice") && (
-                              <td className="px-3 py-2">
-                                {variant.prices[0] ? (
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    step="0.01"
-                                    value={variant.prices[0].amount}
+                              <td
+                                tabIndex={-1}
+                                data-cell=""
+                                className={`px-3 py-2 ${isFirst ? "" : "sheet-cell-na"}`}
+                              >
+                                {isFirst && (
+                                  <select
+                                    value={row.status}
                                     onChange={(e) =>
-                                      updateVariantPrice(
+                                      updateRow(
                                         row.id,
-                                        variant.id,
-                                        variant.prices[0].currency_code,
+                                        "status",
                                         e.target.value
                                       )
                                     }
-                                    placeholder="0.00"
                                     className={cellInput}
-                                  />
-                                ) : (
-                                  <Text size="small" className="text-ui-fg-muted px-3">
-                                    —
-                                  </Text>
+                                  >
+                                    <option value="draft">Draft</option>
+                                    <option value="proposed">Proposed</option>
+                                    <option value="published">Published</option>
+                                    <option value="rejected">Rejected</option>
+                                  </select>
                                 )}
                               </td>
                               )}
-                              {isColumnVisible("salePrice") && SALE_PRICE_LIST_ID ? (
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    step="0.01"
-                                    value={variant.sale_price_amount}
-                                    onChange={(e) =>
-                                      updateVariantSalePrice(
-                                        row.id,
-                                        variant.id,
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="0.00"
-                                    className={cellInput}
-                                  />
+                              {deeplConfig?.enabled &&
+                                (deeplConfig.targetLangs?.length ?? 0) > 0 && (
+                                <td
+                                  tabIndex={-1}
+                                  data-cell=""
+                                  aria-disabled={!isFirst}
+                                  className={`px-3 py-2 align-top ${isFirst ? "" : "sheet-cell-na"}`}
+                                >
+                                  {isFirst && (
+                                    <div className="flex flex-col gap-1.5">
+                                      {(deeplConfig.targetLangs ?? []).map(
+                                        (loc) => {
+                                          const norm =
+                                            normalizeLocaleKeyClient(loc)
+                                          const autos =
+                                            parseAutoTranslateLocalesFromMetadata(
+                                              row.metadata
+                                            )
+                                          const busyKey = `${row.id}:${norm}`
+                                          return (
+                                            <label
+                                              key={`${row.id}:${loc}`}
+                                              className="flex cursor-pointer items-center gap-2"
+                                            >
+                                              <Checkbox
+                                                checked={autos.has(norm)}
+                                                disabled={
+                                                  !!i18nLocaleToggleBusy[
+                                                    busyKey
+                                                  ]
+                                                }
+                                                onCheckedChange={(v) => {
+                                                  if (v === "indeterminate")
+                                                    return
+                                                  void handleBulkI18nLocaleAuto(
+                                                    row.id,
+                                                    loc,
+                                                    v === true
+                                                  )
+                                                }}
+                                              />
+                                              <Text
+                                                size="xsmall"
+                                                className="w-8 shrink-0 text-ui-fg-subtle"
+                                              >
+                                                {loc.trim().toUpperCase()}
+                                              </Text>
+                                            </label>
+                                          )
+                                        }
+                                      )}
+                                    </div>
+                                  )}
                                 </td>
-                              ) : isColumnVisible("salePrice") ? (
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    step="0.01"
-                                    value={getMeta(variant.metadata, "sale_price")}
-                                    onChange={(e) => {
+                              )}
+                              {(() => {
+                                const naClass = `px-3 py-2 ${isFirst ? "" : "sheet-cell-na"}`
+                                const plainClass = "px-3 py-2"
+                                const cm: Record<string, React.ReactNode> = {}
+                                if (isColumnVisible("subtitle")) cm.subtitle = (
+                                  <td key="subtitle" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (
+                                      <input type="text" value={row.subtitle} onChange={(e) => updateRow(row.id, "subtitle", e.target.value)} placeholder="Subtitle" className={cellInput} />
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("description")) cm.description = (
+                                  <td key="description" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (
+                                      <div className="flex h-8 items-center gap-2">
+                                        <span className="min-w-0 flex-1 truncate txt-small text-ui-fg-base">
+                                          {stripForPreview(row.description, 180) || (<span className="text-ui-fg-muted">—</span>)}
+                                        </span>
+                                        <button type="button" title="Edit rich-text description" onClick={() => openRichTextEdit(row.id, { title: row.title, subtitle: row.subtitle, description: row.description })} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-ui-border-base text-ui-fg-muted hover:bg-ui-bg-base-hover hover:text-ui-fg-base">
+                                          <PencilSquare className="size-3.5" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("handle")) cm.handle = (
+                                  <td key="handle" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (
+                                      <input type="text" value={row.handle} onChange={(e) => updateRow(row.id, "handle", e.target.value)} placeholder="product-handle" className={cellInput} />
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("category")) cm.category = (
+                                  <td key="category" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (
+                                      <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
+                                        <DropdownMenu.Trigger asChild>
+                                          <button type="button" className={`${cellInput} text-left flex items-center justify-between gap-2`}>
+                                            <span className="truncate">{row.category_ids.length > 0 ? categoryLabel : "—"}</span>
+                                            <ChevronDown className="shrink-0" />
+                                          </button>
+                                        </DropdownMenu.Trigger>
+                                        <DropdownMenu.Content className="w-[320px]">
+                                          <div className="p-3 flex flex-col gap-2">
+                                            <Input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Search categories" />
+                                            <div className="max-h-[260px] overflow-auto">
+                                              {hierarchicalCategories.filter((c) => c.breadcrumb.toLowerCase().includes(filterSearch.toLowerCase().trim())).map((c) => {
+                                                const checked = row.category_ids.includes(c.id)
+                                                return (
+                                                  <DropdownMenu.Item key={c.id} asChild onSelect={(e) => {
+                                                    e.preventDefault()
+                                                    const next = checked ? row.category_ids.filter((id) => id !== c.id) : Array.from(new Set([...row.category_ids, c.id]))
+                                                    updateRow(row.id, "category_ids", next)
+                                                  }}>
+                                                    <CategoryMenuCheckboxRow checked={checked} depth={c.depth} breadcrumb={c.breadcrumb} name={c.name} />
+                                                  </DropdownMenu.Item>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                        </DropdownMenu.Content>
+                                      </DropdownMenu>
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("collection")) cm.collection = (
+                                  <td key="collection" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (
+                                      <select value={row.collection_id ?? ""} onChange={(e) => updateRow(row.id, "collection_id", e.target.value || null)} className={cellInput}>
+                                        <option value="">—</option>
+                                        {((collectionsData as any)?.collections ?? []).map((c: { id: string; title?: string }) => (
+                                          <option key={c.id} value={c.id}>{c.title ?? c.id}</option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("salesChannels")) cm.salesChannels = (
+                                  <td key="salesChannels" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (
+                                      <DropdownMenu onOpenChange={(open) => open && setFilterSearch("")}>
+                                        <DropdownMenu.Trigger asChild>
+                                          <button type="button" className={`${cellInput} text-left flex items-center justify-between gap-2`}>
+                                            <span className="truncate">
+                                              {row.sales_channel_ids.length > 0
+                                                ? row.sales_channel_ids.map((id) => ((channelsData as any)?.sales_channels ?? []).find((c: { id: string }) => c.id === id)?.name ?? id).join(", ")
+                                                : "—"}
+                                            </span>
+                                            <ChevronDown className="shrink-0" />
+                                          </button>
+                                        </DropdownMenu.Trigger>
+                                        <DropdownMenu.Content className="w-[280px]">
+                                          <div className="max-h-[260px] overflow-auto p-2">
+                                            {((channelsData as any)?.sales_channels ?? []).map((c: { id: string; name?: string }) => {
+                                              const checked = row.sales_channel_ids.includes(c.id)
+                                              return (
+                                                <DropdownMenu.CheckboxItem key={c.id} checked={checked} onCheckedChange={(v) => {
+                                                  const next = v === true
+                                                    ? Array.from(new Set([...row.sales_channel_ids, c.id]))
+                                                    : row.sales_channel_ids.filter((id) => id !== c.id)
+                                                  updateRow(row.id, "sales_channel_ids", next)
+                                                }}>{c.name ?? c.id}</DropdownMenu.CheckboxItem>
+                                              )
+                                            })}
+                                          </div>
+                                        </DropdownMenu.Content>
+                                      </DropdownMenu>
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("sku")) cm.sku = (
+                                  <td key="sku" tabIndex={-1} data-cell="" className={plainClass}>
+                                    <Input value={variant.sku} onChange={(e) => updateVariantSku(row.id, variant.id, e.target.value)} placeholder="SKU-001" />
+                                  </td>
+                                )
+                                if (isColumnVisible("basePrice")) cm.basePrice = (
+                                  <td key="basePrice" tabIndex={-1} data-cell="" className={plainClass}>
+                                    {variant.prices[0] ? (
+                                      <input type="number" min={0} step="0.01" value={variant.prices[0].amount} onChange={(e) => updateVariantPrice(row.id, variant.id, variant.prices[0].currency_code, e.target.value)} placeholder="0.00" className={cellInput} />
+                                    ) : (
+                                      <Text size="small" className="text-ui-fg-muted px-3">—</Text>
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("salePrice")) {
+                                  cm.salePrice = SALE_PRICE_LIST_ID ? (
+                                    <td key="salePrice" tabIndex={-1} data-cell="" className={plainClass}>
+                                      <input type="number" min={0} step="0.01" value={variant.sale_price_amount} onChange={(e) => updateVariantSalePrice(row.id, variant.id, e.target.value)} placeholder="0.00" className={cellInput} />
+                                    </td>
+                                  ) : (
+                                    <td key="salePrice" tabIndex={-1} data-cell="" className={plainClass}>
+                                      <input type="number" min={0} step="0.01" value={getMeta(variant.metadata, "sale_price")} onChange={(e) => {
+                                        const val = e.target.value.trim()
+                                        updateVariantMetadata(row.id, variant.id, "sale_price", val ? (Number.isFinite(Number(val)) ? Number(val) : val) : null)
+                                      }} placeholder="0.00" className={cellInput} />
+                                    </td>
+                                  )
+                                }
+                                if (isColumnVisible("b2bDiscount")) cm.b2bDiscount = (
+                                  <td key="b2bDiscount" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (
+                                      <Input size="small" value={getMeta(row.metadata, B2B_DISCOUNT_META_KEY)} onChange={(e) => updateProductMetadata(row.id, B2B_DISCOUNT_META_KEY, e.target.value || null)} placeholder="e.g. 10 or 10%" />
+                                    )}
+                                  </td>
+                                )
+                                if (isColumnVisible("clientA")) cm.clientA = (
+                                  <td key="clientA" tabIndex={-1} data-cell="" className={plainClass}>
+                                    <Input size="small" value={getMeta(variant.metadata, "wcwp_client-a")} onChange={(e) => updateVariantMetadata(row.id, variant.id, "wcwp_client-a", e.target.value || null)} placeholder="—" />
+                                  </td>
+                                )
+                                if (isColumnVisible("clientB")) cm.clientB = (
+                                  <td key="clientB" tabIndex={-1} data-cell="" className={plainClass}>
+                                    <Input size="small" value={getMeta(variant.metadata, "wcwp_client-b")} onChange={(e) => updateVariantMetadata(row.id, variant.id, "wcwp_client-b", e.target.value || null)} placeholder="—" />
+                                  </td>
+                                )
+                                if (isColumnVisible("clientC")) cm.clientC = (
+                                  <td key="clientC" tabIndex={-1} data-cell="" className={plainClass}>
+                                    <Input size="small" value={getMeta(variant.metadata, "wcwp_client-c")} onChange={(e) => updateVariantMetadata(row.id, variant.id, "wcwp_client-c", e.target.value || null)} placeholder="—" />
+                                  </td>
+                                )
+                                if (isColumnVisible("clientD")) cm.clientD = (
+                                  <td key="clientD" tabIndex={-1} data-cell="" className={plainClass}>
+                                    <Input size="small" value={getMeta(variant.metadata, "wcwp_client-d")} onChange={(e) => updateVariantMetadata(row.id, variant.id, "wcwp_client-d", e.target.value || null)} placeholder="—" />
+                                  </td>
+                                )
+                                if (isColumnVisible("stockQty")) cm.stockQty = (
+                                  <td key="stockQty" tabIndex={-1} data-cell="" className={plainClass}>
+                                    <input type="text" value={variant.manage_inventory && variant.inventory_quantity !== null ? String(variant.inventory_quantity) : "-"} onChange={(e) => {
                                       const val = e.target.value.trim()
-                                      updateVariantMetadata(
-                                        row.id,
-                                        variant.id,
-                                        "sale_price",
-                                        val ? (Number.isFinite(Number(val)) ? Number(val) : val) : null
-                                      )
-                                    }
-                                    }
-                                    placeholder="0.00"
-                                    className={cellInput}
-                                  />
-                                </td>
-                              ) : null}
-                              {isColumnVisible("b2bDiscount") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={getMeta(row.metadata, B2B_DISCOUNT_META_KEY)}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("clientA") && (
-                              <td className="px-3 py-2">
-                                <Input
-                                  size="small"
-                                  value={getMeta(variant.metadata, "wcwp_client-a")}
-                                  onChange={(e) =>
-                                    updateVariantMetadata(
-                                      row.id,
-                                      variant.id,
-                                      "wcwp_client-a",
-                                      e.target.value || null
-                                    )
-                                  }
-                                  placeholder="—"
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("clientB") && (
-                              <td className="px-3 py-2">
-                                <Input
-                                  size="small"
-                                  value={getMeta(variant.metadata, "wcwp_client-b")}
-                                  onChange={(e) =>
-                                    updateVariantMetadata(
-                                      row.id,
-                                      variant.id,
-                                      "wcwp_client-b",
-                                      e.target.value || null
-                                    )
-                                  }
-                                  placeholder="—"
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("clientC") && (
-                              <td className="px-3 py-2">
-                                <Input
-                                  size="small"
-                                  value={getMeta(variant.metadata, "wcwp_client-c")}
-                                  onChange={(e) =>
-                                    updateVariantMetadata(
-                                      row.id,
-                                      variant.id,
-                                      "wcwp_client-c",
-                                      e.target.value || null
-                                    )
-                                  }
-                                  placeholder="—"
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("clientD") && (
-                              <td className="px-3 py-2">
-                                <Input
-                                  size="small"
-                                  value={getMeta(variant.metadata, "wcwp_client-d")}
-                                  onChange={(e) =>
-                                    updateVariantMetadata(
-                                      row.id,
-                                      variant.id,
-                                      "wcwp_client-d",
-                                      e.target.value || null
-                                    )
-                                  }
-                                  placeholder="—"
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("manageStock") && (
-                              <td className="px-3 py-2 text-center">
-                                <Checkbox
-                                  checked={variant.manage_inventory}
-                                  onCheckedChange={(checked) =>
-                                    updateVariantManageInventory(
-                                      row.id,
-                                      variant.id,
-                                      checked === true
-                                    )
-                                  }
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("stockQty") && (
-                              <td className="px-3 py-2">
-                                {variant.manage_inventory ? (
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    step={1}
-                                    value={
-                                      variant.inventory_quantity ?? ""
-                                    }
-                                    onChange={(e) => {
-                                      const val = e.target.value.trim()
-                                      const num = val
-                                        ? Math.max(0, Math.floor(Number(val)))
-                                        : NaN
-                                      updateVariantInventoryQuantity(
-                                        row.id,
-                                        variant.id,
-                                        val
-                                          ? Number.isFinite(num)
-                                            ? num
-                                            : variant.inventory_quantity ?? null
-                                          : null
-                                      )
-                                    }
-                                    }
-                                    placeholder="0"
-                                    className={cellInput}
-                                  />
-                                ) : (
-                                  <Text size="small" className="text-ui-fg-muted px-3">
-                                    —
-                                  </Text>
-                                )}
-                              </td>
-                              )}
-                              {isColumnVisible("tags") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.tags}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("material") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.material}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("weight") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.weight}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("width") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.width}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("height") && (
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={row.height}
-                                  disabled
-                                  className={`${cellInput} bg-ui-bg-subtle cursor-not-allowed opacity-70`}
-                                />
-                              </td>
-                              )}
-                              {isColumnVisible("color") && (
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="color"
-                                    value={
-                                      getMeta(variant.metadata, "color_hex") ||
-                                      "#000000"
-                                    }
-                                    onChange={(e) =>
-                                      updateVariantMetadata(
-                                        row.id,
-                                        variant.id,
-                                        "color_hex",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-8 h-8 rounded border border-ui-border-base cursor-pointer p-0"
-                                    title="Color"
-                                  />
-                                  <Input
-                                    size="small"
-                                    value={getMeta(variant.metadata, "color_hex")}
-                                    onChange={(e) =>
-                                      updateVariantMetadata(
-                                        row.id,
-                                        variant.id,
-                                        "color_hex",
-                                        e.target.value || null
-                                      )
-                                    }
-                                    placeholder="#hex"
-                                    className="w-20"
-                                  />
-                                </div>
-                              </td>
-                              )}
+                                      if (val === "-" || val === "") {
+                                        updateVariantManageInventory(row.id, variant.id, false)
+                                        updateVariantInventoryQuantity(row.id, variant.id, null)
+                                      } else {
+                                        const num = Math.max(0, Math.floor(Number(val)))
+                                        if (!variant.manage_inventory) updateVariantManageInventory(row.id, variant.id, true)
+                                        updateVariantInventoryQuantity(row.id, variant.id, Number.isFinite(num) ? num : variant.inventory_quantity ?? null)
+                                      }
+                                    }} placeholder="-" className={cellInput} />
+                                  </td>
+                                )
+                                if (isColumnVisible("tags")) cm.tags = (
+                                  <td key="tags" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (<input type="text" value={row.tags} onChange={(e) => updateRow(row.id, "tags", e.target.value)} placeholder="tag1, tag2" className={cellInput} />)}
+                                  </td>
+                                )
+                                if (isColumnVisible("material")) cm.material = (
+                                  <td key="material" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (<input type="text" value={row.material} onChange={(e) => updateRow(row.id, "material", e.target.value)} placeholder="e.g. Cotton" className={cellInput} />)}
+                                  </td>
+                                )
+                                if (isColumnVisible("weight")) cm.weight = (
+                                  <td key="weight" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (<input type="text" value={row.weight} onChange={(e) => updateRow(row.id, "weight", e.target.value)} placeholder="0" className={cellInput} />)}
+                                  </td>
+                                )
+                                if (isColumnVisible("width")) cm.width = (
+                                  <td key="width" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (<input type="text" value={row.width} onChange={(e) => updateRow(row.id, "width", e.target.value)} placeholder="0" className={cellInput} />)}
+                                  </td>
+                                )
+                                if (isColumnVisible("height")) cm.height = (
+                                  <td key="height" tabIndex={-1} data-cell="" className={naClass}>
+                                    {isFirst && (<input type="text" value={row.height} onChange={(e) => updateRow(row.id, "height", e.target.value)} placeholder="0" className={cellInput} />)}
+                                  </td>
+                                )
+                                if (isColumnVisible("color")) cm.color = (
+                                  <td key="color" tabIndex={-1} data-cell="" className={plainClass}>
+                                    <div className="flex items-center gap-1">
+                                      <input type="color" value={getMeta(variant.metadata, "color_hex") || "#000000"} onChange={(e) => updateVariantMetadata(row.id, variant.id, "color_hex", e.target.value)} className="w-8 h-8 rounded border border-ui-border-base cursor-pointer p-0" title="Color" />
+                                      <Input size="small" value={getMeta(variant.metadata, "color_hex")} onChange={(e) => updateVariantMetadata(row.id, variant.id, "color_hex", e.target.value || null)} placeholder="#hex" className="w-20" />
+                                    </div>
+                                  </td>
+                                )
+                                return columnOrder.filter((id) => cm[id]).map((id) => cm[id])
+                              })()}
                               {customColumns.map((cc) =>
                                 isColumnVisible(cc.id) ? (
-                                  <td key={cc.id} className="px-3 py-2">
+                                  <td tabIndex={-1} data-cell="" key={cc.id} className="px-3 py-2">
                                     {cc.source.kind === "variant_metadata" ? (
                                       <Input
                                         size="small"
@@ -3727,7 +4713,7 @@ const BulkEditPage = () => {
                                 ) : null
                               )}
                               {isColumnVisible("changed") && (
-                              <td className="px-3 py-2 text-right">
+                              <td tabIndex={-1} data-cell="" className="px-3 py-2 text-right">
                                 {vDirty && (
                                   <Badge color="orange" className="whitespace-nowrap">
                                     Changed
@@ -3744,6 +4730,7 @@ const BulkEditPage = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Container>
 
@@ -3792,51 +4779,20 @@ const BulkEditPage = () => {
             <>
               <FocusModal.Header>
                 <FocusModal.Title className="txt-compact-large font-sans font-medium">
-                  Edit title, subtitle & description
+                  Edit description
                 </FocusModal.Title>
               </FocusModal.Header>
               <FocusModal.Body className="min-h-0 flex-1 overflow-y-auto p-4">
-                <div className="flex flex-col gap-6">
-                  <div>
-                    <Text size="small" weight="plus" className="mb-2 block">
-                      Title
-                    </Text>
-                    <Input
-                      value={richTextEdit.draftTitle}
-                      onChange={(e) =>
-                        setRichTextDraftField("draftTitle", e.target.value)
-                      }
-                      placeholder="Product title…"
-                    />
-                  </div>
-                  <div>
-                    <Text size="small" weight="plus" className="mb-2 block">
-                      Subtitle
-                    </Text>
-                    <Input
-                      value={richTextEdit.draftSubtitle}
-                      onChange={(e) =>
-                        setRichTextDraftField("draftSubtitle", e.target.value)
-                      }
-                      placeholder="Product subtitle…"
-                    />
-                  </div>
-                  <div>
-                    <Text size="small" weight="plus" className="mb-2 block">
-                      Description
-                    </Text>
-                    <SimpleMarkdownEditor
-                      key={`${richTextEdit.productId}-description`}
-                      id={`rte-${richTextEdit.productId}-description`}
-                      value={richTextEdit.draftDescription}
-                      onChange={(v) =>
-                        setRichTextDraftField("draftDescription", v)
-                      }
-                      placeholder="Product description…"
-                      minHeight={280}
-                    />
-                  </div>
-                </div>
+                <SimpleMarkdownEditor
+                  key={`${richTextEdit.productId}-description`}
+                  id={`rte-${richTextEdit.productId}-description`}
+                  value={richTextEdit.draftDescription}
+                  onChange={(v) =>
+                    setRichTextDraftField("draftDescription", v)
+                  }
+                  placeholder="Product description…"
+                  minHeight={360}
+                />
               </FocusModal.Body>
               <FocusModal.Footer>
                 <Button

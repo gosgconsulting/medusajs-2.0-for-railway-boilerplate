@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react"
 import { Heading, Text, toast } from "@medusajs/ui"
+import { useQueryClient } from "@tanstack/react-query"
 import { sdk } from "../lib/sdk"
 
 const selectInput =
@@ -21,6 +22,7 @@ function getErrorMessage(e: unknown): string {
 
 export const CustomerGroupSelectWidget = ({ data }: { data: CustomerWidgetData }) => {
   const customerId = data?.id
+  const queryClient = useQueryClient()
   const [groups, setGroups] = useState<CustomerGroupRow[]>([])
   const [assignedId, setAssignedId] = useState<string>("")
   const [loading, setLoading] = useState(true)
@@ -72,6 +74,17 @@ export const CustomerGroupSelectWidget = ({ data }: { data: CustomerWidgetData }
       }
       setAssignedId(nextId)
       toast.success(nextId ? "Customer group updated." : "Customer removed from group.")
+      // Invalidate Medusa admin's react-query caches so the customer groups
+      // index page and customer detail page reflect the change without a hard refresh.
+      await Promise.all([
+        queryClient.invalidateQueries({ predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey.some((k) =>
+            typeof k === "string" &&
+            (k.includes("customer-group") || k.includes("customerGroup") || k === "customers" || k.includes("customer"))
+          ),
+        }),
+      ])
     } catch (e: unknown) {
       toast.error(getErrorMessage(e))
       await refresh()

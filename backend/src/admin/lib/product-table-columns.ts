@@ -7,6 +7,8 @@ export const TOGGLEABLE_COLUMNS = [
   { id: "description", label: "Description" },
   { id: "handle", label: "Handle" },
   { id: "category", label: "Category" },
+  { id: "collection", label: "Collection" },
+  { id: "salesChannels", label: "Sales channels" },
   { id: "sku", label: "SKU" },
   { id: "basePrice", label: "Base price" },
   { id: "salePrice", label: "Sale price" },
@@ -31,6 +33,11 @@ export type ToggleableColumnId = (typeof TOGGLEABLE_COLUMNS)[number]["id"]
 export const DEFAULT_VISIBLE_COLUMNS = new Set<string>(
   TOGGLEABLE_COLUMNS.map((c) => c.id)
 )
+
+/** Default display order of reorderable columns (excluding "changed" which is always at the end). */
+export const DEFAULT_COLUMN_ORDER: string[] = TOGGLEABLE_COLUMNS
+  .map((c) => c.id)
+  .filter((id) => id !== "changed")
 
 /**
  * Preset product `metadata` keys for bulk-edit: checklist in Manage columns (all **unchecked**

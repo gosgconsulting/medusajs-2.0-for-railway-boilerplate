@@ -2,6 +2,7 @@ import type Medusa from "@medusajs/js-sdk"
 import { DEFAULT_VISIBLE_COLUMNS } from "./product-table-columns"
 
 export const COL_PREFS_KEY = "medusa-admin-product-index-columns-v1"
+export const SAVED_VIEWS_KEY = "medusa-admin-bulk-edit-views-v1"
 
 export type CustomColumnSource =
   | { kind: "variant_metadata"; key: string }
@@ -11,6 +12,15 @@ export type CustomColumnDef = {
   id: string
   label: string
   source: CustomColumnSource
+}
+
+export type SavedView = {
+  id: string
+  name: string
+  visible: string[]
+  customColumns: CustomColumnDef[]
+  /** User-defined column display order (by column id). If absent, falls back to TOGGLEABLE_COLUMNS order. */
+  order?: string[]
 }
 
 /** Payload stored in DB and mirrored in localStorage */
@@ -155,4 +165,76 @@ export async function saveRemoteProductColumnPrefs(
     method: "PUT",
     body: prefs,
   })
+}
+
+// ─── Saved views (bulk-edit) ────────────────────────────────────────────────
+
+export function newSavedViewId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `view_${crypto.randomUUID()}`
+  }
+  return `view_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function parseSavedViews(raw: unknown): SavedView[] {
+  if (!Array.isArray(raw)) return []
+  const out: SavedView[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue
+    const o = item as Record<string, unknown>
+    const id = typeof o.id === "string" && o.id.startsWith("view_") ? o.id : ""
+    const name = typeof o.name === "string" ? o.name.trim() : ""
+    if (!id || !name) continue
+    const visible = Array.isArray(o.visible)
+      ? (o.visible as unknown[]).filter(
+          (s): s is string => typeof s === "string"
+        )
+      : []
+    const customColumns = parseCustomColumns(o.customColumns)
+    const order = Array.isArray(o.order)
+      ? (o.order as unknown[]).filter(
+          (s): s is string => typeof s === "string"
+        )
+      : undefined
+    out.push({ id, name, visible, customColumns, order })
+  }
+  return out
+}
+
+export function loadSavedViews(): {
+  savedViews: SavedView[]
+  currentViewId: string | null
+} {
+  if (typeof window === "undefined") {
+    return { savedViews: [], currentViewId: null }
+  }
+  try {
+    const raw = window.localStorage.getItem(SAVED_VIEWS_KEY)
+    if (!raw) return { savedViews: [], currentViewId: null }
+    const p = JSON.parse(raw) as {
+      savedViews?: unknown
+      currentViewId?: unknown
+    }
+    const savedViews = parseSavedViews(p.savedViews)
+    const rawId = typeof p.currentViewId === "string" ? p.currentViewId : null
+    const currentViewId =
+      rawId && savedViews.some((v) => v.id === rawId) ? rawId : null
+    return { savedViews, currentViewId }
+  } catch {
+    return { savedViews: [], currentViewId: null }
+  }
+}
+
+export function saveSavedViews(
+  savedViews: SavedView[],
+  currentViewId: string | null
+): void {
+  try {
+    window.localStorage.setItem(
+      SAVED_VIEWS_KEY,
+      JSON.stringify({ savedViews, currentViewId })
+    )
+  } catch {
+    /* ignore */
+  }
 }

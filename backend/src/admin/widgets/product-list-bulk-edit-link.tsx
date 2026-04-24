@@ -264,21 +264,11 @@ const ProductListBulkEditWidget = () => {
 
   return (
     <>
-      <div className="flex justify-end gap-2 px-6 pb-3 pt-1">
-        {/* <Button
-          size="small"
-          variant="secondary"
-          type="button"
-          title="WooCommerce API Import"
-          onClick={() => setWcModalOpen(true)}
-        >
-          <Plus />
-          WC API Import
-        </Button> */}
+      <div className="flex justify-end gap-2 px-6 pb-2 pt-0">
         <Button size="small" variant="secondary" asChild>
           <Link to="/products/bulk-edit">
             <PencilSquare />
-            Bulk Edit
+            Edit with spreadsheet
           </Link>
         </Button>
         {/* <Button
