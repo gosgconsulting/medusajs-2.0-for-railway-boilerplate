@@ -2088,36 +2088,73 @@ const BulkEditPage = () => {
       )
 
       if (invQtyChanges.length && primaryStockLocationId) {
-        // ── Newly managed variants: create inventory item → link to variant → create level ──
-        // Medusa does NOT auto-create an inventory item when manage_inventory is set to true
-        // on an existing variant via the batch/update endpoint. We must do it explicitly.
+        // ── Newly managed variants ──────────────────────────────────────────────
+        // Medusa's product update workflow does NOT auto-create inventory items when
+        // manage_inventory flips from false to true on an existing variant. We must:
+        //   1. Create an inventory item
+        //   2. Link it to the variant (sets up the join in the link module)
+        //   3. Create the inventory level at the primary location
+        // The variant batch already set manage_inventory=true (sent in the product batch update).
+        const newlyManagedFailures: string[] = []
         for (const chg of invQtyChanges.filter((c) => c.isNew)) {
+          let newItemId: string | undefined
+          // Step 1: create inventory item
           try {
             const body: Record<string, unknown> = {}
             if (chg.variantSku) body.sku = chg.variantSku
             const newItemRes = await sdk.admin.inventoryItem.create(
               body as Parameters<typeof sdk.admin.inventoryItem.create>[0]
             )
-            const newItemId = (newItemRes as { inventory_item?: { id?: string } }).inventory_item?.id
-            if (!newItemId) continue
+            newItemId = (newItemRes as { inventory_item?: { id?: string } }).inventory_item?.id
+          } catch (e) {
+            newlyManagedFailures.push(
+              `Create inventory item failed for ${chg.variantSku || chg.variantId}: ${(e as Error)?.message ?? "unknown"}`
+            )
+            continue
+          }
+          if (!newItemId) {
+            newlyManagedFailures.push(
+              `Create inventory item returned no id for ${chg.variantSku || chg.variantId}`
+            )
+            continue
+          }
 
-            // Link inventory item to variant
+          // Step 2: link inventory item to variant
+          try {
             await sdk.client.fetch(
               `/admin/products/${chg.productId}/variants/${chg.variantId}/inventory-items`,
               { method: "POST", body: { inventory_item_id: newItemId, required_quantity: 1 } }
             )
+          } catch (e) {
+            newlyManagedFailures.push(
+              `Link inventory item to ${chg.variantSku || chg.variantId} failed: ${(e as Error)?.message ?? "unknown"}`
+            )
+            continue
+          }
 
-            // Create inventory level at primary location
+          // Step 3: create inventory level
+          try {
             await sdk.admin.inventoryItem.batchInventoryItemLocationLevels(
               newItemId,
               {
                 create: [{ location_id: primaryStockLocationId, stocked_quantity: chg.stocked_quantity }],
               } as Parameters<typeof sdk.admin.inventoryItem.batchInventoryItemLocationLevels>[1]
             )
+          } catch (e) {
+            newlyManagedFailures.push(
+              `Create inventory level for ${chg.variantSku || chg.variantId} failed: ${(e as Error)?.message ?? "unknown"}`
+            )
+            continue
+          }
 
-            chg.inventoryItemId = newItemId
-            chg.isNew = false
-          } catch { /* skip this variant — non-fatal */ }
+          chg.inventoryItemId = newItemId
+          chg.isNew = false
+        }
+
+        if (newlyManagedFailures.length) {
+          throw new Error(
+            `Inventory setup failed: ${newlyManagedFailures.join("; ")}`
+          )
         }
 
         // ── Existing inventory items: update or create level at primary location ──
