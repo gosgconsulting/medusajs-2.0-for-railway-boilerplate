@@ -20,6 +20,7 @@ import { hydrateProductVariantsInventoryQuantity } from "../../../lib/hydrate-pr
 import { sdk } from "../../../lib/sdk"
 import {
   fetchRemoteProductColumnPrefs,
+  isPresetViewId,
   loadSavedViews,
   newCustomColumnId,
   newSavedViewId,
@@ -665,7 +666,14 @@ const BulkEditPage = () => {
       customColumns,
       order: [...columnOrder],
     }
-    setSavedViews((prev) => [...prev, newView])
+    setSavedViews((prev) => {
+      const next = [...prev, newView]
+      // Persist synchronously here too. The useEffect persists on state change,
+      // but doing it inline avoids losing the view if the component unmounts
+      // (e.g. user clicks "Back to products") before the effect commits.
+      saveSavedViews(next, id)
+      return next
+    })
     setCurrentViewIdState(id)
     setNewViewNameInput("")
     setIsNamingNewView(false)
@@ -674,8 +682,8 @@ const BulkEditPage = () => {
 
   const updateCurrentView = useCallback(() => {
     if (!currentViewId) return
-    setSavedViews((prev) =>
-      prev.map((v) =>
+    setSavedViews((prev) => {
+      const next = prev.map((v) =>
         v.id === currentViewId
           ? {
               ...v,
@@ -685,19 +693,29 @@ const BulkEditPage = () => {
             }
           : v
       )
-    )
+      saveSavedViews(next, currentViewId)
+      return next
+    })
     const view = savedViews.find((v) => v.id === currentViewId)
     toast.success(`View "${view?.name ?? ""}" updated`)
-  }, [currentViewId, savedViews, visibleColumns, customColumns, columnOrder])
+  }, [currentViewId, savedViews, visibleColumns, columnOrder, customColumns])
 
   const deleteCurrentView = useCallback(() => {
     if (!currentViewId) return
+    if (isPresetViewId(currentViewId)) {
+      toast.error("Built-in views can't be deleted. Customize and save it under a new name instead.")
+      return
+    }
     const view = savedViews.find((v) => v.id === currentViewId)
     if (!view) return
     if (!window.confirm(`Delete view "${view.name}"? This cannot be undone.`)) {
       return
     }
-    setSavedViews((prev) => prev.filter((v) => v.id !== currentViewId))
+    setSavedViews((prev) => {
+      const next = prev.filter((v) => v.id !== currentViewId)
+      saveSavedViews(next, null)
+      return next
+    })
     setCurrentViewIdState(null)
     setVisibleColumns(new Set(DEFAULT_VISIBLE_COLUMNS))
     setCustomColumns([])
@@ -746,13 +764,15 @@ const BulkEditPage = () => {
 
   const isColumnVisible = useCallback(
     (id: string) => {
+      // Always-on structural columns
       if (id === "expand" || id === "image" || id === "title" || id === "status")
         return true
-      // Default view (no saved view selected) and no modifications: show all columns
-      if (!currentViewId && !isViewDirty) return true
+      // Honor `visibleColumns` directly. Default view starts with the B2C set
+      // (B2B columns hidden); built-in B2B preset has them visible. User toggles
+      // mutate this set and the change persists in the active saved view.
       return visibleColumns.has(id)
     },
-    [currentViewId, isViewDirty, visibleColumns]
+    [visibleColumns]
   )
 
   useEffect(() => {
@@ -3419,7 +3439,7 @@ const BulkEditPage = () => {
                       onChange={(e) => selectView(e.target.value || null)}
                       disabled={isSaving}
                     >
-                      <option value="">Default (all columns)</option>
+                      <option value="">Default (B2C)</option>
                       {savedViews.map((v) => (
                         <option key={v.id} value={v.id}>
                           {v.name}
@@ -3488,7 +3508,7 @@ const BulkEditPage = () => {
                             Update view
                           </Button>
                         )}
-                        {currentViewId && (
+                        {currentViewId && !isPresetViewId(currentViewId) && (
                           <Button
                             size="small"
                             variant="transparent"

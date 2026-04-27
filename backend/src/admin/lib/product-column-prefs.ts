@@ -1,5 +1,13 @@
 import type Medusa from "@medusajs/js-sdk"
-import { DEFAULT_VISIBLE_COLUMNS } from "./product-table-columns"
+import {
+  B2B_VISIBLE_COLUMNS,
+  DEFAULT_COLUMN_ORDER,
+  DEFAULT_VISIBLE_COLUMNS,
+} from "./product-table-columns"
+
+/** Stable id for the built-in "B2B" preset view. Stable so the preset is
+ *  recognized across reloads and not duplicated. */
+export const B2B_PRESET_VIEW_ID = "view_preset_b2b"
 
 export const COL_PREFS_KEY = "medusa-admin-product-index-columns-v1"
 export const SAVED_VIEWS_KEY = "medusa-admin-bulk-edit-views-v1"
@@ -201,27 +209,53 @@ function parseSavedViews(raw: unknown): SavedView[] {
   return out
 }
 
+/** Built-in "B2B" preset view — every toggleable column including the
+ *  custom B2B-pricing ones (B2B discount, Client A/B/C/D). Always present in
+ *  the dropdown; cannot be deleted (the page filters delete by preset id). */
+export function buildB2bPresetView(): SavedView {
+  return {
+    id: B2B_PRESET_VIEW_ID,
+    name: "B2B",
+    visible: [...B2B_VISIBLE_COLUMNS],
+    customColumns: [],
+    order: [...DEFAULT_COLUMN_ORDER],
+  }
+}
+
+/** Returns true if the given view id is a built-in preset (cannot be deleted). */
+export function isPresetViewId(id: string): boolean {
+  return id === B2B_PRESET_VIEW_ID
+}
+
 export function loadSavedViews(): {
   savedViews: SavedView[]
   currentViewId: string | null
 } {
+  const ensureB2bPreset = (views: SavedView[]): SavedView[] => {
+    if (views.some((v) => v.id === B2B_PRESET_VIEW_ID)) return views
+    // Inject the preset so it's always selectable from the dropdown. User
+    // customizations of the preset are persisted normally (parseSavedViews
+    // accepts any view_* id including the preset id).
+    return [buildB2bPresetView(), ...views]
+  }
+
   if (typeof window === "undefined") {
-    return { savedViews: [], currentViewId: null }
+    return { savedViews: ensureB2bPreset([]), currentViewId: null }
   }
   try {
     const raw = window.localStorage.getItem(SAVED_VIEWS_KEY)
-    if (!raw) return { savedViews: [], currentViewId: null }
+    if (!raw) return { savedViews: ensureB2bPreset([]), currentViewId: null }
     const p = JSON.parse(raw) as {
       savedViews?: unknown
       currentViewId?: unknown
     }
-    const savedViews = parseSavedViews(p.savedViews)
+    const savedViews = ensureB2bPreset(parseSavedViews(p.savedViews))
     const rawId = typeof p.currentViewId === "string" ? p.currentViewId : null
     const currentViewId =
       rawId && savedViews.some((v) => v.id === rawId) ? rawId : null
     return { savedViews, currentViewId }
   } catch {
-    return { savedViews: [], currentViewId: null }
+    return { savedViews: ensureB2bPreset([]), currentViewId: null }
   }
 }
 

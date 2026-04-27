@@ -30,7 +30,27 @@ export const TOGGLEABLE_COLUMNS = [
 
 export type ToggleableColumnId = (typeof TOGGLEABLE_COLUMNS)[number]["id"]
 
+/**
+ * B2B-specific custom-pricing columns. Hidden in the Default (B2C) view and
+ * surfaced in the built-in "B2B" preset view.
+ */
+export const B2B_COLUMN_IDS: readonly string[] = [
+  "b2bDiscount",
+  "clientA",
+  "clientB",
+  "clientC",
+  "clientD",
+] as const
+
+/** Default (B2C) view: every toggleable column EXCEPT the B2B-specific ones. */
 export const DEFAULT_VISIBLE_COLUMNS = new Set<string>(
+  TOGGLEABLE_COLUMNS.map((c) => c.id).filter(
+    (id) => !B2B_COLUMN_IDS.includes(id)
+  )
+)
+
+/** B2B preset view: every toggleable column (B2C columns + B2B custom-pricing columns). */
+export const B2B_VISIBLE_COLUMNS = new Set<string>(
   TOGGLEABLE_COLUMNS.map((c) => c.id)
 )
 
