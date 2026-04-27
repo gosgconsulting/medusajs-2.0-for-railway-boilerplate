@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 9000
+    },
+    {
+      "name": "storefront",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../storefront", "run", "dev"],
+      "port": 8000
+    },
+    {
+      "name": "email",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["email:dev"],
+      "port": 3002
+    }
+  ]
+}
