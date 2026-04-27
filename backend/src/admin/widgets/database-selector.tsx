@@ -42,24 +42,23 @@ function saveActiveId(id: string): void {
   } catch { /* ignore */ }
 }
 
-function findNotificationButton(): HTMLElement | null {
-  // Medusa's admin marks the bell with aria-label or testid in different
-  // versions — try a handful of stable selectors.
-  const selectors = [
-    'button[aria-label*="Notification" i]',
-    'button[aria-label*="notification" i]',
-    'button[data-testid*="notification" i]',
-    'header button[aria-label*="Bell" i]',
-  ]
-  for (const sel of selectors) {
-    const el = document.querySelector(sel) as HTMLElement | null
-    if (el) return el
-  }
-  // Fallback: look for a Bell SVG inside a button in the top header.
-  const candidates = document.querySelectorAll("header button, [role='banner'] button")
-  for (const btn of candidates) {
-    const svg = btn.querySelector("svg")
-    if (svg && /bell/i.test(svg.outerHTML)) return btn as HTMLElement
+/**
+ * The Medusa 2.x admin Topbar is a div with the distinctive class combo
+ * `grid grid-cols-2 border-b p-3` (rendered by `Topbar` inside MainLayout).
+ * It's a 2-column grid: the first cell holds the sidebar toggles + page title,
+ * the second cell holds the notification bell on the right. We anchor our
+ * portal as the FIRST child of that right cell so the dropdown appears
+ * immediately before the bell.
+ */
+function findTopbarRightCell(): HTMLElement | null {
+  const topbars = document.querySelectorAll<HTMLElement>("div.grid.grid-cols-2.border-b")
+  for (const tb of topbars) {
+    // Sanity check: must have exactly two direct child cells.
+    const cells = Array.from(tb.children).filter(
+      (c) => c instanceof HTMLElement
+    ) as HTMLElement[]
+    if (cells.length !== 2) continue
+    return cells[1]
   }
   return null
 }
@@ -73,19 +72,31 @@ const DatabaseSelectorWidget = () => {
     const tryMount = (): boolean => {
       // Reuse the singleton container if a previous mount on another page
       // already injected it. Avoids flicker on SPA navigation.
-      let el = document.getElementById(PORTAL_ID)
-      if (el && document.body.contains(el)) {
-        setContainer(el)
+      const existing = document.getElementById(PORTAL_ID)
+      if (existing && document.body.contains(existing)) {
+        setContainer(existing)
         return true
       }
-      const bell = findNotificationButton()
-      if (!bell?.parentElement) return false
-      el = document.createElement("div")
+      const rightCell = findTopbarRightCell()
+      if (!rightCell) return false
+      const el = document.createElement("div")
       el.id = PORTAL_ID
+      // The right cell is right-aligned (justify-self / contains the bell on
+      // the far right). We want the dropdown to sit immediately to the left
+      // of the bell, so we make the cell flex with end-justified children
+      // and insert our portal as the first child.
       el.style.display = "inline-flex"
       el.style.alignItems = "center"
       el.style.marginRight = "8px"
-      bell.parentElement.insertBefore(el, bell)
+      // Force the right cell into a flex layout so our element + the bell
+      // align horizontally even if the original cell was just a div.
+      const cs = window.getComputedStyle(rightCell)
+      if (cs.display !== "flex" && cs.display !== "inline-flex") {
+        rightCell.style.display = "flex"
+        rightCell.style.alignItems = "center"
+        rightCell.style.justifyContent = "flex-end"
+      }
+      rightCell.insertBefore(el, rightCell.firstChild)
       setContainer(el)
       return true
     }
