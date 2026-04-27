@@ -36,6 +36,11 @@ export default defineMiddlewares({
       bodyParser: { sizeLimit: "10mb" },
     },
     {
+      matcher: "/admin/bulk-edit-import-products",
+      methods: ["POST"],
+      bodyParser: { sizeLimit: "50mb" },
+    },
+    {
       matcher: "/admin/uploads/protected",
       methods: ["POST"],
       bodyParser: { sizeLimit: "10mb" },

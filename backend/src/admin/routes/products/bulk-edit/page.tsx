@@ -2295,11 +2295,9 @@ const BulkEditPage = () => {
   // ── Export / Import (CSV) ──────────────────────────────────────────────────
   // Export honors the same filters that produce the visible product list, so
   // applying a status/tag/search filter narrows the export to those products.
+  // Both go through our custom endpoints (bulk-edit-export-products and
+  // bulk-edit-import-products) so metadata round-trips correctly.
   const importFileInputRef = useRef<HTMLInputElement | null>(null)
-  const [pendingImport, setPendingImport] = useState<{
-    transactionId: string
-    summary?: Record<string, unknown>
-  } | null>(null)
 
   const { mutate: startExport, isPending: isExporting } = useMutation({
     mutationFn: async () => {
@@ -2340,11 +2338,23 @@ const BulkEditPage = () => {
     },
   })
 
+  // Import uses our custom endpoint (not sdk.admin.product.import) so the
+  // CSV column shape matches the export — round-trip preserves metadata.
   const { mutateAsync: uploadImport, isPending: isImporting } = useMutation({
     mutationFn: async (file: File) => {
-      const res = await sdk.admin.product.import({ file } as unknown as Parameters<
-        typeof sdk.admin.product.import
-      >[0])
+      const text = await file.text()
+      const res = (await sdk.client.fetch("/admin/bulk-edit-import-products", {
+        method: "POST",
+        body: { csv: text },
+      } as Parameters<typeof sdk.client.fetch>[1])) as {
+        products_updated: number
+        variants_updated: number
+        inventory_levels_applied?: number
+        skipped_rows?: number
+        skipped_no_product_id?: number
+        errors?: string[]
+        message?: string
+      }
       return res
     },
     onError: (e: Error) => {
@@ -2352,39 +2362,29 @@ const BulkEditPage = () => {
     },
   })
 
-  const { mutate: confirmImport, isPending: isConfirmingImport } = useMutation({
-    mutationFn: async (transactionId: string) => {
-      return sdk.admin.product.confirmImport(transactionId)
-    },
-    onSuccess: () => {
-      toast.success("Import confirmed. Products are being applied — refreshing in a moment.")
-      setPendingImport(null)
-      // Refresh the list so the imported rows appear.
-      void queryClient.invalidateQueries({ queryKey: ["admin-products-bulk"] })
-    },
-    onError: (e: Error) => {
-      toast.error(e?.message || "Import confirmation failed.")
-    },
-  })
-
   const handleImportFileSelect = useCallback(
     async (file: File) => {
       try {
-        const res = (await uploadImport(file)) as {
-          transaction_id?: string
-          summary?: Record<string, unknown>
+        const res = await uploadImport(file)
+        if (res?.errors?.length) {
+          toast.error(
+            `Import partially applied. ${res.errors.length} error(s): ${res.errors[0]}${
+              res.errors.length > 1 ? ` (+${res.errors.length - 1} more)` : ""
+            }`
+          )
+        } else if (res?.message) {
+          toast.warning(res.message)
+        } else {
+          toast.success(
+            `Imported ${res.products_updated} product(s), ${res.variants_updated} variant patch(es).`
+          )
         }
-        const txId = res?.transaction_id
-        if (!txId) {
-          toast.error("Import returned no transaction id.")
-          return
-        }
-        setPendingImport({ transactionId: txId, summary: res.summary })
+        await queryClient.invalidateQueries({ queryKey: ["admin-products-bulk"] })
       } catch {
         /* error already toasted by mutation onError */
       }
     },
-    [uploadImport]
+    [uploadImport, queryClient]
   )
 
   const { mutate: deleteBulk, isPending: isDeleting } = useMutation({
@@ -3029,11 +3029,11 @@ const BulkEditPage = () => {
             variant="secondary"
             size="small"
             onClick={() => importFileInputRef.current?.click()}
-            disabled={isImporting || isConfirmingImport}
-            title="Import products from a CSV (Medusa format)"
+            disabled={isImporting}
+            title="Import products from a CSV exported from this page"
           >
             <ArrowUpTray />
-            {isImporting ? "Uploading…" : "Import"}
+            {isImporting ? "Importing…" : "Import"}
           </Button>
           <input
             ref={importFileInputRef}
@@ -3049,47 +3049,6 @@ const BulkEditPage = () => {
           />
         </div>
       </div>
-
-      {pendingImport && (
-        <FocusModal open onOpenChange={(open) => !open && setPendingImport(null)}>
-          <FocusModal.Content>
-            <FocusModal.Header>
-              <Heading>Confirm import</Heading>
-            </FocusModal.Header>
-            <FocusModal.Body className="flex flex-col gap-4 p-6">
-              <Text>
-                The CSV has been parsed. Confirm to apply the changes — this will
-                create or update products in your store. The action cannot be undone.
-              </Text>
-              {pendingImport.summary && (
-                <pre className="bg-ui-bg-subtle p-4 rounded text-xs overflow-x-auto">
-                  {JSON.stringify(pendingImport.summary, null, 2)}
-                </pre>
-              )}
-              <Text size="small" className="text-ui-fg-subtle">
-                Transaction: {pendingImport.transactionId}
-              </Text>
-            </FocusModal.Body>
-            <FocusModal.Footer>
-              <div className="flex justify-end gap-2 w-full">
-                <Button
-                  variant="secondary"
-                  onClick={() => setPendingImport(null)}
-                  disabled={isConfirmingImport}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => confirmImport(pendingImport.transactionId)}
-                  disabled={isConfirmingImport}
-                >
-                  {isConfirmingImport ? "Applying…" : "Confirm import"}
-                </Button>
-              </div>
-            </FocusModal.Footer>
-          </FocusModal.Content>
-        </FocusModal>
-      )}
 
       {/* Page title */}
       {/* <div>
