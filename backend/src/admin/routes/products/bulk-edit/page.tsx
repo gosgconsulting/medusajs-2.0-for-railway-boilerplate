@@ -209,8 +209,13 @@ function toVariantRow(v: ApiVariant): VariantRow {
     (typeof v.thumbnail === "string" && v.thumbnail.trim() ? v.thumbnail : null) ??
     (v.images?.[0]?.url ?? null) ??
     (typeof meta?.thumbnail === "string" ? meta.thumbnail : null)
+  // Medusa's `*variants.inventory_items` expansion has returned the join record
+  // (`{ inventory_item_id, required_quantity }`) in some versions and the inventory
+  // item itself (`{ id, sku, ... }`) in others. Try every shape so we never miss
+  // an existing link — missing it would cause our save to create a duplicate.
   const invLink = v.inventory_items?.[0] as
     | {
+        id?: string | null
         inventory_item_id?: string | null
         required_quantity?: number | null
         inventory?: { id?: string | null }
@@ -222,7 +227,9 @@ function toVariantRow(v: ApiVariant): VariantRow {
       ? invLink.inventory_item_id
       : typeof invLink?.inventory?.id === "string"
         ? invLink.inventory.id
-        : null
+        : typeof invLink?.id === "string" && invLink.id.startsWith("iitem_")
+          ? invLink.id
+          : null
   return {
     id: v.id,
     title: v.title ?? "Default",
@@ -2091,12 +2098,50 @@ const BulkEditPage = () => {
         // ── Newly managed variants ──────────────────────────────────────────────
         // Medusa's product update workflow does NOT auto-create inventory items when
         // manage_inventory flips from false to true on an existing variant. We must:
-        //   1. Create an inventory item
-        //   2. Link it to the variant (sets up the join in the link module)
-        //   3. Create the inventory level at the primary location
-        // The variant batch already set manage_inventory=true (sent in the product batch update).
+        //   1. Check whether the variant ALREADY has an inventory item linked
+        //      (the GET /admin/products may not have populated `inventory_item_id`,
+        //      and creating another would produce duplicate rows in "Edit stock levels").
+        //   2. If not, create one and link it to the variant.
+        //   3. Create/update the inventory level at the primary location.
+        // The variant batch already set manage_inventory=true.
         const newlyManagedFailures: string[] = []
         for (const chg of invQtyChanges.filter((c) => c.isNew)) {
+          // Step 0: safety check — re-fetch the variant's existing inventory items
+          // before creating a new one. Prevents duplicates when the initial product
+          // list query didn't surface inventory_item_id in a parseable shape.
+          try {
+            const lookup = await sdk.admin.productVariant.list({
+              id: chg.variantId,
+              fields: "*inventory_items",
+              limit: 1,
+            } as Parameters<typeof sdk.admin.productVariant.list>[0])
+            const existingItems = (lookup.variants?.[0] as any)?.inventory_items as
+              | Array<{
+                  id?: string | null
+                  inventory_item_id?: string | null
+                  inventory?: { id?: string | null }
+                }>
+              | undefined
+            const existingId = existingItems?.length
+              ? existingItems
+                  .map((item) =>
+                    typeof item?.inventory_item_id === "string"
+                      ? item.inventory_item_id
+                      : typeof item?.inventory?.id === "string"
+                        ? item.inventory.id
+                        : typeof item?.id === "string" && item.id.startsWith("iitem_")
+                          ? item.id
+                          : null
+                  )
+                  .find((id): id is string => !!id)
+              : null
+            if (existingId) {
+              chg.inventoryItemId = existingId
+              chg.isNew = false
+              continue
+            }
+          } catch { /* fall through and create — non-fatal */ }
+
           let newItemId: string | undefined
           // Step 1: create inventory item
           try {
