@@ -2303,6 +2303,11 @@ const BulkEditPage = () => {
 
   const { mutate: startExport, isPending: isExporting } = useMutation({
     mutationFn: async () => {
+      // Use our custom endpoint (not sdk.admin.product.export) because Medusa's
+      // built-in export drops product/variant metadata — which we rely on for
+      // b2b_discount, sale_price, color_hex, wcwp_client-* etc. Direct download
+      // also avoids the notification round-trip and the "Failed to export
+      // products" toasts caused by stale region references in the legacy export.
       const filters: Record<string, unknown> = {
         ...(debouncedSearch ? { q: debouncedSearch } : {}),
         ...(statusFilter.length ? { status: statusFilter } : {}),
@@ -2312,15 +2317,23 @@ const BulkEditPage = () => {
         ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
         ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
       }
-      return sdk.admin.product.export(
-        {} as Parameters<typeof sdk.admin.product.export>[0],
-        filters as Parameters<typeof sdk.admin.product.export>[1]
-      )
+      const blob = (await sdk.client.fetch("/admin/bulk-edit-export-products", {
+        method: "POST",
+        body: filters,
+        headers: { accept: "text/csv" },
+      } as Parameters<typeof sdk.client.fetch>[1])) as Blob
+      // Trigger browser download
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `bulk-edit-products-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
     },
     onSuccess: () => {
-      toast.success(
-        "Export started. The CSV will be ready in a notification once Medusa finishes building it."
-      )
+      toast.success("Export downloaded.")
     },
     onError: (e: Error) => {
       toast.error(e?.message || "Export failed.")
