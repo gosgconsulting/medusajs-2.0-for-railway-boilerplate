@@ -15,7 +15,7 @@ import {
   Text,
   toast,
 } from "@medusajs/ui"
-import { ArrowUturnLeft, Check, ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
+import { ArrowDownTray, ArrowUpTray, ArrowUturnLeft, Check, ChevronDown, ChevronLeft, ChevronRight, PencilSquare, XMarkMini } from "@medusajs/icons"
 import { hydrateProductVariantsInventoryQuantity } from "../../../lib/hydrate-product-variant-inventory"
 import { sdk } from "../../../lib/sdk"
 import {
@@ -2292,6 +2292,88 @@ const BulkEditPage = () => {
     saveBatch()
   }, [hasErrors, hasDirty, isSaving, saveBatch])
 
+  // ── Export / Import (CSV) ──────────────────────────────────────────────────
+  // Export honors the same filters that produce the visible product list, so
+  // applying a status/tag/search filter narrows the export to those products.
+  const importFileInputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingImport, setPendingImport] = useState<{
+    transactionId: string
+    summary?: Record<string, unknown>
+  } | null>(null)
+
+  const { mutate: startExport, isPending: isExporting } = useMutation({
+    mutationFn: async () => {
+      const filters: Record<string, unknown> = {
+        ...(debouncedSearch ? { q: debouncedSearch } : {}),
+        ...(statusFilter.length ? { status: statusFilter } : {}),
+        ...(tagIds.length ? { tag_id: tagIds } : {}),
+        ...(typeIds.length ? { type_id: typeIds } : {}),
+        ...(salesChannelIds.length ? { sales_channel_id: salesChannelIds } : {}),
+        ...(createdAt.$gte || createdAt.$lte ? { created_at: createdAt } : {}),
+        ...(updatedAt.$gte || updatedAt.$lte ? { updated_at: updatedAt } : {}),
+      }
+      return sdk.admin.product.export(
+        {} as Parameters<typeof sdk.admin.product.export>[0],
+        filters as Parameters<typeof sdk.admin.product.export>[1]
+      )
+    },
+    onSuccess: () => {
+      toast.success(
+        "Export started. The CSV will be ready in a notification once Medusa finishes building it."
+      )
+    },
+    onError: (e: Error) => {
+      toast.error(e?.message || "Export failed.")
+    },
+  })
+
+  const { mutateAsync: uploadImport, isPending: isImporting } = useMutation({
+    mutationFn: async (file: File) => {
+      const res = await sdk.admin.product.import({ file } as unknown as Parameters<
+        typeof sdk.admin.product.import
+      >[0])
+      return res
+    },
+    onError: (e: Error) => {
+      toast.error(e?.message || "Import failed.")
+    },
+  })
+
+  const { mutate: confirmImport, isPending: isConfirmingImport } = useMutation({
+    mutationFn: async (transactionId: string) => {
+      return sdk.admin.product.confirmImport(transactionId)
+    },
+    onSuccess: () => {
+      toast.success("Import confirmed. Products are being applied — refreshing in a moment.")
+      setPendingImport(null)
+      // Refresh the list so the imported rows appear.
+      void queryClient.invalidateQueries({ queryKey: ["admin-products-bulk"] })
+    },
+    onError: (e: Error) => {
+      toast.error(e?.message || "Import confirmation failed.")
+    },
+  })
+
+  const handleImportFileSelect = useCallback(
+    async (file: File) => {
+      try {
+        const res = (await uploadImport(file)) as {
+          transaction_id?: string
+          summary?: Record<string, unknown>
+        }
+        const txId = res?.transaction_id
+        if (!txId) {
+          toast.error("Import returned no transaction id.")
+          return
+        }
+        setPendingImport({ transactionId: txId, summary: res.summary })
+      } catch {
+        /* error already toasted by mutation onError */
+      }
+    },
+    [uploadImport]
+  )
+
   const { mutate: deleteBulk, isPending: isDeleting } = useMutation({
     mutationFn: async (args: {
       productIds: string[]
@@ -2919,7 +3001,82 @@ const BulkEditPage = () => {
           <span className="txt-small text-ui-fg-subtle">Edit with spreadsheet</span>
         </div>
 
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={() => startExport()}
+            disabled={isExporting || isLoading}
+            title={hasAnyFilters ? "Export the filtered products to CSV" : "Export all products to CSV"}
+          >
+            <ArrowDownTray />
+            {isExporting ? "Exporting…" : hasAnyFilters ? "Export filtered" : "Export"}
+          </Button>
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={() => importFileInputRef.current?.click()}
+            disabled={isImporting || isConfirmingImport}
+            title="Import products from a CSV (Medusa format)"
+          >
+            <ArrowUpTray />
+            {isImporting ? "Uploading…" : "Import"}
+          </Button>
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleImportFileSelect(f)
+              // Reset so picking the same file again still triggers onChange
+              e.target.value = ""
+            }}
+          />
+        </div>
       </div>
+
+      {pendingImport && (
+        <FocusModal open onOpenChange={(open) => !open && setPendingImport(null)}>
+          <FocusModal.Content>
+            <FocusModal.Header>
+              <Heading>Confirm import</Heading>
+            </FocusModal.Header>
+            <FocusModal.Body className="flex flex-col gap-4 p-6">
+              <Text>
+                The CSV has been parsed. Confirm to apply the changes — this will
+                create or update products in your store. The action cannot be undone.
+              </Text>
+              {pendingImport.summary && (
+                <pre className="bg-ui-bg-subtle p-4 rounded text-xs overflow-x-auto">
+                  {JSON.stringify(pendingImport.summary, null, 2)}
+                </pre>
+              )}
+              <Text size="small" className="text-ui-fg-subtle">
+                Transaction: {pendingImport.transactionId}
+              </Text>
+            </FocusModal.Body>
+            <FocusModal.Footer>
+              <div className="flex justify-end gap-2 w-full">
+                <Button
+                  variant="secondary"
+                  onClick={() => setPendingImport(null)}
+                  disabled={isConfirmingImport}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => confirmImport(pendingImport.transactionId)}
+                  disabled={isConfirmingImport}
+                >
+                  {isConfirmingImport ? "Applying…" : "Confirm import"}
+                </Button>
+              </div>
+            </FocusModal.Footer>
+          </FocusModal.Content>
+        </FocusModal>
+      )}
 
       {/* Page title */}
       {/* <div>
