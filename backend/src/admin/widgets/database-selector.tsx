@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
+import "../lib/sync-active-store-cookie"
 import { createPortal } from "react-dom"
 import { Link } from "react-router-dom"
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
@@ -8,6 +9,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import {
   ADMIN_ACTIVE_STORE_STORAGE_KEY,
+  ADMIN_LIST_ALL_STORES_HEADER,
   setActiveAdminStoreId,
 } from "../lib/active-store-context"
 import { sdk } from "../lib/sdk"
@@ -54,7 +56,11 @@ const DatabaseSelectorWidget = () => {
 
   const { data: storesRes, isLoading } = useQuery({
     queryKey: ["admin-store-list-for-selector"],
-    queryFn: async () => sdk.admin.store.list({ limit: 200, fields: "id,name" }),
+    queryFn: async () =>
+      sdk.admin.store.list(
+        { limit: 200, fields: "id,name" },
+        { [ADMIN_LIST_ALL_STORES_HEADER]: "true" }
+      ),
     staleTime: 60_000,
   })
 

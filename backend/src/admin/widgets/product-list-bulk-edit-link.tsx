@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react"
+import "../lib/sync-active-store-cookie"
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
 import { Button, Checkbox, Heading, Input, Text, toast } from "@medusajs/ui"
 import { PencilSquare, Plus, Trash, XMark } from "@medusajs/icons"

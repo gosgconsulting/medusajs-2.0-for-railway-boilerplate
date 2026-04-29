@@ -1,13 +1,17 @@
 import { adminSdkGlobalHeaders } from "./sdk"
+import {
+  ADMIN_ACTIVE_STORE_COOKIE,
+  ADMIN_ACTIVE_STORE_HEADER,
+  ADMIN_ACTIVE_STORE_STORAGE_KEY,
+} from "./active-store-keys"
 
-/** Header sent with Admin API requests so the backend can scope list endpoints by store. */
-export const ADMIN_ACTIVE_STORE_HEADER = "x-medusa-store-id"
-
-/** Cookie mirrored for requests that do not use the JS SDK (core dashboard fetch). */
-export const ADMIN_ACTIVE_STORE_COOKIE = "active_medusa_store_id"
-
-/** localStorage key for the selected Medusa Store id (survives reload). */
-export const ADMIN_ACTIVE_STORE_STORAGE_KEY = "admin-active-database-v1"
+export {
+  ADMIN_ACTIVE_STORE_COOKIE,
+  ADMIN_ACTIVE_STORE_HEADER,
+  ADMIN_ACTIVE_STORE_STORAGE_KEY,
+  ADMIN_LIST_ALL_STORES_HEADER,
+  readActiveStoreIdFromStorage,
+} from "./active-store-keys"
 
 /**
  * Persists the active store id for SDK headers, cookie (dashboard fetch), and localStorage.

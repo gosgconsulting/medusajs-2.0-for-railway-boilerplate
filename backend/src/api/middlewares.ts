@@ -4,7 +4,11 @@ import type {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { defineMiddlewares } from "@medusajs/framework/http"
-import { injectAdminActiveStoreListQuery } from "lib/inject-admin-active-store-query"
+import {
+  injectAdminActiveStoreProductList,
+  injectAdminOrdersListQuery,
+  injectAdminStoresListScope,
+} from "lib/inject-admin-active-store-query"
 import { validateAndTransformQuery } from "@medusajs/framework"
 import { MedusaError } from "@medusajs/framework/utils"
 import { StoreGetOrderParams } from "@medusajs/medusa/api/store/orders/validators"
@@ -32,14 +36,19 @@ function requireDeferredCheckoutEnabled(
 export default defineMiddlewares({
   routes: [
     {
+      matcher: "/admin/stores",
+      methods: ["GET"],
+      middlewares: [injectAdminStoresListScope()],
+    },
+    {
       matcher: "/admin/products",
       methods: ["GET"],
-      middlewares: [injectAdminActiveStoreListQuery()],
+      middlewares: [injectAdminActiveStoreProductList()],
     },
     {
       matcher: "/admin/orders",
       methods: ["GET"],
-      middlewares: [injectAdminActiveStoreListQuery()],
+      middlewares: [injectAdminOrdersListQuery()],
     },
     {
       matcher: "/admin/uploads",

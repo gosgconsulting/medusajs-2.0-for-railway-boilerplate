@@ -13,6 +13,7 @@ import {
 } from "@medusajs/ui"
 import { ChevronDown, ChevronRight, PencilSquare } from "@medusajs/icons"
 import { hydrateProductVariantsInventoryQuantity } from "../../lib/hydrate-product-variant-inventory"
+import { readActiveStoreIdFromStorage } from "../../lib/active-store-keys"
 import { sdk } from "../../lib/sdk"
 import {
   applyProductColumnPrefsPayload,
@@ -269,7 +270,12 @@ const ProductsIndexPage = () => {
   )
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["admin-products-index", offset, debouncedSearch],
+    queryKey: [
+      "admin-products-index",
+      readActiveStoreIdFromStorage() ?? "",
+      offset,
+      debouncedSearch,
+    ],
     queryFn: async () => {
       const res = await sdk.admin.product.list({
         limit: PAGE_SIZE,
