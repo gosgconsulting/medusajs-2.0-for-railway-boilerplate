@@ -100,6 +100,7 @@ const MultiStoreCreatePage = () => {
 
 export const config = defineRouteConfig({
   label: "Create store",
+  rank: 10,
 })
 
 export default MultiStoreCreatePage

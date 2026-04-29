@@ -118,6 +118,18 @@ const DatabaseSelectorWidget = () => {
     }
   }, [])
 
+  /** Sidebar route labels come from static route config; hide “Stores” when only one store exists. */
+  useEffect(() => {
+    if (isLoading) return
+    const showMultiStoreNav = normalized.length > 1
+    const anchors = document.querySelectorAll<HTMLElement>(
+      'aside a[href*="multi-store/list"]'
+    )
+    anchors.forEach((a) => {
+      a.style.display = showMultiStoreNav ? "" : "none"
+    })
+  }, [isLoading, normalized.length])
+
   const handleSelect = (id: string) => {
     if (!normalized.some((s) => s.id === id)) return
     setActiveAdminStoreId(id)
@@ -173,6 +185,16 @@ const DatabaseSelectorWidget = () => {
           </DropdownMenu.Item>
         ))}
         <DropdownMenu.Separator />
+        {normalized.length > 1 ? (
+          <>
+            <DropdownMenu.Item asChild>
+              <Link to="/multi-store/list" className="cursor-pointer">
+                View all stores…
+              </Link>
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+          </>
+        ) : null}
         <DropdownMenu.Item asChild>
           <Link to="/multi-store/create" className="cursor-pointer">
             Create new store…
