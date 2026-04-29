@@ -1,59 +1,44 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { Link } from "react-router-dom"
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
 import { Button, DropdownMenu, Text } from "@medusajs/ui"
 import { ChevronDown } from "@medusajs/icons"
+import { useQuery } from "@tanstack/react-query"
+
+import {
+  ADMIN_ACTIVE_STORE_STORAGE_KEY,
+  setActiveAdminStoreId,
+} from "../lib/active-store-context"
+import { sdk } from "../lib/sdk"
 
 /**
- * Database / tenant selector that lives in the admin top bar, immediately
- * before the notification bell. Currently a single-tenant scaffold — the only
- * entry is the active store ("Julia Paris"). Wired up so a future multi-tenant
- * setup can swap the active database from this dropdown.
+ * Active Medusa Store selector for multi-store setups.
  *
- * Implementation note: Medusa's admin SDK doesn't expose a global header
- * injection zone, so we mount this widget at every "list" zone and use a
- * MutationObserver to find the notification button in the rendered admin
- * chrome, then portal the dropdown into a sibling `<div>` placed right
- * before it. The same DOM container is reused across navigations so the
- * dropdown doesn't flicker between pages.
+ * Persists selection via cookie + SDK headers (`active-store-context`); the backend merges all
+ * sales channels for that store (default channel + `metadata.store_id`) into Admin product/order
+ * list queries — see `inject-admin-active-store-query.ts`.
  */
 
-const STORAGE_KEY = "admin-active-database-v1"
 const PORTAL_ID = "tenant-database-selector-portal"
 
-type DatabaseEntry = { id: string; label: string }
+/** Avoid syncing SDK headers repeatedly when multiple widget zones mount. */
+let syncedAdminStoreSelectionGlobally = false
 
-const DATABASES: ReadonlyArray<DatabaseEntry> = [
-  { id: "julia-paris", label: "Julia Paris" },
-]
-
-function loadActiveId(): string {
-  if (typeof window === "undefined") return DATABASES[0].id
+function loadStoredStoreId(stores: { id: string }[]): string | null {
+  if (typeof window === "undefined") return null
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    if (stored && DATABASES.some((d) => d.id === stored)) return stored
-  } catch { /* ignore */ }
-  return DATABASES[0].id
+    const stored = window.localStorage.getItem(ADMIN_ACTIVE_STORE_STORAGE_KEY)
+    if (stored && stores.some((s) => s.id === stored)) return stored
+  } catch {
+    /* ignore */
+  }
+  return null
 }
 
-function saveActiveId(id: string): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, id)
-  } catch { /* ignore */ }
-}
-
-/**
- * The Medusa 2.x admin Topbar is a div with the distinctive class combo
- * `grid grid-cols-2 border-b p-3` (rendered by `Topbar` inside MainLayout).
- * It's a 2-column grid: the first cell holds the sidebar toggles + page title,
- * the second cell holds the notification bell on the right. We anchor our
- * portal as the FIRST child of that right cell so the dropdown appears
- * immediately before the bell.
- */
 function findTopbarRightCell(): HTMLElement | null {
   const topbars = document.querySelectorAll<HTMLElement>("div.grid.grid-cols-2.border-b")
   for (const tb of topbars) {
-    // Sanity check: must have exactly two direct child cells.
     const cells = Array.from(tb.children).filter(
       (c) => c instanceof HTMLElement
     ) as HTMLElement[]
@@ -65,13 +50,31 @@ function findTopbarRightCell(): HTMLElement | null {
 
 const DatabaseSelectorWidget = () => {
   const [container, setContainer] = useState<HTMLElement | null>(null)
-  const [activeId, setActiveId] = useState<string>(() => loadActiveId())
   const observerRef = useRef<MutationObserver | null>(null)
+
+  const { data: storesRes, isLoading } = useQuery({
+    queryKey: ["admin-store-list-for-selector"],
+    queryFn: async () => sdk.admin.store.list({ limit: 200, fields: "id,name" }),
+    staleTime: 60_000,
+  })
+
+  const normalized = useMemo(() => {
+    const stores = storesRes?.stores ?? []
+    return stores.map((s) => ({
+      id: s.id,
+      label: (s as { name?: string | null }).name?.trim() || s.id,
+    }))
+  }, [storesRes?.stores])
+
+  useEffect(() => {
+    if (!normalized.length || syncedAdminStoreSelectionGlobally) return
+    syncedAdminStoreSelectionGlobally = true
+    const stored = loadStoredStoreId(normalized)
+    setActiveAdminStoreId(stored ?? normalized[0].id)
+  }, [normalized])
 
   useEffect(() => {
     const tryMount = (): boolean => {
-      // Reuse the singleton container if a previous mount on another page
-      // already injected it. Avoids flicker on SPA navigation.
       const existing = document.getElementById(PORTAL_ID)
       if (existing && document.body.contains(existing)) {
         setContainer(existing)
@@ -81,15 +84,9 @@ const DatabaseSelectorWidget = () => {
       if (!rightCell) return false
       const el = document.createElement("div")
       el.id = PORTAL_ID
-      // The right cell is right-aligned (justify-self / contains the bell on
-      // the far right). We want the dropdown to sit immediately to the left
-      // of the bell, so we make the cell flex with end-justified children
-      // and insert our portal as the first child.
       el.style.display = "inline-flex"
       el.style.alignItems = "center"
       el.style.marginRight = "8px"
-      // Force the right cell into a flex layout so our element + the bell
-      // align horizontally even if the original cell was just a div.
       const cs = window.getComputedStyle(rightCell)
       if (cs.display !== "flex" && cs.display !== "inline-flex") {
         rightCell.style.display = "flex"
@@ -112,21 +109,27 @@ const DatabaseSelectorWidget = () => {
     return () => {
       observerRef.current?.disconnect()
       observerRef.current = null
-      // Note: we deliberately leave the portal container in the DOM so that
-      // navigating to a page without this widget zone doesn't make the
-      // selector flash out and back in.
     }
   }, [])
 
   const handleSelect = (id: string) => {
-    if (id === activeId) return
-    setActiveId(id)
-    saveActiveId(id)
+    if (!normalized.some((s) => s.id === id)) return
+    setActiveAdminStoreId(id)
+    window.location.reload()
   }
 
   if (!container) return null
 
-  const active = DATABASES.find((d) => d.id === activeId) ?? DATABASES[0]
+  let activeId: string | null = null
+  if (typeof window !== "undefined") {
+    try {
+      activeId = window.localStorage.getItem(ADMIN_ACTIVE_STORE_STORAGE_KEY)
+    } catch {
+      activeId = null
+    }
+  }
+  const active =
+    normalized.find((s) => s.id === activeId) ?? normalized[0]
 
   return createPortal(
     <DropdownMenu>
@@ -135,25 +138,28 @@ const DatabaseSelectorWidget = () => {
           variant="transparent"
           size="small"
           className="!h-8 gap-1.5 px-2"
-          title="Active database (multi-tenant placeholder)"
+          title="Active Medusa Store"
+          disabled={isLoading || !normalized.length}
         >
           <Text size="small" weight="plus">
-            {active.label}
+            {isLoading
+              ? "Stores…"
+              : active?.label ?? "No stores"}
           </Text>
           <ChevronDown />
         </Button>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" className="min-w-[200px]">
-        <DropdownMenu.Label>Active database</DropdownMenu.Label>
+      <DropdownMenu.Content align="end" className="min-w-[220px]">
+        <DropdownMenu.Label>Active store</DropdownMenu.Label>
         <DropdownMenu.Separator />
-        {DATABASES.map((db) => (
+        {normalized.map((db) => (
           <DropdownMenu.Item
             key={db.id}
             onClick={() => handleSelect(db.id)}
-            className={db.id === activeId ? "bg-ui-bg-base-pressed" : ""}
+            className={db.id === active?.id ? "bg-ui-bg-base-pressed" : ""}
           >
             <span className="flex-1">{db.label}</span>
-            {db.id === activeId && (
+            {db.id === active?.id && (
               <Text size="xsmall" className="text-ui-fg-muted">
                 active
               </Text>
@@ -161,10 +167,10 @@ const DatabaseSelectorWidget = () => {
           </DropdownMenu.Item>
         ))}
         <DropdownMenu.Separator />
-        <DropdownMenu.Item disabled>
-          <Text size="xsmall" className="text-ui-fg-muted">
-            Switching not yet enabled
-          </Text>
+        <DropdownMenu.Item asChild>
+          <Link to="/multi-store/create" className="cursor-pointer">
+            Create new store…
+          </Link>
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu>,
@@ -172,10 +178,6 @@ const DatabaseSelectorWidget = () => {
   )
 }
 
-// Mount on every common list zone so the dropdown is visible on the pages
-// users hit most often. SPA navigations between these pages reuse the same
-// DOM portal container (see useEffect above), so the dropdown doesn't
-// disappear between page transitions inside this set.
 export const config = defineWidgetConfig({
   zone: [
     "product.list.before",
