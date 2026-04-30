@@ -4,7 +4,7 @@ import { HITPAY_STORE_SECRET_ENCRYPTION_KEY } from "./constants"
 import {
   STORE_METADATA_HITPAY_ENV_KEY,
   type HitPayEnvMetadataSnapshot,
-} from "./sync-hitpay-env-to-store-metadata"
+} from "./hitpay-metadata-shared"
 import { tryDecryptHitPayCredentialsFromMetadata } from "./store-credentials-crypto"
 
 export type ResolvedHitPayConfig = {

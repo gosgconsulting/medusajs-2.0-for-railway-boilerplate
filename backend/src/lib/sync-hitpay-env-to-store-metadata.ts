@@ -18,19 +18,12 @@ import {
   parseStoreCredentialsEncryptionKey,
   STORE_METADATA_HITPAY_CREDENTIALS_ENC_KEY,
 } from "./store-credentials-crypto"
+import {
+  STORE_METADATA_HITPAY_ENV_KEY,
+  type HitPayEnvMetadataSnapshot,
+} from "./hitpay-metadata-shared"
 
-/** Snapshot of env-driven HitPay settings (no raw secrets — keys are truncated). */
-export const STORE_METADATA_HITPAY_ENV_KEY = "hitpay_from_env"
-
-export type HitPayEnvMetadataSnapshot = {
-  configured: boolean
-  sandbox: boolean
-  redirect_url: string | null
-  salt_configured: boolean
-  api_key_last4: string | null
-  credentials_encrypted: boolean
-  synced_at: string
-}
+export { STORE_METADATA_HITPAY_ENV_KEY, type HitPayEnvMetadataSnapshot }
 
 export function buildHitPayEnvMetadataSnapshot(
   credentialsEncrypted: boolean
