@@ -1,5 +1,6 @@
-import type { MedusaContainer, RemoteQueryFunction } from "@medusajs/framework/types"
-import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import type { MedusaContainer } from "@medusajs/framework/types"
+import type { Knex } from "@medusajs/framework/mikro-orm/knex"
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { HITPAY_STORE_SECRET_ENCRYPTION_KEY } from "./constants"
 import {
   STORE_METADATA_HITPAY_ENV_KEY,
@@ -32,9 +33,9 @@ export function extractMedusaPaymentSessionId(
 }
 
 /**
- * Payment module providers receive the Awilix cradle, not the app `MedusaContainer`.
- * Property `cradle.resolve` is intercepted as a dependency named "resolve" and throws.
- * Read injections with bracket notation (same pattern as @medusajs/payment PaymentProviderService).
+ * Payment module providers receive the Awilix `localContainer.cradle`, not the app container.
+ * Do not use `cradle.resolve` (Awilix treats `"resolve"` as a dependency key). Use bracket reads.
+ * `query` / remote Graph are not registered on this cradle; use `paymentSessionService` and `__pg_connection__`.
  */
 function cradleGet<T>(cradle: MedusaContainer, key: string): T {
   const v = (cradle as unknown as Record<string, unknown>)[key]
@@ -46,80 +47,95 @@ function cradleGet<T>(cradle: MedusaContainer, key: string): T {
   return v as T
 }
 
-async function resolveStoreIdFromPaymentCollection(
-  container: MedusaContainer,
-  paymentCollectionId: string
+async function paymentCollectionIdFromSession(
+  cradle: MedusaContainer,
+  medusaPaymentSessionId: string
 ): Promise<string | null> {
-  const query = cradleGet<RemoteQueryFunction>(
-    container,
-    ContainerRegistrationKeys.QUERY,
-  )
+  const paymentSessionService = cradleGet<{
+    retrieve: (
+      id: string,
+      config?: { select?: string[] }
+    ) => Promise<{ payment_collection_id?: string | null }>
+  }>(cradle, "paymentSessionService")
 
-  const { data: cpcRows } = await query.graph({
-    entity: "cart_payment_collection",
-    fields: ["cart_id"],
-    filters: { payment_collection_id: paymentCollectionId },
+  const row = await paymentSessionService.retrieve(medusaPaymentSessionId.trim(), {
+    select: ["payment_collection_id"],
   })
+  const pid = row?.payment_collection_id
+  return typeof pid === "string" && pid.trim() ? pid.trim() : null
+}
 
-  let salesChannelId: string | undefined
+async function salesChannelIdFromPaymentCollection(
+  knex: Knex,
+  paymentCollectionId: string
+): Promise<string | undefined> {
+  const cartLink = await knex("cart_payment_collection")
+    .select("cart_id")
+    .where("payment_collection_id", paymentCollectionId)
+    .first()
 
-  if (cpcRows?.length) {
-    const cartId = (cpcRows[0] as { cart_id: string }).cart_id
-    const { data: carts } = await query.graph({
-      entity: "cart",
-      fields: ["sales_channel_id"],
-      filters: { id: cartId },
-    })
-    salesChannelId = (carts?.[0] as { sales_channel_id?: string | null })
-      ?.sales_channel_id ?? undefined
-  }
-
-  if (!salesChannelId) {
-    const { data: opcRows } = await query.graph({
-      entity: "order_payment_collection",
-      fields: ["order_id"],
-      filters: { payment_collection_id: paymentCollectionId },
-    })
-    if (opcRows?.length) {
-      const orderId = (opcRows[0] as { order_id: string }).order_id
-      const { data: orders } = await query.graph({
-        entity: "order",
-        fields: ["sales_channel_id"],
-        filters: { id: orderId },
-      })
-      salesChannelId = (orders?.[0] as { sales_channel_id?: string | null })
-        ?.sales_channel_id ?? undefined
+  if (cartLink?.cart_id) {
+    const cart = await knex("cart")
+      .select("sales_channel_id")
+      .where("id", cartLink.cart_id as string)
+      .whereNull("deleted_at")
+      .first()
+    const sid = cart?.sales_channel_id as string | null | undefined
+    if (typeof sid === "string" && sid.length) {
+      return sid
     }
   }
 
+  const orderLink = await knex("order_payment_collection")
+    .select("order_id")
+    .where("payment_collection_id", paymentCollectionId)
+    .first()
+
+  if (!orderLink?.order_id) {
+    return undefined
+  }
+
+  const orderRes = await knex.raw(
+    `select sales_channel_id from "order" where id = ? and deleted_at is null limit 1`,
+    [orderLink.order_id as string],
+  ) as { rows?: { sales_channel_id?: string | null }[] }
+
+  const sid = orderRes.rows?.[0]?.sales_channel_id
+  return typeof sid === "string" && sid.length ? sid : undefined
+}
+
+async function resolveStoreIdFromPaymentCollection(
+  cradle: MedusaContainer,
+  paymentCollectionId: string
+): Promise<string | null> {
+  const knex = cradleGet<Knex>(cradle, ContainerRegistrationKeys.PG_CONNECTION)
+
+  const salesChannelId = await salesChannelIdFromPaymentCollection(
+    knex,
+    paymentCollectionId
+  )
   if (!salesChannelId) {
     return null
   }
 
-  const { data: scRows } = await query.graph({
-    entity: "sales_channel",
-    fields: ["id", "metadata"],
-    filters: { id: salesChannelId },
-  })
-  const scMeta = (
-    scRows?.[0] as { metadata?: Record<string, unknown> | null } | undefined
-  )?.metadata
+  const sc = await knex("sales_channel")
+    .select("metadata")
+    .where("id", salesChannelId)
+    .first()
+
+  const scMeta = sc?.metadata as Record<string, unknown> | null | undefined
   const fromMeta =
     typeof scMeta?.store_id === "string" ? scMeta.store_id.trim() : ""
   if (fromMeta.length) {
     return fromMeta
   }
 
-  const storeModule = cradleGet<{
-    listStores: () => Promise<
-      { id: string; default_sales_channel_id?: string | null }[]
-    >
-  }>(container, Modules.STORE)
-  const stores = await storeModule.listStores()
-  const match = stores.find(
-    (s) => s.default_sales_channel_id === salesChannelId
-  )
-  return match?.id ?? null
+  const storeRow = await knex("store")
+    .select("id")
+    .where("default_sales_channel_id", salesChannelId)
+    .first()
+
+  return (storeRow?.id as string | undefined) ?? null
 }
 
 /**
@@ -127,7 +143,7 @@ async function resolveStoreIdFromPaymentCollection(
  * Returns null if the session/store cannot be resolved or ciphertext is missing/invalid.
  */
 export async function resolveHitPayConfigFromSessionId(
-  container: MedusaContainer,
+  cradle: MedusaContainer,
   medusaPaymentSessionId: string
 ): Promise<ResolvedHitPayConfig | null> {
   if (
@@ -137,43 +153,29 @@ export async function resolveHitPayConfigFromSessionId(
     return null
   }
 
-  const query = cradleGet<RemoteQueryFunction>(
-    container,
-    ContainerRegistrationKeys.QUERY,
+  const paymentCollectionId = await paymentCollectionIdFromSession(
+    cradle,
+    medusaPaymentSessionId
   )
-  const { data: sessRows } = await query.graph({
-    entity: "payment_session",
-    fields: ["id", "payment_collection_id"],
-    filters: { id: medusaPaymentSessionId.trim() },
-  })
-  const paymentCollectionId = (
-    sessRows?.[0] as { payment_collection_id?: string } | undefined
-  )?.payment_collection_id
-
-  if (typeof paymentCollectionId !== "string" || !paymentCollectionId.trim()) {
+  if (!paymentCollectionId) {
     return null
   }
 
   const storeId = await resolveStoreIdFromPaymentCollection(
-    container,
+    cradle,
     paymentCollectionId
   )
   if (!storeId) {
     return null
   }
 
-  const storeModule = cradleGet<{ retrieveStore: (id: string) => Promise<{ metadata?: Record<string, unknown> | null }> }>(
-    container,
-    Modules.STORE,
-  )
-  let store: { metadata?: Record<string, unknown> | null }
-  try {
-    store = await storeModule.retrieveStore(storeId)
-  } catch {
-    return null
-  }
+  const knex = cradleGet<Knex>(cradle, ContainerRegistrationKeys.PG_CONNECTION)
+  const storeRow = await knex("store")
+    .select("metadata")
+    .where("id", storeId)
+    .first()
 
-  const meta = store.metadata ?? undefined
+  const meta = storeRow?.metadata as Record<string, unknown> | null | undefined
   if (!meta) {
     return null
   }
