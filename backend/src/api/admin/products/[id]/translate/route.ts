@@ -3,7 +3,7 @@ import { MedusaError } from "@medusajs/framework/utils"
 import {
   translateProductMetadataI18n,
   updateProductI18nAutoLocalesOnly,
-} from "lib/translate-product-metadata-i18n"
+} from "../../../../../lib/translate-product-metadata-i18n"
 
 type TranslatePostBody = {
   enableAutoOnUpdateForLocales?: string[]

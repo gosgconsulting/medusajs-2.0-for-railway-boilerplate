@@ -4,12 +4,12 @@ import {
   MedusaError,
 } from "@medusajs/framework/utils"
 import { createOrUpdateOrderPaymentCollectionWorkflow } from "@medusajs/medusa/core-flows"
-import { buildDeferredInvoicePayUrl } from "lib/deferred-invoice-pay-url"
-import { ensureNotificationEmailTemplateRow } from "lib/ensure-notification-email-template"
-import { resolveCustomerOrderNotificationLocale } from "lib/notification-email-locales"
-import { getDefaultSubjectForTemplateKey } from "lib/notification-template-defaults"
-import { OrderNotificationEmailKeys } from "lib/order-notification-email-keys"
-import { sendOrderNotificationEmail } from "lib/send-order-notification-email"
+import { buildDeferredInvoicePayUrl } from "../../../../../lib/deferred-invoice-pay-url"
+import { ensureNotificationEmailTemplateRow } from "../../../../../lib/ensure-notification-email-template"
+import { resolveCustomerOrderNotificationLocale } from "../../../../../lib/notification-email-locales"
+import { getDefaultSubjectForTemplateKey } from "../../../../../lib/notification-template-defaults"
+import { OrderNotificationEmailKeys } from "../../../../../lib/order-notification-email-keys"
+import { sendOrderNotificationEmail } from "../../../../../lib/send-order-notification-email"
 
 function isDeferredCheckout(
   metadata: Record<string, unknown> | null | undefined

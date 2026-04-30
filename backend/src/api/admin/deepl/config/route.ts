@@ -1,5 +1,5 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { DEEPL_AUTH_KEY, DEEPL_TARGET_LANGS } from "lib/constants"
+import { DEEPL_AUTH_KEY, DEEPL_TARGET_LANGS } from "../../../../lib/constants"
 
 function parseCommaList(raw: string | undefined): string[] {
   if (!raw?.trim()) return []

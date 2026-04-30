@@ -5,16 +5,16 @@ import {
   HITPAY_REDIRECT_URL,
   HITPAY_SANDBOX,
   HITPAY_STORE_SECRET_ENCRYPTION_KEY,
-} from "lib/constants"
+} from "../../../../../lib/constants"
 import {
   STORE_METADATA_HITPAY_ENV_KEY,
   type HitPayEnvMetadataSnapshot,
-} from "lib/sync-hitpay-env-to-store-metadata"
+} from "../../../../../lib/sync-hitpay-env-to-store-metadata"
 import {
   encryptHitPayCredentialsPayload,
   parseStoreCredentialsEncryptionKey,
   STORE_METADATA_HITPAY_CREDENTIALS_ENC_KEY,
-} from "lib/store-credentials-crypto"
+} from "../../../../../lib/store-credentials-crypto"
 
 type HitPayCredentialsBody = {
   apiKey?: string

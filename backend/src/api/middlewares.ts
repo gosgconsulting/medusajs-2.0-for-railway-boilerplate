@@ -8,7 +8,7 @@ import {
   injectAdminActiveStoreProductList,
   injectAdminOrdersListQuery,
   injectAdminStoresListScope,
-} from "lib/inject-admin-active-store-query"
+} from "../lib/inject-admin-active-store-query"
 import { validateAndTransformQuery } from "@medusajs/framework"
 import { MedusaError } from "@medusajs/framework/utils"
 import { StoreGetOrderParams } from "@medusajs/medusa/api/store/orders/validators"
@@ -17,8 +17,8 @@ import { StoreGetPaymentCollectionParams } from "@medusajs/medusa/api/store/paym
 import * as PaymentCollectionQueryConfig from "@medusajs/medusa/api/store/payment-collections/query-config"
 import { StoreGetCartsCart } from "@medusajs/medusa/api/store/carts/validators"
 import * as StoreCartQueryConfig from "@medusajs/medusa/api/store/carts/query-config"
-import { STORE_DEFERRED_CHECKOUT } from "lib/constants"
-import { hitpayStoreMetadataSyncMiddleware } from "lib/sync-hitpay-env-to-store-metadata"
+import { STORE_DEFERRED_CHECKOUT } from "../lib/constants"
+import { hitpayStoreMetadataSyncMiddleware } from "../lib/sync-hitpay-env-to-store-metadata"
 
 function requireDeferredCheckoutEnabled(
   _req: MedusaRequest,
