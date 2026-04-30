@@ -1,4 +1,4 @@
-import type { MedusaContainer } from "@medusajs/framework/types"
+import type { MedusaContainer, RemoteQueryFunction } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { HITPAY_STORE_SECRET_ENCRYPTION_KEY } from "./constants"
 import {
@@ -31,11 +31,29 @@ export function extractMedusaPaymentSessionId(
   return null
 }
 
+/**
+ * Payment module providers receive the Awilix cradle, not the app `MedusaContainer`.
+ * Property `cradle.resolve` is intercepted as a dependency named "resolve" and throws.
+ * Read injections with bracket notation (same pattern as @medusajs/payment PaymentProviderService).
+ */
+function cradleGet<T>(cradle: MedusaContainer, key: string): T {
+  const v = (cradle as unknown as Record<string, unknown>)[key]
+  if (v === undefined) {
+    throw new Error(
+      `HitPay: payment module cradle is missing "${key}" (cannot load per-store HitPay config).`,
+    )
+  }
+  return v as T
+}
+
 async function resolveStoreIdFromPaymentCollection(
   container: MedusaContainer,
   paymentCollectionId: string
 ): Promise<string | null> {
-  const query = container.resolve(ContainerRegistrationKeys.QUERY)
+  const query = cradleGet<RemoteQueryFunction>(
+    container,
+    ContainerRegistrationKeys.QUERY,
+  )
 
   const { data: cpcRows } = await query.graph({
     entity: "cart_payment_collection",
@@ -92,11 +110,11 @@ async function resolveStoreIdFromPaymentCollection(
     return fromMeta
   }
 
-  const storeModule = container.resolve(Modules.STORE) as {
+  const storeModule = cradleGet<{
     listStores: () => Promise<
       { id: string; default_sales_channel_id?: string | null }[]
     >
-  }
+  }>(container, Modules.STORE)
   const stores = await storeModule.listStores()
   const match = stores.find(
     (s) => s.default_sales_channel_id === salesChannelId
@@ -119,7 +137,10 @@ export async function resolveHitPayConfigFromSessionId(
     return null
   }
 
-  const query = container.resolve(ContainerRegistrationKeys.QUERY)
+  const query = cradleGet<RemoteQueryFunction>(
+    container,
+    ContainerRegistrationKeys.QUERY,
+  )
   const { data: sessRows } = await query.graph({
     entity: "payment_session",
     fields: ["id", "payment_collection_id"],
@@ -141,7 +162,10 @@ export async function resolveHitPayConfigFromSessionId(
     return null
   }
 
-  const storeModule = container.resolve(Modules.STORE)
+  const storeModule = cradleGet<{ retrieveStore: (id: string) => Promise<{ metadata?: Record<string, unknown> | null }> }>(
+    container,
+    Modules.STORE,
+  )
   let store: { metadata?: Record<string, unknown> | null }
   try {
     store = await storeModule.retrieveStore(storeId)
