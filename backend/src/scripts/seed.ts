@@ -20,6 +20,7 @@ import {
   updateStoresStep,
   updateStoresWorkflow,
 } from "@medusajs/medusa/core-flows";
+import { IS_HITPAY_PAYMENT_PROVIDER_ENABLED } from "lib/constants";
 import {
   createWorkflow,
   transform,
@@ -119,11 +120,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
           countries,
           payment_providers: [
             "pp_system_default",
-            ...(process.env.HITPAY_API_KEY &&
-            process.env.HITPAY_SALT &&
-            process.env.HITPAY_REDIRECT_URL
-              ? ["pp_hitpay_hitpay"]
-              : []),
+            ...(IS_HITPAY_PAYMENT_PROVIDER_ENABLED ? ["pp_hitpay_hitpay"] : []),
           ],
         },
       ],

@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto"
+import type { MedusaContainer } from "@medusajs/framework/types"
 import type {
   AuthorizePaymentInput,
   AuthorizePaymentOutput,
@@ -29,6 +30,11 @@ import {
   PaymentActions,
   PaymentSessionStatus,
 } from "@medusajs/framework/utils"
+import {
+  extractMedusaPaymentSessionId,
+  resolveHitPayConfigFromSessionId,
+} from "../../lib/hitpay-resolve-runtime-config"
+import { HITPAY_STORE_SECRET_ENCRYPTION_KEY_BUFFER } from "../../lib/constants"
 
 const ZERO_DECIMAL_CURRENCIES = new Set([
   "BIF",
@@ -50,11 +56,19 @@ const ZERO_DECIMAL_CURRENCIES = new Set([
 ])
 
 export type HitPayOptions = {
+  apiKey?: string
+  salt?: string
+  sandbox?: boolean
+  redirectUrl?: string
+  /** Optional HitPay payment method codes (e.g. paynow_online, card) */
+  paymentMethods?: string[]
+}
+
+type ResolvedHitPayCallConfig = {
   apiKey: string
   salt: string
-  sandbox?: boolean
+  sandbox: boolean
   redirectUrl: string
-  /** Optional HitPay payment method codes (e.g. paynow_online, card) */
   paymentMethods?: string[]
 }
 
@@ -143,16 +157,13 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
   static identifier = "hitpay"
 
   static validateOptions(options: Record<string, unknown>): void {
-    if (!options?.apiKey) {
-      throw new MedusaError(MedusaError.Types.INVALID_DATA, "HitPay: apiKey is required in the provider options.")
-    }
-    if (!options?.salt) {
-      throw new MedusaError(MedusaError.Types.INVALID_DATA, "HitPay: salt is required for webhook verification.")
-    }
-    if (!options?.redirectUrl) {
+    const legacy =
+      !!(options?.apiKey && options?.salt && options?.redirectUrl)
+    const metadataMode = !!HITPAY_STORE_SECRET_ENCRYPTION_KEY_BUFFER
+    if (!legacy && !metadataMode) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "HitPay: redirectUrl is required (customer return URL after checkout).",
+        "HitPay: set HITPAY_STORE_SECRET_ENCRYPTION_KEY (store metadata credentials) or HITPAY_API_KEY + HITPAY_SALT + HITPAY_REDIRECT_URL (legacy env options).",
       )
     }
   }
@@ -164,8 +175,43 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     this.options_ = options
   }
 
-  protected get baseUrl(): string {
-    return this.options_.sandbox ? "https://api.sandbox.hit-pay.com" : "https://api.hit-pay.com"
+  protected hitPayHost(sandbox: boolean): string {
+    return sandbox ? "https://api.sandbox.hit-pay.com" : "https://api.hit-pay.com"
+  }
+
+  /**
+   * Merges per-store ciphertext + `hitpay_from_env` snapshot with optional legacy provider options.
+   */
+  protected async resolveEffectiveConfig(
+    data: Record<string, unknown> | undefined | null
+  ): Promise<ResolvedHitPayCallConfig> {
+    const sid = extractMedusaPaymentSessionId(data ?? undefined)
+    const fromMeta =
+      sid != null
+        ? await resolveHitPayConfigFromSessionId(
+            this.container as MedusaContainer,
+            sid
+          )
+        : null
+    const o = this.options_
+    const apiKey = (fromMeta?.apiKey ?? o.apiKey ?? "").trim()
+    const salt = (fromMeta?.salt ?? o.salt ?? "").trim()
+    const sandbox =
+      fromMeta !== null ? fromMeta.sandbox : !!(o.sandbox ?? false)
+    const redirectUrl = (fromMeta?.redirectUrl ?? o.redirectUrl ?? "").trim()
+    if (!apiKey.length || !salt.length || !redirectUrl.length) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "HitPay: missing apiKey, salt, or redirectUrl — configure encrypted store credentials and snapshot or set legacy provider env.",
+      )
+    }
+    return {
+      apiKey,
+      salt,
+      sandbox,
+      redirectUrl,
+      paymentMethods: o.paymentMethods,
+    }
   }
 
   protected buildError(message: string, error: unknown): Error {
@@ -173,8 +219,12 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     return new Error(`${message}: ${err.message}`)
   }
 
-  protected async hitpayFetch<T>(path: string, init: RequestInit): Promise<T> {
-    const url = `${this.baseUrl}${path}`
+  protected async hitpayFetch<T>(
+    path: string,
+    init: RequestInit,
+    sandbox: boolean,
+  ): Promise<T> {
+    const url = `${this.hitPayHost(sandbox)}${path}`
     const res = await fetch(url, init)
     const text = await res.text()
     let json: unknown
@@ -193,25 +243,39 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     return json as T
   }
 
-  protected async createPaymentRequest(body: URLSearchParams): Promise<HitPayPaymentRequestResponse> {
-    return this.hitpayFetch<HitPayPaymentRequestResponse>("/v1/payment-requests", {
-      method: "POST",
-      headers: {
-        "X-BUSINESS-API-KEY": this.options_.apiKey,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Requested-With": "XMLHttpRequest",
+  protected async createPaymentRequest(
+    body: URLSearchParams,
+    cfg: ResolvedHitPayCallConfig,
+  ): Promise<HitPayPaymentRequestResponse> {
+    return this.hitpayFetch<HitPayPaymentRequestResponse>(
+      "/v1/payment-requests",
+      {
+        method: "POST",
+        headers: {
+          "X-BUSINESS-API-KEY": cfg.apiKey,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: body.toString(),
       },
-      body: body.toString(),
-    })
+      cfg.sandbox,
+    )
   }
 
-  protected async getPaymentRequest(requestId: string): Promise<HitPayPaymentRequestResponse> {
-    return this.hitpayFetch<HitPayPaymentRequestResponse>(`/v1/payment-requests/${encodeURIComponent(requestId)}`, {
-      method: "GET",
-      headers: {
-        "X-BUSINESS-API-KEY": this.options_.apiKey,
+  protected async getPaymentRequest(
+    requestId: string,
+    cfg: ResolvedHitPayCallConfig,
+  ): Promise<HitPayPaymentRequestResponse> {
+    return this.hitpayFetch<HitPayPaymentRequestResponse>(
+      `/v1/payment-requests/${encodeURIComponent(requestId)}`,
+      {
+        method: "GET",
+        headers: {
+          "X-BUSINESS-API-KEY": cfg.apiKey,
+        },
       },
-    })
+      cfg.sandbox,
+    )
   }
 
   async initiatePayment(input: InitiatePaymentInput): Promise<InitiatePaymentOutput> {
@@ -220,6 +284,8 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "HitPay: missing payment session id in initiatePayment data.")
     }
 
+    const cfg = await this.resolveEffectiveConfig(input.data ?? undefined)
+
     const currency = input.currency_code.toUpperCase()
     const amountStr = formatMajorAmountForHitPay(input.amount, currency)
 
@@ -227,7 +293,7 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     params.set("amount", amountStr)
     params.set("currency", currency)
     params.set("reference_number", sessionId)
-    params.set("redirect_url", this.options_.redirectUrl)
+    params.set("redirect_url", cfg.redirectUrl)
 
     const customer = input.context?.customer
     if (customer?.email) {
@@ -244,14 +310,14 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
       params.set("phone", customer.phone)
     }
 
-    const methods = this.options_.paymentMethods
+    const methods = cfg.paymentMethods
     if (methods?.length) {
       for (const m of methods) {
         params.append("payment_methods[]", m)
       }
     }
 
-    const pr = await this.createPaymentRequest(params)
+    const pr = await this.createPaymentRequest(params, cfg)
 
     if (!pr.url) {
       throw this.buildError("HitPay: payment request created without checkout url", new Error(JSON.stringify(pr)))
@@ -274,7 +340,8 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     if (!id) {
       throw this.buildError("HitPay authorizePayment: missing payment request id", new Error("no id in session data"))
     }
-    const pr = await this.getPaymentRequest(id)
+    const cfg = await this.resolveEffectiveConfig(input.data ?? undefined)
+    const pr = await this.getPaymentRequest(id, cfg)
     const mapped = mapRequestStatusToSession(pr)
     return {
       status: mapped.status,
@@ -287,7 +354,8 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     if (!id) {
       return { data: input.data as Record<string, unknown> }
     }
-    const pr = await this.getPaymentRequest(id)
+    const cfg = await this.resolveEffectiveConfig(input.data ?? undefined)
+    const pr = await this.getPaymentRequest(id, cfg)
     const mapped = mapRequestStatusToSession(pr)
     if (mapped.status !== PaymentSessionStatus.CAPTURED) {
       return { data: { ...(input.data as Record<string, unknown>), ...mapped.data } }
@@ -308,7 +376,8 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     if (!id) {
       throw this.buildError("HitPay getPaymentStatus: missing payment request id", new Error("no id"))
     }
-    const pr = await this.getPaymentRequest(id)
+    const cfg = await this.resolveEffectiveConfig(input.data ?? undefined)
+    const pr = await this.getPaymentRequest(id, cfg)
     const mapped = mapRequestStatusToSession(pr)
     return {
       status: mapped.status,
@@ -326,18 +395,23 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
         "HitPay refund: missing hitpay_payment_id on payment data (complete a payment first).",
       )
     }
+    const cfg = await this.resolveEffectiveConfig(input.data ?? undefined)
     const amountNum = new BigNumber(input.amount).numeric
-    await this.hitpayFetch("/v1/refund", {
-      method: "POST",
-      headers: {
-        "X-BUSINESS-API-KEY": this.options_.apiKey,
-        "Content-Type": "application/json",
+    await this.hitpayFetch(
+      "/v1/refund",
+      {
+        method: "POST",
+        headers: {
+          "X-BUSINESS-API-KEY": cfg.apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          payment_id: paymentId,
+          amount: Number(amountNum),
+        }),
       },
-      body: JSON.stringify({
-        payment_id: paymentId,
-        amount: Number(amountNum),
-      }),
-    })
+      cfg.sandbox,
+    )
     return { data: (input.data ?? {}) as Record<string, unknown> }
   }
 
@@ -346,7 +420,8 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     if (!id) {
       throw this.buildError("HitPay retrievePayment: missing id", new Error("no id"))
     }
-    const pr = await this.getPaymentRequest(id)
+    const cfg = await this.resolveEffectiveConfig(input.data ?? undefined)
+    const pr = await this.getPaymentRequest(id, cfg)
     return { data: pr as unknown as Record<string, unknown> }
   }
 
@@ -355,7 +430,8 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
     if (!id) {
       throw this.buildError("HitPay updatePayment: missing id", new Error("no id"))
     }
-    const pr = await this.getPaymentRequest(id)
+    const cfg = await this.resolveEffectiveConfig(input.data ?? undefined)
+    const pr = await this.getPaymentRequest(id, cfg)
     const currentAmount = pr.amount != null ? parseAmountString(pr.amount).numeric : null
     const nextAmount = new BigNumber(input.amount).numeric
     const sameMajor =
@@ -374,16 +450,18 @@ export default class HitPayPaymentProviderService extends AbstractPaymentProvide
   async getWebhookActionAndData(
     payload: ProviderWebhookPayload["payload"],
   ): Promise<WebhookActionResult> {
+    const body = payload.data as Record<string, unknown>
+    const cfg = await this.resolveEffectiveConfig(body)
+
     const signature = payload.headers["hitpay-signature"] ?? payload.headers["Hitpay-Signature"]
     const raw = payload.rawData
     if (raw == null) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "HitPay webhook: missing raw body for signature verification.")
     }
-    if (!verifyHitPaySignature(raw, signature, this.options_.salt)) {
+    if (!verifyHitPaySignature(raw, signature, cfg.salt)) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "HitPay webhook: invalid signature.")
     }
 
-    const body = payload.data as Record<string, unknown>
     const eventObject = String(
       payload.headers["hitpay-event-object"] ?? payload.headers["Hitpay-Event-Object"] ?? "",
     ).toLowerCase()

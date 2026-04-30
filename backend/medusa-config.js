@@ -1,4 +1,4 @@
-import { loadEnv, Modules, defineConfig } from '@medusajs/utils';
+import { loadEnv, Modules, defineConfig, DEFAULT_STORE_RESTRICTED_FIELDS } from '@medusajs/utils';
 import {
   ADMIN_CORS,
   AUTH_CORS,
@@ -19,6 +19,7 @@ import {
   HITPAY_SALT,
   HITPAY_SANDBOX,
   HITPAY_REDIRECT_URL,
+  IS_HITPAY_PAYMENT_PROVIDER_ENABLED,
   WORKER_MODE,
   MINIO_ENDPOINT,
   MINIO_ACCESS_KEY,
@@ -43,16 +44,20 @@ const paymentModuleProviders = [
         },
       ]
     : []),
-  ...(HITPAY_API_KEY && HITPAY_SALT && HITPAY_REDIRECT_URL
+  ...(IS_HITPAY_PAYMENT_PROVIDER_ENABLED
     ? [
         {
           resolve: "./src/modules/hitpay-payment",
           id: "hitpay",
           options: {
-            apiKey: HITPAY_API_KEY,
-            salt: HITPAY_SALT,
-            sandbox: HITPAY_SANDBOX,
-            redirectUrl: HITPAY_REDIRECT_URL,
+            ...(HITPAY_API_KEY && HITPAY_SALT && HITPAY_REDIRECT_URL
+              ? {
+                  apiKey: HITPAY_API_KEY,
+                  salt: HITPAY_SALT,
+                  sandbox: HITPAY_SANDBOX,
+                  redirectUrl: HITPAY_REDIRECT_URL,
+                }
+              : {}),
           },
         },
       ]
@@ -70,7 +75,13 @@ const medusaConfig = {
       authCors: AUTH_CORS,
       storeCors: STORE_CORS,
       jwtSecret: JWT_SECRET,
-      cookieSecret: COOKIE_SECRET
+      cookieSecret: COOKIE_SECRET,
+      restrictedFields: {
+        store: [
+          ...DEFAULT_STORE_RESTRICTED_FIELDS,
+          'metadata.hitpay_credentials_enc_v1',
+        ],
+      },
     },
     build: {
       rollupOptions: {

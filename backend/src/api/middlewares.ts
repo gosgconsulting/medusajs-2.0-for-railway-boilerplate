@@ -18,6 +18,7 @@ import * as PaymentCollectionQueryConfig from "@medusajs/medusa/api/store/paymen
 import { StoreGetCartsCart } from "@medusajs/medusa/api/store/carts/validators"
 import * as StoreCartQueryConfig from "@medusajs/medusa/api/store/carts/query-config"
 import { STORE_DEFERRED_CHECKOUT } from "lib/constants"
+import { hitpayStoreMetadataSyncMiddleware } from "lib/sync-hitpay-env-to-store-metadata"
 
 function requireDeferredCheckoutEnabled(
   _req: MedusaRequest,
@@ -38,7 +39,10 @@ export default defineMiddlewares({
     {
       matcher: "/admin/stores",
       methods: ["GET"],
-      middlewares: [injectAdminStoresListScope()],
+      middlewares: [
+        hitpayStoreMetadataSyncMiddleware(),
+        injectAdminStoresListScope(),
+      ],
     },
     {
       matcher: "/admin/products",

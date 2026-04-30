@@ -1,6 +1,7 @@
 import { loadEnv } from '@medusajs/framework/utils'
 
 import { assertValue } from 'utils/assert-value'
+import { parseStoreCredentialsEncryptionKey } from './store-credentials-crypto'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
@@ -109,6 +110,28 @@ export const HITPAY_API_KEY = process.env.HITPAY_API_KEY;
 export const HITPAY_SALT = process.env.HITPAY_SALT;
 export const HITPAY_SANDBOX = process.env.HITPAY_SANDBOX === "true";
 export const HITPAY_REDIRECT_URL = process.env.HITPAY_REDIRECT_URL;
+
+/**
+ * 32-byte AES key (hex or base64) used to encrypt HitPay apiKey + salt in store
+ * metadata (`hitpay_credentials_enc_v1`). Required to persist secrets there;
+ * keep only in env / secret manager, never commit.
+ */
+export const HITPAY_STORE_SECRET_ENCRYPTION_KEY =
+  process.env.HITPAY_STORE_SECRET_ENCRYPTION_KEY?.trim() || undefined;
+
+/** Parsed 32-byte key when env is configured; drives metadata-backed HitPay mode. */
+export const HITPAY_STORE_SECRET_ENCRYPTION_KEY_BUFFER =
+  parseStoreCredentialsEncryptionKey(HITPAY_STORE_SECRET_ENCRYPTION_KEY)
+
+/**
+ * Register the HitPay payment provider when ciphertext can be decrypted
+ * (`HITPAY_STORE_SECRET_ENCRYPTION_KEY`), or legacy env trio is present.
+ */
+export const IS_HITPAY_PAYMENT_PROVIDER_ENABLED =
+  Boolean(HITPAY_STORE_SECRET_ENCRYPTION_KEY_BUFFER) ||
+  (Boolean(HITPAY_API_KEY) &&
+    Boolean(HITPAY_SALT) &&
+    Boolean(HITPAY_REDIRECT_URL))
 
 /**
  * (optional) Meilisearch configuration
