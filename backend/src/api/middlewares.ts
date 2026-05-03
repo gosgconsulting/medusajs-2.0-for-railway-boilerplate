@@ -9,6 +9,11 @@ import {
   injectAdminOrdersListQuery,
   injectAdminStoresListScope,
 } from "../lib/inject-admin-active-store-query"
+import {
+  injectAdminApiKeysListQuery,
+  injectAdminCustomersListQuery,
+  injectAdminInventoryItemsListQuery,
+} from "../lib/inject-admin-active-brand-query"
 import { validateAndTransformQuery } from "@medusajs/framework"
 import { MedusaError } from "@medusajs/framework/utils"
 import { StoreGetOrderParams } from "@medusajs/medusa/api/store/orders/validators"
@@ -53,6 +58,21 @@ export default defineMiddlewares({
       matcher: "/admin/orders",
       methods: ["GET"],
       middlewares: [injectAdminOrdersListQuery()],
+    },
+    {
+      matcher: "/admin/customers",
+      methods: ["GET"],
+      middlewares: [injectAdminCustomersListQuery()],
+    },
+    {
+      matcher: "/admin/inventory-items",
+      methods: ["GET"],
+      middlewares: [injectAdminInventoryItemsListQuery()],
+    },
+    {
+      matcher: "/admin/api-keys",
+      methods: ["GET"],
+      middlewares: [injectAdminApiKeysListQuery()],
     },
     {
       matcher: "/admin/uploads",
