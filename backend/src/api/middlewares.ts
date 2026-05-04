@@ -11,6 +11,7 @@ import {
 } from "../lib/inject-admin-active-store-query"
 import {
   injectAdminApiKeysListQuery,
+  injectAdminCustomerGroupsListQuery,
   injectAdminCustomersListQuery,
   injectAdminInventoryItemsListQuery,
 } from "../lib/inject-admin-active-brand-query"
@@ -63,6 +64,11 @@ export default defineMiddlewares({
       matcher: "/admin/customers",
       methods: ["GET"],
       middlewares: [injectAdminCustomersListQuery()],
+    },
+    {
+      matcher: "/admin/customer-groups",
+      methods: ["GET"],
+      middlewares: [injectAdminCustomerGroupsListQuery()],
     },
     {
       matcher: "/admin/inventory-items",

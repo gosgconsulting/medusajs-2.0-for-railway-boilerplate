@@ -98,7 +98,7 @@ function intersectIdQuery(
 
 function buildBrandScopedListMiddleware(
   matchPath: string,
-  table: "customer" | "inventory_item" | "api_key"
+  table: "customer" | "customer_group" | "inventory_item" | "api_key"
 ) {
   return () =>
     async (
@@ -132,6 +132,9 @@ export const injectAdminCustomersListQuery = buildBrandScopedListMiddleware(
   "/admin/customers",
   "customer"
 )
+
+export const injectAdminCustomerGroupsListQuery =
+  buildBrandScopedListMiddleware("/admin/customer-groups", "customer_group")
 
 export const injectAdminInventoryItemsListQuery =
   buildBrandScopedListMiddleware("/admin/inventory-items", "inventory_item")

@@ -71,7 +71,7 @@ export async function getBrandIdForStore(
  */
 export async function fetchIdsForBrand(
   scope: { resolve: (key: string) => any },
-  table: "customer" | "inventory_item" | "api_key",
+  table: "customer" | "customer_group" | "inventory_item" | "api_key",
   brandId: string
 ): Promise<string[] | null> {
   const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION) as any
