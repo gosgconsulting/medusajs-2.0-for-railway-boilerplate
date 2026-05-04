@@ -25,6 +25,10 @@ import {
   MINIO_ACCESS_KEY,
   MINIO_SECRET_KEY,
   MINIO_BUCKET,
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_BUCKET,
+  SUPABASE_PREFIX,
   MEILISEARCH_HOST,
   MEILISEARCH_ADMIN_KEY
 } from 'lib/constants';
@@ -98,8 +102,21 @@ const medusaConfig = {
       key: Modules.FILE,
       resolve: '@medusajs/file',
       options: {
+        // Provider precedence: Supabase Storage (preferred — per-brand keying
+        // under brands/<slug>/...) > MinIO (legacy/fallback) > local disk.
+        // Each block is gated on its required env vars so the chain degrades
+        // safely on environments that haven't been provisioned yet.
         providers: [
-          ...(MINIO_ENDPOINT && MINIO_ACCESS_KEY && MINIO_SECRET_KEY ? [{
+          ...(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? [{
+            resolve: './src/modules/supabase-file',
+            id: 'supabase',
+            options: {
+              url: SUPABASE_URL,
+              serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+              bucket: SUPABASE_BUCKET,   // optional, default 'images'
+              prefix: SUPABASE_PREFIX,   // optional, default 'brands/{brand}'
+            }
+          }] : MINIO_ENDPOINT && MINIO_ACCESS_KEY && MINIO_SECRET_KEY ? [{
             resolve: './src/modules/minio-file',
             id: 'minio',
             options: {

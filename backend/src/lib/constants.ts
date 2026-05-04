@@ -68,6 +68,18 @@ export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
 export const MINIO_BUCKET = process.env.MINIO_BUCKET; // Optional, if not set bucket will be called: medusa-media
 
 /**
+ * Supabase Storage credentials. When all three are set the supabase-file
+ * provider takes precedence over MinIO and local — see medusa-config.js.
+ * SUPABASE_BUCKET defaults to "images" (existing public bucket on the Sparti
+ * project); SUPABASE_PREFIX defaults to "brands/{brand}" so uploads land
+ * under the same brand-keyed convention used by the rest of Sparti's storage.
+ */
+export const SUPABASE_URL = process.env.SUPABASE_URL;
+export const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET;
+export const SUPABASE_PREFIX = process.env.SUPABASE_PREFIX;
+
+/**
  * (optional) Resend API Key and from Email - do not set if using SendGrid
  */
 export const RESEND_API_KEY = process.env.RESEND_API_KEY;
