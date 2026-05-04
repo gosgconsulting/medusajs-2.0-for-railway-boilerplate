@@ -203,13 +203,57 @@ function displayToAmount(value: string): number {
   return Number(value)
 }
 
+function parseVariantImagesFromMetadata(metaImgs: unknown): {
+  id?: string
+  url: string
+}[] {
+  if (!Array.isArray(metaImgs)) return []
+  const out: { id?: string; url: string }[] = []
+  for (const m of metaImgs) {
+    if (typeof m === "string" && m.trim()) {
+      out.push({ url: m.trim() })
+    } else if (m && typeof m === "object") {
+      const url = (m as { url?: unknown }).url
+      const id = (m as { id?: unknown }).id
+      if (typeof url === "string" && url.trim()) {
+        out.push({
+          url: url.trim(),
+          ...(typeof id === "string" ? { id } : {}),
+        })
+      }
+    }
+  }
+  return out
+}
+
+function variantImagesFromApi(
+  images: ApiVariant["images"]
+): { id?: string; url: string }[] {
+  return (images ?? [])
+    .map((i) => ({ id: i.id, url: i.url ?? "" }))
+    .filter((i) => !!i.url)
+}
+
 function toVariantRow(v: ApiVariant): VariantRow {
   const meta = (v.metadata ?? {}) as Record<string, unknown>
-  // Variant thumbnail: top-level field first, then first image URL, then metadata fallback
+  // Gallery: metadata.variant_images is the persisted gallery when present and non-empty
+  // (see variant update flow). If metadata holds an empty array, still use API images —
+  // otherwise every variant loses thumbnails after clearing metadata once.
+  const fromMeta = parseVariantImagesFromMetadata(meta?.variant_images)
+  const fromApi = variantImagesFromApi(v.images)
+  const images = fromMeta.length > 0 ? fromMeta : fromApi
+
+  // Variant thumbnail: API fields first, then first resolved gallery URL (gallery may
+  // exist only in metadata while thumbnail is unset).
   const thumbnail =
-    (typeof v.thumbnail === "string" && v.thumbnail.trim() ? v.thumbnail : null) ??
-    (v.images?.[0]?.url ?? null) ??
-    (typeof meta?.thumbnail === "string" ? meta.thumbnail : null)
+    (typeof v.thumbnail === "string" && v.thumbnail.trim() ? v.thumbnail.trim() : null) ??
+    (typeof v.images?.[0]?.url === "string" && v.images[0].url.trim()
+      ? v.images[0].url.trim()
+      : null) ??
+    (typeof meta?.thumbnail === "string" && (meta.thumbnail as string).trim()
+      ? (meta.thumbnail as string).trim()
+      : null) ??
+    (images[0]?.url ?? null)
   // Medusa's `*variants.inventory_items` expansion has returned the join record
   // (`{ inventory_item_id, required_quantity }`) in some versions and the inventory
   // item itself (`{ id, sku, ... }`) in others. Try every shape so we never miss
@@ -246,33 +290,8 @@ function toVariantRow(v: ApiVariant): VariantRow {
         ? amountToDisplay(meta.sale_price as number)
         : "",
     thumbnail,
-    // Medusa v2's variant update endpoint does NOT accept an `images` array,
-    // so we persist the variant gallery in metadata.variant_images (array of URLs)
-    // and fall back to the relation images if metadata is absent.
-    images: (() => {
-      const metaImgs = meta?.variant_images
-      if (Array.isArray(metaImgs)) {
-        const out: { id?: string; url: string }[] = []
-        for (const m of metaImgs) {
-          if (typeof m === "string" && m) {
-            out.push({ url: m })
-          } else if (m && typeof m === "object") {
-            const url = (m as { url?: unknown }).url
-            const id = (m as { id?: unknown }).id
-            if (typeof url === "string" && url) {
-              out.push({
-                url,
-                ...(typeof id === "string" ? { id } : {}),
-              })
-            }
-          }
-        }
-        return out
-      }
-      return (v.images ?? [])
-        .map((i) => ({ id: i.id, url: i.url ?? "" }))
-        .filter((i) => !!i.url)
-    })(),
+    // Resolved gallery: see `images` / `thumbnail` construction above.
+    images,
     manage_inventory: v.manage_inventory ?? false,
     inventory_quantity: v.inventory_quantity ?? null,
     inventory_item_id: inventoryItemId,
