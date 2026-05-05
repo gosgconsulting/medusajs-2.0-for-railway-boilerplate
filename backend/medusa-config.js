@@ -84,6 +84,7 @@ const medusaConfig = {
         store: [
           ...DEFAULT_STORE_RESTRICTED_FIELDS,
           'metadata.hitpay_credentials_enc_v1',
+          'metadata.stripe_credentials_enc_v1',
         ],
       },
     },

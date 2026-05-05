@@ -9,9 +9,18 @@ const KEY_LENGTH = 32
 export const STORE_METADATA_HITPAY_CREDENTIALS_ENC_KEY =
   "hitpay_credentials_enc_v1"
 
+/** Metadata key for encrypted Stripe secret key + webhook signing secret (single blob). */
+export const STORE_METADATA_STRIPE_CREDENTIALS_ENC_KEY =
+  "stripe_credentials_enc_v1"
+
 export type HitPayCredentialPayload = {
   apiKey: string
   salt: string
+}
+
+export type StripeCredentialPayload = {
+  secretKey: string
+  webhookSecret: string
 }
 
 /**
@@ -111,6 +120,81 @@ export function tryDecryptHitPayCredentialsFromMetadata(
   }
   try {
     return decryptHitPayCredentialsPayload(enc, key)
+  } catch {
+    return null
+  }
+}
+
+export function encryptStripeCredentialsPayload(
+  payload: StripeCredentialPayload,
+  key: Buffer
+): string {
+  if (key.length !== KEY_LENGTH) {
+    throw new Error(
+      "Invalid encryption key length (expected 32 bytes after decoding)."
+    )
+  }
+  const iv = randomBytes(IV_LENGTH)
+  const cipher = createCipheriv(ALGO, key, iv)
+  const plaintext = JSON.stringify(payload)
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ])
+  const tag = cipher.getAuthTag()
+  return Buffer.concat([iv, tag, ciphertext]).toString("base64")
+}
+
+export function decryptStripeCredentialsPayload(
+  blob: string,
+  key: Buffer
+): StripeCredentialPayload {
+  if (key.length !== KEY_LENGTH) {
+    throw new Error(
+      "Invalid encryption key length (expected 32 bytes after decoding)."
+    )
+  }
+  const raw = Buffer.from(blob, "base64")
+  if (raw.length < IV_LENGTH + AUTH_TAG_LENGTH + 1) {
+    throw new Error("Invalid ciphertext length.")
+  }
+  const iv = raw.subarray(0, IV_LENGTH)
+  const tag = raw.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH)
+  const ciphertext = raw.subarray(IV_LENGTH + AUTH_TAG_LENGTH)
+  const decipher = createDecipheriv(ALGO, key, iv)
+  decipher.setAuthTag(tag)
+  const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+  const parsed = JSON.parse(plain.toString("utf8")) as unknown
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    typeof (parsed as StripeCredentialPayload).secretKey !== "string" ||
+    typeof (parsed as StripeCredentialPayload).webhookSecret !== "string"
+  ) {
+    throw new Error("Invalid decrypted credential payload shape.")
+  }
+  return parsed as StripeCredentialPayload
+}
+
+/**
+ * Server-side only: decrypt Stripe credentials from store metadata when present.
+ */
+export function tryDecryptStripeCredentialsFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+  keyRaw?: string | null
+): StripeCredentialPayload | null {
+  const enc = metadata?.[STORE_METADATA_STRIPE_CREDENTIALS_ENC_KEY]
+  if (typeof enc !== "string" || !enc.length) {
+    return null
+  }
+  const key = parseStoreCredentialsEncryptionKey(
+    keyRaw ?? process.env.STRIPE_STORE_SECRET_ENCRYPTION_KEY
+  )
+  if (!key) {
+    return null
+  }
+  try {
+    return decryptStripeCredentialsPayload(enc, key)
   } catch {
     return null
   }

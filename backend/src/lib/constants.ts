@@ -116,6 +116,17 @@ export const STRIPE_API_KEY = process.env.STRIPE_API_KEY;
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 /**
+ * 32-byte AES key (hex or base64) used to encrypt Stripe secret key + webhook
+ * signing secret in store metadata (`stripe_credentials_enc_v1`).
+ */
+export const STRIPE_STORE_SECRET_ENCRYPTION_KEY =
+  process.env.STRIPE_STORE_SECRET_ENCRYPTION_KEY?.trim() || undefined;
+
+/** Parsed 32-byte key when env is configured. */
+export const STRIPE_STORE_SECRET_ENCRYPTION_KEY_BUFFER =
+  parseStoreCredentialsEncryptionKey(STRIPE_STORE_SECRET_ENCRYPTION_KEY)
+
+/**
  * (optional) HitPay — API key, webhook salt (HMAC), sandbox flag, storefront redirect after checkout
  */
 export const HITPAY_API_KEY = process.env.HITPAY_API_KEY;
