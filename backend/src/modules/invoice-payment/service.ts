@@ -11,14 +11,20 @@ import type {
   GetPaymentStatusOutput,
   InitiatePaymentInput,
   InitiatePaymentOutput,
+  ProviderWebhookPayload,
   RefundPaymentInput,
   RefundPaymentOutput,
   RetrievePaymentInput,
   RetrievePaymentOutput,
   UpdatePaymentInput,
   UpdatePaymentOutput,
+  WebhookActionResult,
 } from "@medusajs/framework/types"
-import { AbstractPaymentProvider, PaymentSessionStatus } from "@medusajs/framework/utils"
+import {
+  AbstractPaymentProvider,
+  PaymentActions,
+  PaymentSessionStatus,
+} from "@medusajs/framework/utils"
 
 export type InvoicePaymentOptions = Record<string, never>
 
@@ -97,6 +103,12 @@ export default class InvoicePaymentProviderService extends AbstractPaymentProvid
 
   async updatePayment(input: UpdatePaymentInput): Promise<UpdatePaymentOutput> {
     return { data: (input.data ?? {}) as Record<string, unknown> }
+  }
+
+  async getWebhookActionAndData(
+    _payload: ProviderWebhookPayload["payload"],
+  ): Promise<WebhookActionResult> {
+    return { action: PaymentActions.NOT_SUPPORTED }
   }
 }
 
