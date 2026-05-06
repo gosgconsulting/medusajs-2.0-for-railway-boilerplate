@@ -15,6 +15,7 @@ import {
   STORE_CORS,
   STRIPE_API_KEY,
   STRIPE_WEBHOOK_SECRET,
+  STRIPE_STORE_SECRET_ENCRYPTION_KEY_BUFFER,
   HITPAY_API_KEY,
   HITPAY_SALT,
   HITPAY_SANDBOX,
@@ -36,14 +37,18 @@ import {
 loadEnv(process.env.NODE_ENV, process.cwd());
 
 const paymentModuleProviders = [
-  ...(STRIPE_API_KEY
+  ...(STRIPE_API_KEY || STRIPE_STORE_SECRET_ENCRYPTION_KEY_BUFFER
     ? [
         {
-          resolve: "@medusajs/payment-stripe",
+          resolve: "./src/modules/stripe-payment",
           id: "stripe",
           options: {
-            apiKey: STRIPE_API_KEY,
-            webhookSecret: STRIPE_WEBHOOK_SECRET || "unconfigured",
+            ...(STRIPE_API_KEY
+              ? {
+                  apiKey: STRIPE_API_KEY,
+                  webhookSecret: STRIPE_WEBHOOK_SECRET || "unconfigured",
+                }
+              : {}),
           },
         },
       ]
