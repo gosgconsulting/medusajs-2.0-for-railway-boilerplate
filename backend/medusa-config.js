@@ -37,6 +37,11 @@ import {
 loadEnv(process.env.NODE_ENV, process.cwd());
 
 const paymentModuleProviders = [
+  {
+    resolve: "./src/modules/invoice-payment",
+    id: "invoice",
+    options: {},
+  },
   ...(STRIPE_API_KEY || STRIPE_STORE_SECRET_ENCRYPTION_KEY_BUFFER
     ? [
         {
