@@ -93,9 +93,13 @@ export default class StripePaymentProviderService extends AbstractPaymentProvide
     const webhookSecret = (fromMeta?.webhookSecret ?? this.options_.webhookSecret ?? "").trim()
 
     if (!secretKey) {
+      const hint = sid == null
+        ? "session_id not found in payment data — data keys: " +
+          (data ? Object.keys(data).join(", ") || "(empty)" : "null")
+        : `store credentials not resolved for session_id=${sid} — check STRIPE_STORE_SECRET_ENCRYPTION_KEY is set and credentials were saved via admin UI`
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Stripe: no API key available — configure encrypted store credentials or set STRIPE_API_KEY env.",
+        `Stripe: no API key available (${hint}).`,
       )
     }
 

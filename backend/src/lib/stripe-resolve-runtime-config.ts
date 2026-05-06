@@ -134,6 +134,7 @@ export async function resolveStripeConfigFromSessionId(
     medusaPaymentSessionId
   )
   if (!paymentCollectionId) {
+    console.error(`[Stripe] resolveStripeConfig: no payment_collection_id for session ${medusaPaymentSessionId}`)
     return null
   }
 
@@ -142,6 +143,7 @@ export async function resolveStripeConfigFromSessionId(
     paymentCollectionId
   )
   if (!storeId) {
+    console.error(`[Stripe] resolveStripeConfig: no store_id for payment_collection ${paymentCollectionId}`)
     return null
   }
 
@@ -153,15 +155,21 @@ export async function resolveStripeConfigFromSessionId(
 
   const meta = storeRow?.metadata as Record<string, unknown> | null | undefined
   if (!meta) {
+    console.error(`[Stripe] resolveStripeConfig: store ${storeId} has no metadata`)
     return null
   }
 
+  const hasBlob = typeof meta["stripe_credentials_enc_v1"] === "string"
+  const hasEncKey = !!(STRIPE_STORE_SECRET_ENCRYPTION_KEY)
   const decrypted = tryDecryptStripeCredentialsFromMetadata(
     meta,
     STRIPE_STORE_SECRET_ENCRYPTION_KEY ?? null
   )
 
   if (!decrypted) {
+    console.error(
+      `[Stripe] resolveStripeConfig: decryption failed for store ${storeId} — blob_present=${hasBlob}, enc_key_present=${hasEncKey}`
+    )
     return null
   }
 
